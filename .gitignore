@@ -1,0 +1,13 @@
+# IDE 설정 파일
+.vscode/
+.idea/
+
+# 빌드 결과물
+/build
+/dist
+
+# 종속성 폴더
+/node_modules
+
+# 환경 설정 파일
+.env
