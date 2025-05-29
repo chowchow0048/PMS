@@ -1,0 +1,885 @@
+.pageContainer {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+.headerContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 60px; /* navbar 높이를 고려해 상단 여백 추가 */
+  margin-bottom: 10px;
+  padding: 0 10px;
+}
+
+.teacherHeader {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.timetableContainer {
+  padding: 10px;
+  overflow-x: auto;
+  margin-bottom: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.timetable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  height: calc(100vh - 160px); /* 화면 높이에서 여백 제외한 높이 */
+}
+
+.timeHeader {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border: 1px solid #ddd;
+  width: 80px;
+}
+
+.dayHeader {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border: 1px solid #ddd;
+  width: calc((100% - 80px) / 7); /* 7일로 균등하게 분할 */
+}
+
+.timeCell {
+  padding: 5px;
+  border: 1px solid #ddd;
+  text-align: center;
+  vertical-align: middle;
+  height: calc((100vh - 160px) / 13); /* 13개 시간대 균등 분할 */
+}
+
+.tableCell {
+  padding: 0;
+  border: 1px solid #ddd;
+  vertical-align: top;
+  width: calc((100% - 80px) / 7); /* 7일로 균등하게 분할 */
+  height: calc((100vh - 160px) / 13); /* 13개 시간대 균등 분할 */
+}
+
+.tableCell:hover {
+  background-color: #f5f5f5;
+  cursor: pointer;
+}
+
+/* 플로팅 버튼 스타일 - 기본 (원형) */
+.floatingButton {
+  position: fixed;
+  z-index: 1000;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* 축소 모드 (원형 + 버튼) */
+.floatingButtonCollapsed {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: white;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+.floatingButtonCollapsed:hover {
+  background-color: #f5f5f5;
+  opacity: 1;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+}
+
+/* 확장 모드 (패널) */
+.floatingButtonExpanded {
+  background-color: white;
+  border-radius: 12px;
+  width: 300px;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  opacity: 1;
+}
+
+.floatingButtonHeader {
+  background-color: #f5f5f5;
+  padding: 12px 16px;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  cursor: move;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.floatingButtonTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: #666;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.closeButton:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #333;
+}
+
+.floatingButtonContent {
+  padding: 16px;
+  max-height: 340px;
+  overflow-y: auto;
+  flex-grow: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+}
+
+.floatingButtonContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.floatingButtonContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.floatingButtonContent::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 4px;
+}
+
+.floatingButtonContent::-webkit-scrollbar-thumb:hover {
+  background-color: #aaa;
+}
+
+/* 학생 래퍼 - 학생 아이템들을 감싸는 컨테이너 */
+.studentWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.emptyMessage {
+  color: #999;
+  font-style: italic;
+  padding: 10px;
+  text-align: center;
+}
+
+/* 클리닉 모달 스타일 */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+}
+
+.modalContent {
+  background-color: white;
+  border-radius: 12px;
+  width: 800px;
+  height: 600px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  background-color: #f5f5f5;
+  padding: 16px;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.modalBody {
+  padding: 16px;
+  flex-grow: 1;
+  overflow-y: auto;
+  display: flex;
+  gap: 20px;
+}
+
+.modalStudent {
+  display: flex;
+  flex-direction: row;
+  padding: 8px;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  min-height: 60px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-items: center;
+}
+
+.modalStudent:hover {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.modalStudentInfo {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  width: 100%;
+}
+
+.modalStudentSchool {
+  font-size: 12px;
+  color: #666;
+  margin-right: 8px;
+}
+
+.modalStudentGrade {
+  font-size: 12px;
+  color: #666;
+  margin-right: 8px;
+}
+
+.modalStudentName {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.modalFooter {
+  padding: 8px;
+  /* border-top: 1px solid #ddd; */
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalButton {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.modalFooterFullWidth {
+  padding: 0;
+  /* border-top: 1px solid #ddd; */
+  display: flex;
+  width: 100%;
+}
+
+.modalButtonFullWidth {
+  padding: 16px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  flex: 1;
+  text-align: center;
+  border-radius: 0;
+}
+
+.modalButtonFullWidth:first-child {
+  border-bottom-left-radius: 12px;
+}
+
+.modalButtonFullWidth:last-child {
+  border-bottom-right-radius: 12px;
+  border-left: 1px solid #ddd;
+}
+
+.resetButton {
+  background-color: #f44336;
+  color: white;
+}
+
+.resetButton:hover {
+  background-color: #d32f2f;
+}
+
+.closeButton {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.closeButton:hover {
+  background-color: #bdbdbd;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 16px 20px;
+  border-radius: 4px;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 250px;
+}
+
+.toast p {
+  margin: 0 0 12px 0;
+}
+
+.toast div {
+  display: flex;
+  gap: 10px;
+}
+
+.toast button {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.toast button:first-child {
+  background-color: #f44336;
+  color: white;
+}
+
+.toast button:hover {
+  opacity: 0.9;
+}
+
+/* 저장 버튼 컨테이너 */
+.saveButtonContainer {
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+
+/* 저장 버튼 */
+.saveButton {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.saveButton:hover {
+  background-color: #388e3c;
+}
+
+.saveButton:disabled {
+  background-color: #9e9e9e;
+  cursor: not-allowed;
+}
+
+/* 저장 메시지 */
+.saveMessage {
+  margin-left: 10px;
+  font-size: 14px;
+  color: #4caf50;
+}
+
+/* 에러 메시지 */
+.errorMessage {
+  background-color: #ffebee;
+  color: #d32f2f;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+/* 로딩 컨테이너 */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+}
+
+/* 로딩 스피너 */
+.loadingSpinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 미배치 학생들 목록 스타일 */
+.unassignedStudentsContainer {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.unassignedStudentsTitle {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.unassignedStudentsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.unassignedStudentItem {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: grab;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.unassignedStudentItem:hover {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+}
+
+.unassignedStudentItem:active {
+  cursor: grabbing;
+}
+
+.studentInfo {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.studentSchool {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.studentGrade {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.studentName {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+/* 모달 섹션 스타일 */
+.modalSection {
+  margin-bottom: 20px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalSectionTitle {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 5px;
+}
+
+.modalStudentList {
+  flex-grow: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  align-content: start;
+}
+
+.modalStudentListGrid {
+  flex-grow: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  align-content: start;
+}
+
+/* 버튼 스타일 제거됨 - 클릭으로 대체 */
+
+/* 모바일 환경을 위한 미디어 쿼리 */
+@media (max-width: 768px) {
+  .modalContent {
+    width: 90vw;
+    height: 80vh;
+    max-width: 500px;
+  }
+  
+  .modalBody {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .modalSection {
+    flex: none;
+  }
+  
+  .modalStudentList,
+  .modalStudentListGrid {
+    grid-template-columns: 1fr;
+    max-height: 200px;
+  }
+  
+  .modalStudent {
+    min-height: 50px;
+  }
+}
+
+/* 오늘의 클리닉 스타일 */
+.todayClinicContainer {
+  padding: 20px;
+  max-width: 1200px;
+  margin-top: 40px;
+}
+
+.todayClinicHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.todayClinicTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+}
+
+.todayClinicCount {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.todayClinicList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.todayClinicCard {
+  background-color: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.todayClinicCard:hover {
+  border-color: #2196f3;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.todayClinicHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.todayClinicTime {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1976d2;
+}
+
+.todayClinicStudentCount {
+  background-color: #4caf50;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.todayClinicStudents {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todayClinicStudent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+}
+
+.todayClinicStudentSchool {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.todayClinicStudentGrade {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.todayClinicStudentName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.todayClinicMoreStudents {
+  color: #666;
+  font-size: 14px;
+  /* font-style: italic; */
+  text-align: center;
+  padding: 8px;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+}
+
+/* 출석 체크 관련 스타일 */
+.attendanceList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.attendanceItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.attendanceButton {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+}
+
+.attendanceButton:hover {
+  background-color: #388e3c;
+}
+
+.attendanceButton:disabled {
+  background-color: #9e9e9e;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.attendanceChecked {
+  background-color: #2196f3 !important;
+}
+
+.attendanceChecked:hover {
+  background-color: #1976d2 !important;
+}
+
+/* 페이지 전환 버튼 스타일 */
+.pageToggleButton {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: white;
+  color: #333;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: normal;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  z-index: 1000;
+}
+
+.pageToggleButton:hover {
+  background-color: #f5f5f5;
+  transform: translateY(-50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pageToggleButtonRight {
+  right: 20px;
+}
+
+.pageToggleButtonLeft {
+  left: 20px;
+}
+
+/* 페이지 전환 애니메이션 */
+.pageContent {
+  width: 100%;
+  animation: slideIn 0.3s ease-in-out;
+}
+
+.slideInLeft {
+  animation: slideInFromLeft 0.3s ease-in-out;
+}
+
+.slideInRight {
+  animation: slideInFromRight 0.3s ease-in-out;
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 모바일 환경을 위한 미디어 쿼리 */
+@media (max-width: 768px) {
+  .todayClinicList {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .todayClinicCard {
+    padding: 16px;
+  }
+  
+  .todayClinicTime {
+    font-size: 20px;
+  }
+  
+  .todayClinicStudentCount {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+  
+  .attendanceItem {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .attendanceButton {
+    width: 100%;
+  }
+  
+  .pageToggleButton {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  
+  .pageToggleButtonRight {
+    right: 10px;
+  }
+  
+  .pageToggleButtonLeft {
+    left: 10px;
+  }
+} 

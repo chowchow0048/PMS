@@ -1,0 +1,61 @@
+.studentItem {
+  background-color: white;
+  /* /* border: 1px solid #ddd; */
+  border-radius: 4px;
+  padding: 5px;
+  /* margin: 10px; */
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* width: 30%; */
+  width: auto;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.studentItem:hover {
+  background-color: #e8fffd;
+}
+
+.studentItem:active {
+  cursor: grabbing;
+}
+
+.startTime {
+  font-size: 12px;
+  margin-left: 4px;
+  color: #666;
+  font-weight: normal;
+}
+
+.studentName {
+  flex-grow: 1;
+}
+
+/* 상태 표시 동그라미 */
+.statusIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+/* 미배치 상태 - 회색 */
+.unassigned {
+  background-color: #999;
+}
+
+/* 배정됨 상태 - 빨간색 */
+.assigned {
+  background-color: #f44336;
+}
+
+/* 클리닉 확정 상태 - 초록색 */
+.clinic-assigned {
+  background-color: #4caf50;
+} 
