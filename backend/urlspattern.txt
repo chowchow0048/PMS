@@ -1,0 +1,24 @@
+/api/                         # 모든 API의 기본 경로
+  ├── auth/                   # 인증 관련 API
+  │    ├── login/             # 로그인
+  │    ├── logout/            # 로그아웃
+  │    └── register/          # 사용자 등록
+  │
+  ├── mypage/                 # 마이페이지 관련 API
+  │    ├── <user_id>/         # 마이페이지 정보 조회
+  │    ├── clinics/           # 마이페이지 클리닉 관리
+  │    └── comments/          # 마이페이지 코멘트 관리
+  │
+  ├── student-placement/      # 학생 배치 관련 API
+  │    ├── students/          # 학생 목록 조회
+  │    ├── placement/         # 배치 목록 조회
+  │    └── placement/update/  # 배치 업데이트
+  │
+  ├── users/                  # 공통 모델 API
+  ├── subjects/               # 과목 관리 API
+  ├── times/                  # 시간 관리 API
+  ├── students/               # 학생 관리 API
+  ├── clinics/                # 클리닉 관리 API
+  └── comments/               # 코멘트 관리 API
+
+# 모든 기능이 /api/ 경로로 통합되었습니다.
