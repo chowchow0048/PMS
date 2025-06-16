@@ -67,4 +67,10 @@ urlpatterns = [
         views.StudentPlacementView.as_view({"post": "update_placements"}),
         name="student_placement_update",
     ),
+    # 선생님 시간표 수정 API
+    path(
+        "teachers/<int:teacher_id>/available-time/",
+        views.TeacherAvailableTimeUpdateView.as_view(),
+        name="teacher_available_time_update",
+    ),
 ]

@@ -183,6 +183,30 @@ REST_FRAMEWORK = {
 SESSION_COOKIE_AGE = 7200  # 2시간 (초 단위)
 SESSION_SAVE_EVERY_REQUEST = True  # 매 요청마다 세션 갱신
 
+# 프로덕션 보안 설정
+if not DEBUG:
+    # HTTPS 설정 (프로덕션 환경)
+    SECURE_SSL_REDIRECT = True  # HTTP를 HTTPS로 리다이렉트
+    SECURE_HSTS_SECONDS = 31536000  # HSTS 헤더 설정 (1년)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # 서브도메인에도 HSTS 적용
+    SECURE_HSTS_PRELOAD = True  # HSTS 프리로드 목록에 추가 가능
+
+    # 쿠키 보안 설정
+    SESSION_COOKIE_SECURE = True  # HTTPS에서만 세션 쿠키 전송
+    CSRF_COOKIE_SECURE = True  # HTTPS에서만 CSRF 쿠키 전송
+    SESSION_COOKIE_HTTPONLY = True  # JavaScript에서 세션 쿠키 접근 불가
+    CSRF_COOKIE_HTTPONLY = True  # JavaScript에서 CSRF 쿠키 접근 불가
+
+    # 기타 보안 헤더
+    SECURE_CONTENT_TYPE_NOSNIFF = True  # MIME 타입 스니핑 방지
+    SECURE_BROWSER_XSS_FILTER = True  # XSS 필터 활성화
+    X_FRAME_OPTIONS = "DENY"  # 클릭재킹 방지
+
+# 로그 디렉토리 생성 (프로덕션 환경에서 필요)
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
 # 로깅 설정
 LOGGING = {
     "version": 1,
@@ -204,56 +228,69 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
-        "file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(BASE_DIR, "logs", "django.log"),
-            "formatter": "verbose",
-            "maxBytes": 10485760,  # 10MB
-            "backupCount": 5,
-        },
-        "auth_file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(BASE_DIR, "logs", "auth.log"),
-            "formatter": "verbose",
-            "maxBytes": 10485760,  # 10MB
-            "backupCount": 5,
-        },
-        "api_file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(BASE_DIR, "logs", "api.log"),
-            "formatter": "verbose",
-            "maxBytes": 10485760,  # 10MB
-            "backupCount": 5,
-        },
     },
-    # 로거 설정 (각 모듈별 로깅 설정)
+    # 로거 설정 (프로덕션에서는 콘솔 로깅만 사용)
     "loggers": {
         # Django 기본 로거
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": True,
         },
         "django.request": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
         # 각 앱별 로거
         "api": {
-            "handlers": ["console", "api_file"],
-            "level": "DEBUG",
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
         },
         "api.auth": {
-            "handlers": ["console", "auth_file"],
-            "level": "DEBUG",
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
         },
         "auth": {
-            "handlers": ["console", "auth_file"],
-            "level": "DEBUG",
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
         },
     },
 }
+
+# 개발 환경에서만 파일 로깅 사용
+if DEBUG:
+    LOGGING["handlers"].update(
+        {
+            "file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": os.path.join(LOG_DIR, "django.log"),
+                "formatter": "verbose",
+                "maxBytes": 10485760,  # 10MB
+                "backupCount": 5,
+            },
+            "auth_file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": os.path.join(LOG_DIR, "auth.log"),
+                "formatter": "verbose",
+                "maxBytes": 10485760,  # 10MB
+                "backupCount": 5,
+            },
+            "api_file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": os.path.join(LOG_DIR, "api.log"),
+                "formatter": "verbose",
+                "maxBytes": 10485760,  # 10MB
+                "backupCount": 5,
+            },
+        }
+    )
+    # 개발 환경에서는 파일 핸들러도 추가
+    LOGGING["loggers"]["django"]["handlers"].append("file")
+    LOGGING["loggers"]["django.request"]["handlers"].append("file")
+    LOGGING["loggers"]["api"]["handlers"].append("api_file")
+    LOGGING["loggers"]["api.auth"]["handlers"].append("auth_file")
+    LOGGING["loggers"]["auth"]["handlers"].append("auth_file")

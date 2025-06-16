@@ -10,7 +10,7 @@ User = get_user_model()
 
 # Time 관리자 설정
 class TimeAdmin(admin.ModelAdmin):
-    list_display = ("time_day", "time_slot_formatted")
+    list_display = ("id", "time_day", "time_slot_formatted")
     list_filter = ("time_day",)
     search_fields = ("time_day",)
     actions = ["create_timeslots_for_all_days"]

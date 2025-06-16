@@ -739,3 +739,159 @@ class StudentPlacementView(viewsets.ViewSet):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class TeacherAvailableTimeUpdateView(APIView):
+    """선생님의 수업 가능 시간을 업데이트하는 뷰"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, teacher_id):
+        """
+        선생님의 available_time을 업데이트하고 무결성 검사를 수행합니다.
+
+        요청 본문:
+        {
+            "available_time_ids": [1, 2, 3, ...] // Time 모델의 ID 배열
+        }
+
+        응답:
+        {
+            "success": true,
+            "affected_students": [
+                {
+                    "id": 1,
+                    "student_name": "홍길동",
+                    "school": "세화고",
+                    "grade": "1학년"
+                }
+            ],
+            "cancelled_clinics": [
+                {
+                    "id": 1,
+                    "clinic_time": "월요일 10:00"
+                }
+            ]
+        }
+        """
+        try:
+            logger.info(
+                f"[api/views.py] 선생님 시간표 업데이트 요청: teacher_id={teacher_id}"
+            )
+
+            # 선생님 조회
+            try:
+                teacher = User.objects.get(id=teacher_id, is_teacher=True)
+            except User.DoesNotExist:
+                logger.error(
+                    f"[api/views.py] 선생님을 찾을 수 없음: teacher_id={teacher_id}"
+                )
+                return Response(
+                    {"error": "해당 선생님을 찾을 수 없습니다."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # 권한 검사 (관리자 또는 슈퍼유저만 가능)
+            if not (request.user.is_staff or request.user.is_superuser):
+                logger.warning(
+                    f"[api/views.py] 권한 없는 시간표 수정 시도: {request.user.username}"
+                )
+                return Response(
+                    {"error": "시간표를 수정할 권한이 없습니다."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # 새로운 available_time_ids 가져오기
+            available_time_ids = request.data.get("available_time_ids", [])
+            logger.info(f"[api/views.py] 새로운 시간표 ID 목록: {available_time_ids}")
+
+            # Time 객체들 조회
+            new_available_times = Time.objects.filter(id__in=available_time_ids)
+            logger.info(
+                f"[api/views.py] 조회된 시간 객체 수: {new_available_times.count()}"
+            )
+
+            with transaction.atomic():
+                # 기존 available_time 가져오기
+                old_available_times = set(
+                    teacher.available_time.values_list("id", flat=True)
+                )
+                new_available_time_set = set(available_time_ids)
+
+                logger.info(f"[api/views.py] 기존 시간표: {old_available_times}")
+                logger.info(f"[api/views.py] 새로운 시간표: {new_available_time_set}")
+
+                # 무결성 검사: 영향받는 학생과 클리닉 찾기
+                affected_students = []
+                cancelled_clinics = []
+
+                # 현재 이 선생님에게 배치된 학생들 조회
+                assigned_students = Student.objects.filter(assigned_teacher=teacher)
+                logger.info(
+                    f"[api/views.py] 배치된 학생 수: {assigned_students.count()}"
+                )
+
+                for student in assigned_students:
+                    # 학생의 available_time과 새로운 선생님 available_time의 교집합 확인
+                    student_available_times = set(
+                        student.available_time.values_list("id", flat=True)
+                    )
+                    common_times = student_available_times.intersection(
+                        new_available_time_set
+                    )
+
+                    logger.info(
+                        f"[api/views.py] 학생 {student.student_name}의 가능 시간: {student_available_times}"
+                    )
+                    logger.info(f"[api/views.py] 공통 시간: {common_times}")
+
+                    # 공통 시간이 없으면 배치 해제 대상
+                    if not common_times:
+                        affected_students.append(
+                            {
+                                "id": student.id,
+                                "student_name": student.student_name,
+                                "school": student.school,
+                                "grade": student.grade,
+                            }
+                        )
+
+                        # 학생의 배치 해제
+                        student.assigned_teacher = None
+                        student.save()
+                        logger.info(
+                            f"[api/views.py] 학생 배치 해제: {student.student_name}"
+                        )
+
+                # 선생님과 관련된 클리닉 중 새로운 시간표에 없는 클리닉들 찾기
+                teacher_clinics = Clinic.objects.filter(clinic_teacher=teacher)
+                for clinic in teacher_clinics:
+                    clinic_time_id = clinic.clinic_time.id
+                    if clinic_time_id not in new_available_time_set:
+                        cancelled_clinics.append(
+                            {"id": clinic.id, "clinic_time": str(clinic.clinic_time)}
+                        )
+
+                        # 클리닉 삭제
+                        clinic.delete()
+                        logger.info(f"[api/views.py] 클리닉 취소: {clinic.clinic_time}")
+
+                # 선생님의 available_time 업데이트
+                teacher.available_time.set(new_available_times)
+                logger.info(f"[api/views.py] 선생님 시간표 업데이트 완료")
+
+                return Response(
+                    {
+                        "success": True,
+                        "affected_students": affected_students,
+                        "cancelled_clinics": cancelled_clinics,
+                    }
+                )
+
+        except Exception as e:
+            logger.error(f"[api/views.py] 시간표 업데이트 오류: {str(e)}")
+            logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
+            return Response(
+                {"error": f"시간표 업데이트 중 오류가 발생했습니다: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
