@@ -108,15 +108,11 @@ export const ClinicProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // 로딩 완료
         setIsLoading(false);
 
-        // 데이터 로딩 확인용 로그
-        console.log('클리닉 데이터:', clinicsData);
-        console.log('미배치 학생 데이터:', studentsData);
-        console.log('필터링된 클리닉 데이터:', validClinics);
         
         // 데이터 로딩 확인용 로그
-        console.log('클리닉 데이터 로드 완료:', clinicsData.length, '개');
-        console.log('필터링된 클리닉:', validClinics.length, '개');
-        console.log('학생 데이터 로드 완료:', studentsData.length, '명');
+        // console.log('클리닉 데이터 로드 완료:', clinicsData.length, '개');
+        // console.log('필터링된 클리닉:', validClinics.length, '개');
+        // console.log('학생 데이터 로드 완료:', studentsData.length, '명');
       } catch (err) {
         console.error('Failed to fetch clinic data:', err);
         setError(err instanceof Error ? err.message : '데이터를 가져오는데 실패했습니다.');
@@ -265,8 +261,12 @@ export const ClinicProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       )
     );
     
-    // 미배치 학생에 추가
-    setUnassignedStudents(prev => [...prev, ...studentsToReset]);
+    // 미배치 학생에 중복 없이 추가
+    setUnassignedStudents(prev => {
+      const existingIds = new Set(prev.map(s => s.id));
+      const newStudents = studentsToReset.filter(student => !existingIds.has(student.id));
+      return [...prev, ...newStudents];
+    });
   };
 
   // 요일과 시간으로 클리닉 찾기

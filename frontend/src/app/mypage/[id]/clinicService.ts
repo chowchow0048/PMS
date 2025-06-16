@@ -103,7 +103,7 @@ export const fetchUsersClinics = async (userId?: string): Promise<Clinic[]> => {
     for (const clinic of actualClinicsData) {
       // 모든 클리닉을 포함하도록 수정 (학생이 없어도 클리닉 객체는 생성)
       const studentIds = clinic.clinic_students || [];
-      console.log(`클리닉 ID ${clinic.id}의 초기 학생 IDs:`, studentIds);
+      // console.log(`클리닉 ID ${clinic.id}의 초기 학생 IDs:`, studentIds);
       
       // 클리닉 시간 정보 찾기
       const timeInfo = actualTimesData.find((time: any) => time.id === clinic.clinic_time);
@@ -158,26 +158,26 @@ export const fetchUsersClinics = async (userId?: string): Promise<Clinic[]> => {
                               (studentsData.results ? studentsData.results : []);
     
     // 각 클리닉에 학생 정보 추가
-    console.log('=== 학생 정보 연결 시작 ===');
-    console.log('actualClinicsData:', actualClinicsData);
-    console.log('actualStudentsData:', actualStudentsData);
+    // console.log('=== 학생 정보 연결 시작 ===');
+    // console.log('actualClinicsData:', actualClinicsData);
+    // console.log('actualStudentsData:', actualStudentsData);
     
     for (const clinic of actualClinicsData) {
       const studentIds = clinic.clinic_students || [];
-      console.log(`클리닉 ID ${clinic.id}의 학생 IDs:`, studentIds);
+      // console.log(`클리닉 ID ${clinic.id}의 학생 IDs:`, studentIds);
       
       // 학생 ID 매칭 디버깅 추가
-      console.log('첫 5명 학생 데이터 샘플:', actualStudentsData.slice(0, 5).map((s: any) => ({ id: s.id, name: s.student_name })));
-      console.log('매칭하려는 학생 IDs:', studentIds);
-      console.log('매칭하려는 학생 IDs 타입:', studentIds.map((id: any) => typeof id));
-      console.log('학생 데이터 ID 타입 샘플:', actualStudentsData.slice(0, 5).map((s: any) => ({ id: s.id, type: typeof s.id })));
+      // console.log('첫 5명 학생 데이터 샘플:', actualStudentsData.slice(0, 5).map((s: any) => ({ id: s.id, name: s.student_name })));
+      // console.log('매칭하려는 학생 IDs:', studentIds);
+      // console.log('매칭하려는 학생 IDs 타입:', studentIds.map((id: any) => typeof id));
+      // console.log('학생 데이터 ID 타입 샘플:', actualStudentsData.slice(0, 5).map((s: any) => ({ id: s.id, type: typeof s.id })));
       
       const students = actualStudentsData.filter((student: any) => studentIds.includes(student.id));
-      console.log(`클리닉 ID ${clinic.id}에 매칭된 학생들:`, students);
+      // console.log(`클리닉 ID ${clinic.id}에 매칭된 학생들:`, students);
       
       // 클리닉 시간 정보 찾기
       const timeInfo = actualTimesData.find((time: any) => time.id === clinic.clinic_time);
-      console.log(`클리닉 ID ${clinic.id}의 시간 정보:`, timeInfo);
+      // console.log(`클리닉 ID ${clinic.id}의 시간 정보:`, timeInfo);
       
       if (timeInfo) {
         // 요일 변환
@@ -190,11 +190,11 @@ export const fetchUsersClinics = async (userId?: string): Promise<Clinic[]> => {
         const timeStr = timeInfo.time_slot.substring(0, 5);
         const hour = timeStr.split(':')[0];
         
-        console.log(`변환된 요일/시간: ${day} ${hour}:00`);
+        // console.log(`변환된 요일/시간: ${day} ${hour}:00`);
         
         // 해당 시간의 클리닉만 찾기
         const foundClinic = clinics.find(c => c.day === day && c.time === `${hour}:00`);
-        console.log(`찾은 클리닉:`, foundClinic);
+          //console.log(`찾은 클리닉:`, foundClinic);
         
         if (foundClinic) {
           foundClinic.students = students.map((student: any) => ({
@@ -204,15 +204,15 @@ export const fetchUsersClinics = async (userId?: string): Promise<Clinic[]> => {
             grade: student.grade,
             status: 'clinic-assigned'
           }));
-          console.log(`클리닉 ID ${clinic.id}에 학생 정보 연결 완료:`, foundClinic.students);
+          //console.log(`클리닉 ID ${clinic.id}에 학생 정보 연결 완료:`, foundClinic.students);
         } else {
           console.log(`클리닉을 찾을 수 없음: ${day} ${hour}:00`);
         }
       }
     }
     
-    console.log('=== 최종 클리닉 배열 ===');
-    console.log('clinics:', clinics);
+    // console.log('=== 최종 클리닉 배열 ===');
+    // console.log('clinics:', clinics);
     
     return clinics;
   } catch (error) {
@@ -420,9 +420,9 @@ export const saveClinicData = async (clinics: Clinic[], userId?: string): Promis
     }
     
     // 2. 새 클리닉 등록
-    console.log('=== 클리닉 저장 시작 ===');
-    console.log('저장할 클리닉 수:', backendClinics.length);
-    console.log('클리닉 데이터:', backendClinics);
+    // console.log('=== 클리닉 저장 시작 ===');
+    // console.log('저장할 클리닉 수:', backendClinics.length);
+    // console.log('클리닉 데이터:', backendClinics);
     
     for (const clinic of backendClinics) {
       console.log('저장 중인 클리닉:', clinic);
@@ -432,7 +432,7 @@ export const saveClinicData = async (clinics: Clinic[], userId?: string): Promis
         body: JSON.stringify(clinic)
       });
       
-      console.log('클리닉 저장 응답 상태:', createResponse.status);
+      // console.log('클리닉 저장 응답 상태:', createResponse.status);
       
       if (!createResponse.ok) {
         const errorText = await createResponse.text();

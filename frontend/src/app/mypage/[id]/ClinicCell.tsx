@@ -7,12 +7,30 @@ import { useClinic } from './ClinicContext';
 import StudentItem from './StudentItem';
 import { bg } from 'date-fns/locale';
 
+// 시간 정보 타입 정의 (실제 API 응답 구조에 맞게 수정)
+interface Time {
+  id: number;
+  time_day: string;
+  time_slot: string;
+  time_day_display?: string;
+  time_slot_formatted?: string;
+}
+
+// 강사 정보 타입 정의
+interface Teacher {
+  id: number;
+  name: string;
+  available_time?: number[];
+  available_time_details?: Time[];
+}
+
 interface ClinicCellProps {
   day: string;
   time: string;
+  teacher?: Teacher;
 }
 
-const ClinicCell: React.FC<ClinicCellProps> = ({ day, time }) => {
+const ClinicCell: React.FC<ClinicCellProps> = ({ day, time, teacher }) => {
   const { 
     getClinicByDayAndTime, 
     assignStudent,
@@ -36,6 +54,53 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time }) => {
   const studentsStartingAtThisTime = clinic?.students.filter(
     student => (clinic.startTime || clinic.time) === time
   ) || [];
+  
+  // 해당 시간이 강사의 available_time에 포함되는지 확인
+  const isTimeAvailable = () => {
+    if (!teacher?.available_time_details) {
+      console.log('Teacher 정보 또는 available_time_details가 없음');
+      return true; // 정보가 없으면 모든 시간 활성화
+    }
+    
+    // 요일 매핑
+    const dayMap: { [key: string]: string } = {
+      '월': 'mon',
+      '화': 'tue',
+      '수': 'wed',
+      '목': 'thu',
+      '금': 'fri',
+      '토': 'sat',
+      '일': 'sun'
+    };
+    
+    const englishDay = dayMap[day];
+    if (!englishDay) {
+      console.log(`유효하지 않은 요일: ${day}`);
+      return false;
+    }
+    
+    // 시간 변환 (10:00 -> 10:00:00)
+    const timeWithSeconds = `${time}:00`;
+    
+    console.log(`클리닉 셀 체크: ${day}(${englishDay}) ${timeWithSeconds}`);
+    console.log('Available times:', teacher.available_time_details.map(t => `${t.time_day} ${t.time_slot}`));
+    
+    // available_time_details에서 해당 요일과 시간 찾기 (올바른 필드명 사용)
+    const isAvailable = teacher.available_time_details.some(
+      availableTime => {
+        const matches = availableTime.time_day === englishDay && availableTime.time_slot === timeWithSeconds;
+        if (matches) {
+          console.log(`매칭됨: ${availableTime.time_day} ${availableTime.time_slot}`);
+        }
+        return matches;
+      }
+    );
+    
+    console.log(`${day} ${time} 결과: ${isAvailable ? '활성화' : '비활성화'}`);
+    return isAvailable;
+  };
+  
+  const isAvailable = isTimeAvailable();
   
   // 셀에 표시할 학생 정보 구성
   const getDisplayContent = () => {
@@ -82,6 +147,9 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time }) => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     
+    // 사용 불가능한 시간에는 드롭 불가
+    if (!isAvailable) return;
+    
     // 드래그된 학생 ID 가져오기
     const studentId = parseInt(e.dataTransfer.getData('studentId'));
     if (isNaN(studentId)) return;
@@ -101,6 +169,9 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time }) => {
   
   // 클릭 이벤트 핸들러
   const handleClick = () => {
+    // 사용 불가능한 시간에는 클릭 불가
+    if (!isAvailable) return;
+    
     // 클릭하면 항상 모달 열기 (클리닉이 없어도 학생 배치 가능)
     setIsModalOpen(true);
   };
@@ -165,10 +236,14 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time }) => {
   return (
     <>
       <div 
-        className={styles.clinicCell}
+        className={`${styles.clinicCell} ${!isAvailable ? styles.unavailableCell : ''}`}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onClick={handleClick}
+        style={{ 
+          cursor: isAvailable ? 'pointer' : 'not-allowed',
+          backgroundColor: !isAvailable ? '#e0e0e0' : undefined
+        }}
       >
         {getDisplayContent()}
       </div>

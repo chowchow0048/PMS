@@ -6,7 +6,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Box, Flex, Container, Heading, Grid, GridItem, Spinner, Center, useToast } from '@chakra-ui/react';
 import UnassignedStudentArea from '@/components/student-placement/UnassignedStudentArea';
 import TeacherBox from '@/components/student-placement/TeacherBox';
-import { Student } from '@/components/student-placement/StudentItem';
+import { Student, Time } from '@/components/student-placement/StudentItem';
 import { Teacher } from '@/components/student-placement/TeacherBox';
 import { getStudents, getTeachers, assignStudent, unassignStudent } from '@/lib/api';
 import { AuthGuard } from '@/lib/authGuard';
@@ -18,6 +18,7 @@ function StudentPlacementPageContent() {
   const [assignedStudents, setAssignedStudents] = useState<Record<number, Student[]>>({});
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null); // 하이라이트를 위한 선택된 학생
   const toast = useToast();
   
   // 선택 해제 함수를 위한 ref
@@ -272,6 +273,7 @@ function StudentPlacementPageContent() {
               onUnassignMultipleStudents={handleUnassignMultipleStudents}
               onRefresh={fetchData}
               clearSelectionRef={clearSelectionRef}
+              onStudentClick={setSelectedStudent}
             />
           </Box>
           
@@ -294,6 +296,8 @@ function StudentPlacementPageContent() {
                     onUnassignStudent={handleUnassignStudent}
                     onUnassignMultipleStudents={handleUnassignMultipleStudents}
                     onClearSelection={() => clearSelectionRef.current?.()}
+                    selectedStudent={selectedStudent}
+                    onTeacherUpdate={fetchData}
                   />
                 </GridItem>
               ))}

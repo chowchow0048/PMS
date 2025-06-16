@@ -9,10 +9,21 @@ import ClinicCell from './ClinicCell';
 import TodayClinic from './TodayClinic';
 import { MyPageGuard } from '@/lib/authGuard';
 
+// 시간 정보 타입 정의 (실제 API 응답 구조에 맞게 수정)
+interface Time {
+  id: number;
+  time_day: string;
+  time_slot: string;
+  time_day_display?: string;
+  time_slot_formatted?: string;
+}
+
 // 강사 정보 타입 정의
 interface Teacher {
   id: number;
   name: string;
+  available_time?: number[]; // 가능한 시간 ID 배열
+  available_time_details?: Time[]; // 가능한 시간 상세 정보
 }
 
 // 저장 버튼 컴포넌트
@@ -52,14 +63,26 @@ const SaveButtonComponent: React.FC = () => {
 };
 
 // 시간표 컴포넌트 (저장 버튼 제외)
-const TimeTableWithoutSaveButton: React.FC = () => {
+const TimeTableWithoutSaveButton: React.FC<{ teacher?: Teacher }> = ({ teacher }) => {
   const { isLoading, error, unassignedStudents } = useClinic();
+  
+  // 미배치 학생 모달 상태
+  const [isUnassignedModalOpen, setIsUnassignedModalOpen] = useState(false);
   
   // 요일 배열
   const days = ['월', '화', '수', '목', '금', '토', '일'];
   
-  // 시간 배열 (10:00 ~ 22:00)
-  const times = Array.from({ length: 13 }, (_, i) => `${i + 10}:00`);
+  // 시간 배열 (10:00 ~ 20:00로 수정 - 클리닉은 20:00까지만)
+  const times = Array.from({ length: 11 }, (_, i) => `${i + 10}:00`);
+
+  // 미배치 학생 모달 열기/닫기 핸들러
+  const handleOpenUnassignedModal = () => {
+    setIsUnassignedModalOpen(true);
+  };
+
+  const handleCloseUnassignedModal = () => {
+    setIsUnassignedModalOpen(false);
+  };
 
   return (
     <>
@@ -88,7 +111,7 @@ const TimeTableWithoutSaveButton: React.FC = () => {
                     <td className={styles.timeCell}>{time}</td>
                     {days.map((day) => (
                       <td key={`${day}-${time}`} className={styles.tableCell}>
-                        <ClinicCell day={day} time={time} />
+                        <ClinicCell day={day} time={time} teacher={teacher} />
                       </td>
                     ))}
                   </tr>
@@ -96,6 +119,58 @@ const TimeTableWithoutSaveButton: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* 미배치 학생 보기 Floating Button */}
+          <button 
+            className={styles.floatingButton}
+            onClick={handleOpenUnassignedModal}
+            title="미배치 학생 보기"
+          >
+            미배치 학생 보기
+          </button>
+
+          {/* 미배치 학생 모달 */}
+          {isUnassignedModalOpen && (
+            <div className={styles.unassignedModalOverlay} onClick={handleCloseUnassignedModal}>
+              <div 
+                className={`${styles.unassignedModal} ${styles.slideUpAnimation}`}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className={styles.unassignedModalHeader}>
+                  <h3>미배치 학생 ({unassignedStudents.length}명)</h3>
+                  <button 
+                    className={styles.unassignedModalCloseButton}
+                    onClick={handleCloseUnassignedModal}
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className={styles.unassignedModalBody}>
+                  {unassignedStudents.length === 0 ? (
+                    <p className={styles.noUnassignedStudents}>미배치 학생이 없습니다.</p>
+                  ) : (
+                    <div className={styles.unassignedStudentGrid}>
+                      {unassignedStudents.map(student => (
+                        <div 
+                          key={student.id} 
+                          className={styles.unassignedStudentItem}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('studentId', student.id.toString());
+                          }}
+                        >
+                          <div className={styles.unassignedStudentName}>{student.name}</div>
+                          <div className={styles.unassignedStudentInfo}>
+                            {student.student_phone_num}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </>
@@ -223,7 +298,9 @@ const MyPageContent: React.FC<MyPageProps> = ({ params }) => {
         
         setTeacher({ 
           id: userData.user.id, 
-          name: userData.user.user_name || userData.user.username 
+          name: userData.user.user_name || userData.user.username,
+          available_time: userData.user.available_time,
+          available_time_details: userData.user.available_time_details
         });
         
         console.log('MyPageContent: 강사 정보 설정 완료', {
@@ -321,7 +398,7 @@ const MyPageContent: React.FC<MyPageProps> = ({ params }) => {
           currentPage === 'timetable' ? styles.slideInLeft : styles.slideInRight
         }`}>
           {currentPage === 'timetable' ? (
-            <TimeTableWithoutSaveButton />
+            <TimeTableWithoutSaveButton teacher={teacher} />
           ) : (
             <TodayClinic />
           )}
