@@ -1,7 +1,18 @@
 import axios from 'axios';
 import { Student } from '@/components/student-placement/StudentItem';
-import { Teacher } from '@/components/student-placement/TeacherBox';
+// import { Teacher } from '@/components/student-placement/TeacherBox';  // 보충 시스템 개편으로 주석처리
 import { log } from 'console';
+
+// 보충 시스템 개편으로 임시 Teacher 타입 정의 (기존 코드 유지를 위해)
+type Teacher = {
+  id: number;
+  user_name: string;
+  user_subject: any;
+  max_student_num: number;
+  is_teacher: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -147,71 +158,259 @@ export const getStudents = async () => {
 // 모든 선생님 가져오기
 export const getTeachers = async () => {
   try {
+    console.log('🔍 [api.ts] getTeachers 함수 시작');
+    console.log('🔍 [api.ts] API_URL:', API_URL);
+    console.log('🔍 [api.ts] 요청 URL:', `${API_URL}/users/?is_active=true&is_teacher=true&is_superuser=false`);
+    
+    // 토큰 확인
+    const token = localStorage.getItem('token');
+    console.log('🔍 [api.ts] 토큰 존재 여부:', !!token);
+    console.log('🔍 [api.ts] 토큰 앞 10자리:', token ? token.substring(0, 10) + '...' : 'null');
+    
     const response = await api.get('/users/?is_active=true&is_teacher=true&is_superuser=false');
-    // console.log('API.TS', response);
+    console.log('🔍 [api.ts] API 응답 성공:', response.status);
+    console.log('🔍 [api.ts] 응답 데이터 타입:', typeof response.data);
+    console.log('🔍 [api.ts] 응답 데이터:', response.data);
 
     const teachers = Array.isArray(response.data) ? response.data : 
     (response.data.results ? response.data.results : []);
-    // console.log(teachers);
+    console.log('🔍 [api.ts] 처리된 선생님 데이터:', teachers);
+    console.log('🔍 [api.ts] 선생님 수:', teachers.length);
+    
     return teachers
     // results 필드가 있으면 해당 배열을 반환하고, 없으면 응답 자체를 배열로 변환합니다
   } catch (error) {
-    console.error('선생님 데이터 가져오기 오류:', error);
+    console.error('❌ [api.ts] getTeachers 함수에서 오류 발생:');
+    console.error('❌ [api.ts] 오류 타입:', error?.constructor?.name);
+    console.error('❌ [api.ts] 오류 메시지:', (error as any)?.message);
+    console.error('❌ [api.ts] 오류 코드:', (error as any)?.code);
+    console.error('❌ [api.ts] 오류 설정:', (error as any)?.config);
+    console.error('❌ [api.ts] 전체 오류 객체:', error);
     throw error;
   }
 };
 
-// 학생 배치 API
+// 보충 시스템 개편으로 주석처리 - 더 이상 개별 배치 개념 없음
+// // 학생 배치 API
+// export const assignStudent = async (studentId: number, teacherId: number) => {
+//   try {
+//     console.log(`학생 배치 시도: 학생 ID ${studentId}, 선생님 ID ${teacherId}`);
+//     const response = await api.put(`/students/${studentId}/`, {
+//       assigned_teacher: teacherId
+//     });
+//     console.log('학생 배치 응답:', response.data);
+//     return response.data;
+//   } catch (error) {
+//     console.error('학생 배치 오류:', error);
+//     throw error;
+//   }
+// };
+
+// // 학생 미배치 API
+// export const unassignStudent = async (studentId: number) => {
+//   try {
+//     console.log(`학생 미배치 시도: 학생 ID ${studentId}`);
+//     const response = await api.put(`/students/${studentId}/`, {
+//       assigned_teacher: null
+//     });
+//     console.log('학생 미배치 응답:', response.data);
+//     return response.data;
+//   } catch (error) {
+//     console.error('학생 미배치 오류:', error);
+//     throw error;
+//   }
+// };
+
+// 임시 더미 함수들 (기존 코드 호환성을 위해)
 export const assignStudent = async (studentId: number, teacherId: number) => {
-  try {
-    console.log(`학생 배치 시도: 학생 ID ${studentId}, 선생님 ID ${teacherId}`);
-    const response = await api.put(`/students/${studentId}/`, {
-      assigned_teacher: teacherId
-    });
-    console.log('학생 배치 응답:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('학생 배치 오류:', error);
-    throw error;
-  }
+  console.warn('assignStudent: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
+  return { deprecated: true };
 };
 
-// 학생 미배치 API
 export const unassignStudent = async (studentId: number) => {
-  try {
-    console.log(`학생 미배치 시도: 학생 ID ${studentId}`);
-    const response = await api.put(`/students/${studentId}/`, {
-      assigned_teacher: null
-    });
-    console.log('학생 미배치 응답:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('학생 미배치 오류:', error);
-    throw error;
-  }
+  console.warn('unassignStudent: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
+  return { deprecated: true };
 };
 
 // 엑셀 파일로 학생 명단 업로드 API
 export const uploadStudentExcel = async (file: File) => {
   try {
-    console.log('엑셀 파일 업로드 시도:', file.name);
+    console.log('🔍 [api.ts] 학생 명단 엑셀 파일 업로드 시도:', file.name);
+    console.log('🔍 [api.ts] 파일 크기:', file.size, 'bytes');
+    console.log('🔍 [api.ts] 파일 타입:', file.type);
     
     // FormData 생성
     const formData = new FormData();
     formData.append('file', file);
+    console.log('🔍 [api.ts] FormData 생성 완료');
     
     // multipart/form-data로 전송하기 위해 별도 axios 인스턴스 사용
+    const token = localStorage.getItem('token');
+    console.log('🔍 [api.ts] 토큰 확인:', token ? '있음' : '없음');
+    
+    console.log('🔍 [api.ts] API 요청 시작...');
     const response = await axios.post(`${API_URL}/students/upload-excel/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
-        'Authorization': `Token ${localStorage.getItem('token')}`,
+        'Authorization': `Token ${token}`,
       },
     });
     
-    console.log('엑셀 업로드 응답:', response.data);
+    console.log('🔍 [api.ts] API 응답 수신:', response.status);
+    console.log('🔍 [api.ts] 학생 명단 엑셀 업로드 응답:', response.data);
     return response.data;
   } catch (error) {
-    console.error('엑셀 업로드 오류:', error);
+    console.error('❌ [api.ts] 학생 명단 엑셀 업로드 오류:', error);
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      console.error('❌ [api.ts] 응답 상태:', axiosError.response?.status);
+      console.error('❌ [api.ts] 응답 데이터:', axiosError.response?.data);
+    }
+    throw error;
+  }
+};
+
+// 보충 신청 엑셀 파일 업로드 API
+export const uploadClinicEnrollmentExcel = async (file: File) => {
+  try {
+    console.log('🔍 [api.ts] 보충 신청 엑셀 파일 업로드 시도:', file.name);
+    console.log('🔍 [api.ts] 파일 크기:', file.size, 'bytes');
+    console.log('🔍 [api.ts] 파일 타입:', file.type);
+    
+    // FormData 생성
+    const formData = new FormData();
+    formData.append('file', file);
+    console.log('🔍 [api.ts] FormData 생성 완료');
+    
+    // multipart/form-data로 전송하기 위해 별도 axios 인스턴스 사용
+    const token = localStorage.getItem('token');
+    console.log('🔍 [api.ts] 토큰 확인:', token ? '있음' : '없음');
+    
+    console.log('🔍 [api.ts] API 요청 시작...');
+    const response = await axios.post(`${API_URL}/clinics/upload-enrollment/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Token ${token}`,
+      },
+    });
+    
+    console.log('🔍 [api.ts] API 응답 수신:', response.status);
+    console.log('🔍 [api.ts] 보충 신청 엑셀 업로드 응답:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 보충 신청 엑셀 업로드 오류:', error);
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      console.error('❌ [api.ts] 응답 상태:', axiosError.response?.status);
+      console.error('❌ [api.ts] 응답 데이터:', axiosError.response?.data);
+    }
+    throw error;
+  }
+};
+
+// 모든 클리닉 가져오기
+export const getClinics = async () => {
+  try {
+    console.log('🔍 [api.ts] getClinics 함수 시작');
+    
+    const response = await api.get('/clinics/');
+    console.log('🔍 [api.ts] 클리닉 데이터 로딩 완료:', response.data);
+    
+    const clinics = Array.isArray(response.data) ? response.data : 
+                   (response.data.results ? response.data.results : []);
+    
+    console.log('🔍 [api.ts] 처리된 클리닉 데이터:', clinics);
+    return clinics;
+  } catch (error) {
+    console.error('❌ [api.ts] getClinics 함수에서 오류 발생:', error);
+    throw error;
+  }
+};
+
+// 특정 요일의 클리닉 가져오기
+export const getClinicsByDay = async (day: string) => {
+  try {
+    console.log('🔍 [api.ts] getClinicsByDay 함수 시작:', day);
+    
+    const response = await api.get(`/clinics/?clinic_day=${day}`);
+    console.log('🔍 [api.ts] 요일별 클리닉 데이터 로딩 완료:', response.data);
+    
+    const clinics = Array.isArray(response.data) ? response.data : 
+                   (response.data.results ? response.data.results : []);
+    
+    return clinics;
+  } catch (error) {
+    console.error('❌ [api.ts] getClinicsByDay 함수에서 오류 발생:', error);
+    throw error;
+  }
+};
+
+// 클리닉 업데이트 (학생 배치 관련)
+export const updateClinic = async (clinicId: number, clinicData: any) => {
+  try {
+    console.log('🔍 [api.ts] updateClinic 함수 시작:', clinicId, clinicData);
+    
+    const response = await api.put(`/clinics/${clinicId}/`, clinicData);
+    console.log('🔍 [api.ts] 클리닉 업데이트 완료:', response.data);
+    
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] updateClinic 함수에서 오류 발생:', error);
+    throw error;
+  }
+};
+
+// 클리닉 생성
+export const createClinic = async (clinicData: any) => {
+  try {
+    console.log('🔍 [api.ts] createClinic 함수 시작:', clinicData);
+    
+    const response = await api.post('/clinics/', clinicData);
+    console.log('🔍 [api.ts] 클리닉 생성 완료:', response.data);
+    
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] createClinic 함수에서 오류 발생:', error);
+    throw error;
+  }
+};
+
+// 클리닉에 학생 배치 API (미배치 상태에서 특정 클리닉의 미배치 영역으로 배치)
+export const assignStudentToClinic = async (clinicId: number, studentIds: number[]) => {
+  try {
+    console.log('🔍 [api.ts] assignStudentToClinic 함수 시작:', clinicId, studentIds);
+    
+    // 클리닉 정보 가져오기
+    const clinicResponse = await api.get(`/clinics/${clinicId}/`);
+    const clinic = clinicResponse.data;
+    
+    // 기존 미배치 학생 ID 목록에 새 학생 ID들 추가
+    const updatedUnassignedStudents = [...clinic.clinic_unassigned_students, ...studentIds];
+    
+    // 클리닉 업데이트
+    const response = await api.put(`/clinics/${clinicId}/`, {
+      ...clinic,
+      clinic_unassigned_students: updatedUnassignedStudents
+    });
+    
+    console.log('🔍 [api.ts] 학생 클리닉 배치 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] assignStudentToClinic 함수에서 오류 발생:', error);
+    throw error;
+  }
+};
+
+// 오늘의 클리닉 정보 가져오기
+export const getTodayClinic = async () => {
+  try {
+    console.log('🔍 [api.ts] getTodayClinic 함수 시작');
+    const response = await api.get('/today-clinic/');
+    console.log('🔍 [api.ts] 오늘의 클리닉 API 응답 성공:', response.status);
+    console.log('🔍 [api.ts] 오늘의 클리닉 데이터:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 오늘의 클리닉 정보 가져오기 오류:', error);
     throw error;
   }
 };

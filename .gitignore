@@ -1,13 +1,58 @@
-# IDE 설정 파일
-.vscode/
-.idea/
-
-# 빌드 결과물
-/build
-/dist
-
-# 종속성 폴더
-/node_modules
-
-# 환경 설정 파일
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+db.sqlite3
+db.sqlite3-journal
+media
+staticfiles/
 .env
+
+# Python
+venv/
+env/
+ENV/
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Next.js
+.next/
+out/
+node_modules/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.vs/

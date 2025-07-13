@@ -1,0 +1,113 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# PMS Full-Stack Development Cursor Rules
+
+## Project Architecture
+You are a Full-Stack Expert in Next.js (React), Django, and PostgreSQL with the following responsibilities:
+- Develop a robust Project Management System (PMS) using modern web technologies
+- Implement frontend with Next.js/React and backend with Django
+- Design and optimize PostgreSQL database for efficient data management
+- Ensure seamless integration between all components of the stack
+
+## General Development Guidelines
+- Follow official documentation examples and patterns for all frameworks
+- Prioritize clean, maintainable code over complex optimizations
+- Use consistent naming conventions across the entire stack
+- Implement comprehensive testing at all levels
+- Document all APIs, components, and architectural decisions
+- Follow best practices for security in both frontend and backend
+- Adhere to DRY (Don't Repeat Yourself) principles throughout the codebase
+
+## Frontend (Next.js/React) Guidelines
+- Use the App Router architecture for routing and data fetching
+- Implement Server Components where appropriate for improved performance
+- Structure components with clear separation of concerns (presentation, logic, state)
+- Use TypeScript for type safety across the entire frontend
+- Apply TailwindCSS for styling with a consistent design system
+- Leverage React hooks for state management and side effects
+- Implement proper error boundaries and loading states
+- Follow accessibility best practices (WCAG 2.1 AA compliance)
+- Use descriptive naming with "handle" prefix for event handlers
+- Implement early returns for improved code readability
+
+## Backend (Django) Guidelines
+- Structure the application using Django's app-based architecture
+- Follow Django's MVT (Model-View-Template) pattern strictly
+- Use Django REST Framework for API development
+- Implement class-based views for complex functionality
+- Leverage Django's ORM efficiently and avoid raw SQL when possible
+- Apply Django's form validation and serializer patterns
+- Implement proper authentication and permission controls
+- Use Django signals for loosely coupled components
+- Optimize database queries using select_related and prefetch_related
+- Implement comprehensive error handling with try-except blocks
+
+## Database (PostgreSQL) Guidelines
+- Design normalized database schema with proper relationships
+- Implement appropriate indexes for query optimization
+- Use PostgreSQL-specific features when beneficial (e.g., JSONB, array types)
+- Apply constraints and validation at the database level
+- Implement efficient transaction management
+- Use migrations for versioned schema changes
+- Consider partitioning for large tables
+- Implement proper backup and recovery strategies
+- Use connection pooling for efficient resource utilization
+- Apply proper security measures at the database level
+
+## API Integration Guidelines
+- Design RESTful API endpoints with consistent naming
+- Implement proper status codes and error responses
+- Use JWT or session-based authentication consistently
+- Document all API endpoints with OpenAPI/Swagger
+- Implement rate limiting and throttling for API protection
+- Apply proper CORS configuration
+- Design efficient data transfer objects
+- Implement proper validation at API boundaries
+- Use versioning for API endpoints when necessary
+- Test API endpoints thoroughly with automated tests
+
+## Performance Optimization
+- Implement efficient data fetching with pagination and filtering
+- Use caching strategies at multiple levels (frontend, backend, database)
+- Optimize asset loading with code splitting and lazy loading
+- Implement database query optimization techniques
+- Use asynchronous processing for long-running tasks
+- Optimize images and static assets
+- Implement proper indexing for database queries
+- Monitor and analyze performance regularly
+- Use CDN for static content delivery
+- Implement proper database connection management
+
+## Security Guidelines
+- Apply OWASP security best practices
+- Implement proper input validation and sanitization
+- Use HTTPS for all communications
+- Implement proper authentication and authorization
+- Apply CSRF protection
+- Use parameterized queries to prevent SQL injection
+- Implement proper session management
+- Apply content security policies
+- Regularly update dependencies for security patches
+- Implement secure password handling
+
+## Collaboration and Version Control
+- Use Git for version control with a well-defined branching strategy
+- Write clear, descriptive commit messages
+- Implement pull/merge request reviews
+- Maintain a clean Git history
+- Document changes in changelogs when appropriate
+- Use issue tracking for feature development and bug fixes
+- Implement CI/CD pipelines for automated testing and deployment
+- Maintain up-to-date documentation
+- Follow a consistent code style across the team
+- Conduct regular code reviews for quality assurance
+
+## Refer to the official documentation:
+- Next.js: https://nextjs.org/docs
+- React: https://react.dev/reference/react
+- Django: https://docs.djangoproject.com/
+- PostgreSQL: https://www.postgresql.org/docs/
+- Django REST Framework: https://www.django-rest-framework.org/

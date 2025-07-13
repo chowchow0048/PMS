@@ -19,24 +19,25 @@ class Subject(models.Model):
         return self.subject
 
 
-class Time(models.Model):
-    """시간 모델"""
-
-    DAY_CHOICES = (
-        ("mon", "월요일"),
-        ("tue", "화요일"),
-        ("wed", "수요일"),
-        ("thu", "목요일"),
-        ("fri", "금요일"),
-        ("sat", "토요일"),
-        ("sun", "일요일"),
-    )
-
-    time_day = models.CharField(max_length=3, choices=DAY_CHOICES)  # 요일
-    time_slot = models.TimeField()  # 시간
-
-    def __str__(self):
-        return f"{self.get_time_day_display()} {self.time_slot.strftime('%H:%M')}"
+# Time 모델 주석처리 - 보충 시스템 개편으로 고정 시간 사용
+# class Time(models.Model):
+#     """시간 모델"""
+#
+#     DAY_CHOICES = (
+#         ("mon", "월요일"),
+#         ("tue", "화요일"),
+#         ("wed", "수요일"),
+#         ("thu", "목요일"),
+#         ("fri", "금요일"),
+#         ("sat", "토요일"),
+#         ("sun", "일요일"),
+#     )
+#
+#     time_day = models.CharField(max_length=3, choices=DAY_CHOICES)  # 요일
+#     time_slot = models.TimeField()  # 시간
+#
+#     def __str__(self):
+#         return f"{self.get_time_day_display()} {self.time_slot.strftime('%H:%M')}"
 
 
 class User(AbstractUser):
@@ -55,11 +56,11 @@ class User(AbstractUser):
     )  # 담당 과목
     is_teacher = models.BooleanField(default=True)
     max_student_num = models.IntegerField(default=100)
-    available_time = models.ManyToManyField(
-        Time,
-        blank=True,
-        related_name="teachers_available_time",
-    )  # 선생님이 수업 가능한 시간대들 (복수 선택 가능)
+    # available_time = models.ManyToManyField(
+    #     Time,
+    #     blank=True,
+    #     related_name="teachers_available_time",
+    # )  # 선생님이 수업 가능한 시간대들 (복수 선택 가능) - 보충 시스템 개편으로 주석처리
 
     def __str__(self):
         return self.user_name
@@ -111,61 +112,84 @@ class Student(models.Model):
         related_name="students",
         default="physics1",
     )  # 수강 과목
-    expected_teacher = models.CharField(max_length=100, default="")
-    assigned_teacher = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
+    # expected_teacher = models.CharField(max_length=100, default="")  # 보충 시스템 개편으로 주석처리
+    # assigned_teacher = models.ForeignKey(
+    #     User,
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True,
+    #     related_name="assigned_students",
+    # )  # 담당 강사 - 보충 시스템 개편으로 주석처리
+    # clinic_attended_dates = models.JSONField(
+    #     default=list, blank=True
+    # )  # 클리닉 출석 기록 (날짜와 시간 정보를 JSON 배열로 저장) - 보충 시스템 개편으로 주석처리
+    # available_time = models.ManyToManyField(
+    #     Time,
+    #     blank=True,
+    #     related_name="students_available_time",
+    # )  # 학생이 수업 가능한 시간대들 (복수 선택 가능) - 보충 시스템 개편으로 주석처리
+    reserved_clinic = models.ManyToManyField(
+        "Clinic",
         blank=True,
-        related_name="assigned_students",
-    )  # 담당 강사
-    clinic_attended_dates = models.JSONField(
-        default=list, blank=True
-    )  # 클리닉 출석 기록 (날짜와 시간 정보를 JSON 배열로 저장)
-    available_time = models.ManyToManyField(
-        Time,
-        blank=True,
-        related_name="students_available_time",
-    )  # 학생이 수업 가능한 시간대들 (복수 선택 가능)
+        related_name="reserved_students",
+    )  # 학생이 예약한 클리닉들 (prime clinic, sub clinic 구분)
 
     def __str__(self):
         return self.student_name
 
 
 class Clinic(models.Model):
-    """클리닉 예약 모델"""
+    """클리닉 예약 모델 - 보충 시스템 개편"""
+
+    DAY_CHOICES = (
+        ("mon", "월요일"),
+        ("tue", "화요일"),
+        ("wed", "수요일"),
+        ("thu", "목요일"),
+        ("fri", "금요일"),
+    )
 
     clinic_teacher = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="assigned_clinics"
     )  # 담당 강사
-    clinic_students = models.ManyToManyField(
-        Student, related_name="enrolled_clinics"
-    )  # 등록 학생
-    clinic_time = models.ForeignKey(
-        Time, on_delete=models.CASCADE, related_name="scheduled_clinics"
-    )  # 클리닉 시간
+    clinic_prime_students = models.ManyToManyField(
+        Student, blank=True, related_name="enrolled_prime_clinics"
+    )  # Prime clinic 등록 학생들 (18:00-19:00 담당 선생 수업)
+    clinic_sub_students = models.ManyToManyField(
+        Student, blank=True, related_name="enrolled_sub_clinics"
+    )  # Sub clinic 등록 학생들 (19:00-22:00 자유 질문)
+    clinic_unassigned_students = models.ManyToManyField(
+        Student, blank=True, related_name="unassigned_clinics"
+    )  # Prime or Sub 아닌 학생들 (웹에서 직접 등록할 때 필요한 영역)
+    clinic_day = models.CharField(
+        max_length=3, choices=DAY_CHOICES, default="mon"
+    )  # 클리닉 요일
     clinic_subject = models.ForeignKey(
-        Subject, on_delete=models.CASCADE, related_name="related_clinics"
+        Subject,
+        on_delete=models.CASCADE,
+        related_name="related_clinics",
+        default="physics1",
     )  # 클리닉 과목
 
     def __str__(self):
-        return f"{self.clinic_subject} - {self.clinic_time}"
+        return f"{self.clinic_subject} - {self.get_clinic_day_display()}"
 
 
-class Comment(models.Model):
-    """코멘트 모델"""
-
-    comment_author = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="authored_comments"
-    )  # 작성자
-    comment_student = models.ForeignKey(
-        Student, on_delete=models.CASCADE, related_name="received_comments"
-    )  # 대상 학생
-    comment_text = models.TextField()  # 코멘트 내용
-    created_at = models.DateTimeField(auto_now_add=True)  # 작성 시간
-
-    def __str__(self):
-        return f"{self.comment_author} -> {self.comment_student}"
+# Comment 모델 주석처리 - 보충 시스템 개편으로 불필요
+# class Comment(models.Model):
+#     """코멘트 모델"""
+#
+#     comment_author = models.ForeignKey(
+#         User, on_delete=models.CASCADE, related_name="authored_comments"
+#     )  # 작성자
+#     comment_student = models.ForeignKey(
+#         Student, on_delete=models.CASCADE, related_name="received_comments"
+#     )  # 대상 학생
+#     comment_text = models.TextField()  # 코멘트 내용
+#     created_at = models.DateTimeField(auto_now_add=True)  # 작성 시간
+#
+#     def __str__(self):
+#         return f"{self.comment_author} -> {self.comment_student}"
 
 
 class StudentPlacement(models.Model):

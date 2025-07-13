@@ -88,4 +88,44 @@ export interface RegisterRequest {
   password2: string;
   first_name?: string;
   last_name?: string;
+}
+
+// 클리닉 타입 정의
+export interface Clinic {
+  id: number;
+  clinic_teacher: number;
+  clinic_day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+  clinic_subject: number;
+  clinic_prime_students: number[];
+  clinic_sub_students: number[];
+  clinic_unassigned_students: number[];
+  teacher_name: string;
+  subject_name: string;
+  day_display: string;
+}
+
+// 요일 선택지 타입
+export interface DayChoice {
+  value: 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+  label: string;
+}
+
+// 요일 선택지 상수
+export const DAY_CHOICES: DayChoice[] = [
+  { value: 'mon', label: '월요일' },
+  { value: 'tue', label: '화요일' },
+  { value: 'wed', label: '수요일' },
+  { value: 'thu', label: '목요일' },
+  { value: 'fri', label: '금요일' },
+];
+
+// 클리닉 섹션 타입
+export type ClinicSection = 'unassigned' | 'prime' | 'sub';
+
+// 클리닉 모달 프롭스 타입
+export interface ClinicModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  clinic: Clinic | null;
+  onUpdate: (clinic: Clinic) => void;
 } 

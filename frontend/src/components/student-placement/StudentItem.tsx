@@ -17,14 +17,18 @@ export interface Time {
 export interface Student {
   id: number;
   student_name: string;
+  student_phone_num: string;  // 학생 전화번호
+  student_parent_phone_num: string;  // 학부모 전화번호
   school: string;  // 학교 정보
   grade: string;  // 학년 정보
-  assigned_teacher?: number;  // 배정된 교사 ID
-  assigned_teacher_name?: string; // 배정된 교사 이름
+  student_subject?: number;  // 학생 과목 ID
   subject_name?: string; // 학생 과목 이름
-  expected_teacher?: string; // 희망 선생님
-  available_time?: number[]; // 가능한 시간 ID 배열
-  available_time_details?: Time[]; // 가능한 시간 상세 정보
+  reserved_clinic?: number;  // 예약된 클리닉 ID
+  // assigned_teacher?: number;  // 배정된 교사 ID (보충 시스템 개편으로 deprecated)
+  // assigned_teacher_name?: string; // 배정된 교사 이름 (보충 시스템 개편으로 deprecated)
+  // expected_teacher?: string; // 희망 선생님 (보충 시스템 개편으로 deprecated)
+  // available_time?: number[]; // 가능한 시간 ID 배열 (보충 시스템 개편으로 deprecated)
+  // available_time_details?: Time[]; // 가능한 시간 상세 정보 (보충 시스템 개편으로 deprecated)
 }
 
 // 학생 아이템 컴포넌트 props 인터페이스

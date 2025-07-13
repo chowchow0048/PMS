@@ -34,7 +34,7 @@ import {
 import { SearchIcon, AttachmentIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { useDrop } from 'react-dnd';
 import StudentItem, { Student, ItemTypes } from './StudentItem';
-import { uploadStudentExcel } from '@/lib/api';
+import { uploadStudentExcel, uploadClinicEnrollmentExcel } from '@/lib/api';
 
 // 미배치 학생 영역 컴포넌트 props 인터페이스
 interface UnassignedStudentAreaProps {
@@ -74,6 +74,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadType, setUploadType] = useState<'student' | 'clinic'>('student');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   
@@ -145,16 +146,31 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
 
     setIsUploading(true);
     try {
-      const result = await uploadStudentExcel(selectedFile);
-      setUploadResult(result);
+      let result;
       
-      toast({
-        title: '업로드 완료',
-        description: `총 ${result.total_rows}행 중 ${result.added_students.length}명 추가, ${result.duplicate_students.length}명 중복, ${result.error_students.length}명 오류`,
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
+      if (uploadType === 'student') {
+        result = await uploadStudentExcel(selectedFile);
+        
+        toast({
+          title: '학생 명단 업로드 완료',
+          description: `총 ${result.total_rows}행 중 ${result.added_students.length}명 추가, ${result.duplicate_students.length}명 중복, ${result.error_students.length}명 오류`,
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+      } else {
+        result = await uploadClinicEnrollmentExcel(selectedFile);
+        
+        toast({
+          title: '보충 신청 업로드 완료',
+          description: `${result.processed_students?.length || 0}명의 학생이 클리닉에 등록되었습니다.`,
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+      
+      setUploadResult(result);
 
       // 데이터 새로고침
       if (onRefresh) {
@@ -174,10 +190,19 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
     }
   };
 
+  // 모달 열기 핸들러
+  const handleOpenModal = (type: 'student' | 'clinic') => {
+    setUploadType(type);
+    setSelectedFile(null);
+    setUploadResult(null);
+    onOpen();
+  };
+
   // 모달 닫기 핸들러
   const handleCloseModal = () => {
     setSelectedFile(null);
     setUploadResult(null);
+    setUploadType('student');
     onClose();
   };
 
@@ -314,7 +339,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       <Box p={4} pb={2} flexShrink={0}>
         <Flex justify="space-between" align="center" mb={4}>
           <Heading as="h2" size="lg">
-            미배치 학생 명단
+            학생 명단
           </Heading>
           <HStack spacing={2}>
             {selectedStudents.size > 0 && (
@@ -332,17 +357,29 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                 </Button>
               </>
             )}
-            <Button
-              leftIcon={<AttachmentIcon />}
-              colorScheme="blue"
-              variant="solid"
-              size="md"
-              bg="lightblue"
-              _hover={{ bg: "blue.300" }}
-              onClick={onOpen}
-            >
-              엑셀 추가
-            </Button>
+                           <Button
+               leftIcon={<AttachmentIcon />}
+               colorScheme="blue"
+               variant="solid"
+               size="md"
+               bg="blue.600"
+               _hover={{ bg: "blue.400" }}
+               onClick={() => handleOpenModal('student')}
+               mr={2}
+             >
+               학생 명단
+               </Button>
+               <Button
+               leftIcon={<AttachmentIcon />}
+               colorScheme="green"
+               variant="solid"
+               size="md"
+               bg="green.600"
+               _hover={{ bg: "green.400" }}
+               onClick={() => handleOpenModal('clinic')}
+             >
+               보충 신청
+               </Button>
           </HStack>
         </Flex>
         
@@ -442,7 +479,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                                 </SimpleGrid>
                               ) : (
                                 <Text color="gray.500" fontSize="sm" py={2}>
-                                  미배치된 학생이 없습니다
+                                  해당 학년에 학생이 없습니다
                                 </Text>
                               )}
                             </Box>
@@ -464,21 +501,32 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       <Modal isOpen={isOpen} onClose={handleCloseModal} size="xl">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>엑셀 업로드</ModalHeader>
+                     <ModalHeader>
+             {uploadType === 'student' ? '학생 명단 업로드' : '보충 신청 업로드'}
+           </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4} align="stretch">
               {/* 파일 업로드 안내 */}
-              <Alert status="info">
-                <AlertIcon />
-                <Box>
-                  <AlertTitle>업로드 형식 안내</AlertTitle>
-                  <AlertDescription>
-                    엑셀 파일에는 다음 컬럼이 포함되어야 합니다:<br />
-                    <strong>학교, 학년, 이름, 학생번호, 학부모번호</strong>
-                  </AlertDescription>
-                </Box>
-              </Alert>
+                             <Alert status="info">
+                 <AlertIcon />
+                 <Box>
+                   <AlertTitle>업로드 형식 안내</AlertTitle>
+                   <AlertDescription>
+                     {uploadType === 'student' ? (
+                       <>
+                         엑셀 파일에는 다음 컬럼이 포함되어야 합니다:<br />
+                         <strong>학교, 학년, 이름, 학생번호, 학부모번호</strong>
+                       </>
+                     ) : (
+                       <>
+                         보충 신청 엑셀 파일에는 다음 컬럼이 포함되어야 합니다:<br />
+                         <strong>타임스탬프, 학생이름, 학생핸드폰번호, 숙제해설 희망요일, 자유질문 희망요일</strong>
+                       </>
+                     )}
+                   </AlertDescription>
+                 </Box>
+               </Alert>
 
               {/* 파일 선택 */}
               <Box>
@@ -496,68 +544,113 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                 )}
               </Box>
 
-              {/* 업로드 결과 표시 */}
-              {uploadResult && (
-                <Box>
-                  <Divider my={4} />
-                  <Text fontWeight="bold" mb={3}>업로드 결과</Text>
-                  
-                  <VStack spacing={3} align="stretch">
-                    {/* 요약 정보 */}
-                    <HStack spacing={4}>
-                      <Badge colorScheme="blue">총 {uploadResult.total_rows}행</Badge>
-                      <Badge colorScheme="green">추가 {uploadResult.added_students.length}명</Badge>
-                      <Badge colorScheme="yellow">중복 {uploadResult.duplicate_students.length}명</Badge>
-                      <Badge colorScheme="red">오류 {uploadResult.error_students.length}명</Badge>
-                    </HStack>
+                {/* 업로드 결과 표시 */}
+               {uploadResult && (
+                 <Box>
+                   <Divider my={4} />
+                   <Text fontWeight="bold" mb={3}>업로드 결과</Text>
+                   
+                   <VStack spacing={3} align="stretch">
+                     {/* 요약 정보 */}
+                     <HStack spacing={4}>
+                       {uploadType === 'student' ? (
+                         <>
+                           <Badge colorScheme="blue">총 {uploadResult.total_rows}행</Badge>
+                           <Badge colorScheme="green">추가 {uploadResult.added_students?.length || 0}명</Badge>
+                           <Badge colorScheme="yellow">중복 {uploadResult.duplicate_students?.length || 0}명</Badge>
+                           <Badge colorScheme="red">오류 {uploadResult.error_students?.length || 0}명</Badge>
+                         </>
+                       ) : (
+                         <>
+                           <Badge colorScheme="blue">총 {uploadResult.total_rows}행</Badge>
+                           <Badge colorScheme="green">성공 {uploadResult.processed_students?.length || 0}명</Badge>
+                           <Badge colorScheme="yellow">미발견 {uploadResult.not_found_students?.length || 0}명</Badge>
+                           <Badge colorScheme="red">오류 {uploadResult.error_students?.length || 0}명</Badge>
+                         </>
+                       )}
+                     </HStack>
 
-                    {/* 추가된 학생 목록 */}
-                    {uploadResult.added_students.length > 0 && (
-                      <Box>
-                        <Text fontWeight="medium" color="green.600" mb={2}>
-                          추가된 학생 ({uploadResult.added_students.length}명)
-                        </Text>
-                        <Box maxH="150px" overflowY="auto" bg="green.50" p={2} borderRadius="md">
-                          {uploadResult.added_students.map((student: any, index: number) => (
-                            <Text key={index} fontSize="sm">
-                              {student.name} ({student.school} {student.grade})
-                            </Text>
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
+                                         {/* 성공 결과 목록 */}
+                     {uploadType === 'student' ? (
+                       uploadResult.added_students?.length > 0 && (
+                         <Box>
+                           <Text fontWeight="medium" color="green.600" mb={2}>
+                             추가된 학생 ({uploadResult.added_students.length}명)
+                           </Text>
+                           <Box maxH="150px" overflowY="auto" bg="green.50" p={2} borderRadius="md">
+                             {uploadResult.added_students.map((student: any, index: number) => (
+                               <Text key={index} fontSize="sm">
+                                 {student.name} ({student.school} {student.grade})
+                               </Text>
+                             ))}
+                           </Box>
+                         </Box>
+                       )
+                     ) : (
+                       uploadResult.processed_students?.length > 0 && (
+                         <Box>
+                           <Text fontWeight="medium" color="green.600" mb={2}>
+                             등록 완료 ({uploadResult.processed_students.length}명)
+                           </Text>
+                           <Box maxH="150px" overflowY="auto" bg="green.50" p={2} borderRadius="md">
+                             {uploadResult.processed_students.map((student: any, index: number) => (
+                               <Text key={index} fontSize="sm">
+                                 {student.name}: {[...student.prime_enrollments, ...student.sub_enrollments].join(', ')}
+                               </Text>
+                             ))}
+                           </Box>
+                         </Box>
+                       )
+                     )}
 
-                    {/* 중복된 학생 목록 */}
-                    {uploadResult.duplicate_students.length > 0 && (
-                      <Box>
-                        <Text fontWeight="medium" color="yellow.600" mb={2}>
-                          중복된 학생 ({uploadResult.duplicate_students.length}명)
-                        </Text>
-                        <Box maxH="150px" overflowY="auto" bg="yellow.50" p={2} borderRadius="md">
-                          {uploadResult.duplicate_students.map((student: any, index: number) => (
-                            <Text key={index} fontSize="sm">
-                              행 {student.row}: {student.name} ({student.school} {student.grade})
-                            </Text>
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
+                                         {/* 중복/미발견 학생 목록 */}
+                     {uploadType === 'student' ? (
+                       uploadResult.duplicate_students?.length > 0 && (
+                         <Box>
+                           <Text fontWeight="medium" color="yellow.600" mb={2}>
+                             중복된 학생 ({uploadResult.duplicate_students.length}명)
+                           </Text>
+                           <Box maxH="150px" overflowY="auto" bg="yellow.50" p={2} borderRadius="md">
+                             {uploadResult.duplicate_students.map((student: any, index: number) => (
+                               <Text key={index} fontSize="sm">
+                                 행 {student.row}: {student.name} ({student.school} {student.grade})
+                               </Text>
+                             ))}
+                           </Box>
+                         </Box>
+                       )
+                     ) : (
+                       uploadResult.not_found_students?.length > 0 && (
+                         <Box>
+                           <Text fontWeight="medium" color="yellow.600" mb={2}>
+                             미발견 학생 ({uploadResult.not_found_students.length}명)
+                           </Text>
+                           <Box maxH="150px" overflowY="auto" bg="yellow.50" p={2} borderRadius="md">
+                             {uploadResult.not_found_students.map((student: any, index: number) => (
+                               <Text key={index} fontSize="sm">
+                                 {student.name} ({student.phone})
+                               </Text>
+                             ))}
+                           </Box>
+                         </Box>
+                       )
+                     )}
 
-                    {/* 오류 학생 목록 */}
-                    {uploadResult.error_students.length > 0 && (
-                      <Box>
-                        <Text fontWeight="medium" color="red.600" mb={2}>
-                          오류 발생 ({uploadResult.error_students.length}명)
-                        </Text>
-                        <Box maxH="150px" overflowY="auto" bg="red.50" p={2} borderRadius="md">
-                          {uploadResult.error_students.map((student: any, index: number) => (
-                            <Text key={index} fontSize="sm">
-                              행 {student.row}: {student.name} - {student.error}
-                            </Text>
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
+                                         {/* 오류 학생 목록 */}
+                     {uploadResult.error_students?.length > 0 && (
+                       <Box>
+                         <Text fontWeight="medium" color="red.600" mb={2}>
+                           오류 발생 ({uploadResult.error_students.length}명)
+                         </Text>
+                         <Box maxH="150px" overflowY="auto" bg="red.50" p={2} borderRadius="md">
+                           {uploadResult.error_students.map((student: any, index: number) => (
+                             <Text key={index} fontSize="sm">
+                               행 {student.row}: {student.name} - {student.error}
+                             </Text>
+                           ))}
+                         </Box>
+                       </Box>
+                     )}
                   </VStack>
                 </Box>
               )}

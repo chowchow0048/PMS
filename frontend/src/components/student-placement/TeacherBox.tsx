@@ -412,10 +412,22 @@ const TeacherBox: FC<TeacherBoxProps> = ({
       teacherAvailableTimes.includes(timeId)
     );
 
-    // 희망 선생님인지 확인
-    const isExpectedTeacher = selectedStudent.expected_teacher === teacher.user_name;
+    // 희망 선생님인지 확인 (여러 선생님 지원)
+    const expectedTeacher = selectedStudent.expected_teacher;
+    let isTeacherExpected = false;
+    
+    if (expectedTeacher && expectedTeacher.trim() !== '') {
+      // 쉼표로 구분된 여러 선생님 이름 처리
+      const expectedTeachers = expectedTeacher
+        .split(',')
+        .map(name => name.trim())
+        .filter(name => name !== '');
+      
+      // 현재 선생님이 희망 선생님 목록에 포함되는지 확인
+      isTeacherExpected = expectedTeachers.includes(teacher.user_name);
+    }
 
-    if (isExpectedTeacher) {
+    if (isTeacherExpected) {
       // 희망 선생님이면서 매칭되는 시간이 있는 경우 -> 초록색
       if (commonTimes.length > 0) {
         return 'expected_compatible';

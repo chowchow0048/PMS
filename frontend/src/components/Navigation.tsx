@@ -105,10 +105,17 @@ export default function Navigation() {
                     </MenuItem>
                   )}
                   
-                  <MenuItem 
+                  {/* <MenuItem 
                     onClick={() => router.push(`/mypage/${user?.id}`)}
                   >
                     마이페이지
+                  </MenuItem> */}
+                  <MenuDivider/>
+                  
+                  <MenuItem
+                    onClick={() => router.push('/clinic')}
+                  >
+                    오늘의 클리닉
                   </MenuItem>
                   
                   <MenuDivider/>

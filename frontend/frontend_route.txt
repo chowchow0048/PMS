@@ -1,0 +1,7 @@
+1. /: 로그인 여부에 따라 /login or /student-placement 로 redirect
+      로그인 된 상태라면 /student-placement로 redirect
+      로그인 되지 않은 상태라면 /login으로 redirect
+
+2. /login: 로그인하는 페이지
+3. /student-placement: 학생배치 1단계 페이지. 미배치된 학생들을 선생들에게 배치/배치상태 변경 
+4. /mypage/<int:User.id>: 선생의 마이페이지. 학생배치 2단계 + 클리닉 조회 및 수정 + 클리닉 출석체크 모두 가능한 페이지.
