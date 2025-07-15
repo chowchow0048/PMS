@@ -77,7 +77,7 @@ const sortStudents = (students: Student[]): Student[] => {
     // 같은 학교 내에서는 학생 이름으로 내림차순 정렬
     const nameA = a.student_name || '';
     const nameB = b.student_name || '';
-    return nameB.localeCompare(nameA, 'ko');
+    return nameA.localeCompare(nameB, 'ko');
   });
 };
 
