@@ -147,6 +147,8 @@ class Clinic(models.Model):
         ("wed", "수요일"),
         ("thu", "목요일"),
         ("fri", "금요일"),
+        ("sat", "토요일"),
+        ("sun", "일요일"),
     )
 
     clinic_teacher = models.ForeignKey(

@@ -117,6 +117,8 @@ export const DAY_CHOICES: DayChoice[] = [
   { value: 'wed', label: '수요일' },
   { value: 'thu', label: '목요일' },
   { value: 'fri', label: '금요일' },
+  { value: 'sat', label: '토요일' },
+  { value: 'sun', label: '일요일' },
 ];
 
 // 클리닉 섹션 타입

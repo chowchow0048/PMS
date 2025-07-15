@@ -32,12 +32,54 @@ import {
   ModalBody,
   ModalCloseButton,
   ModalFooter,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  TableContainer,
+  ButtonGroup,
+  Tooltip,
 } from '@chakra-ui/react';
 import { getTodayClinic, updateClinic } from '@/lib/api';
 import { Student } from '@/components/student-placement/StudentItem';
 import { Clinic } from '@/lib/types';
-import { ArrowBackIcon, EditIcon } from '@chakra-ui/icons';
+import { ArrowBackIcon, EditIcon, ViewIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
+
+// 보기 모드 타입 정의
+type ViewMode = 'box' | 'table';
+
+// 학생 정렬 함수
+const sortStudents = (students: Student[]): Student[] => {
+  return [...students].sort((a, b) => {
+    // 먼저 학교별로 정렬 (세화고 먼저)
+    const schoolA = a.school || '';
+    const schoolB = b.school || '';
+    
+    // 세화고 우선순위 체크
+    const isSchoolASehwa = schoolA.includes('세화고') || schoolA.includes('세화');
+    const isSchoolBSehwa = schoolB.includes('세화고') || schoolB.includes('세화');
+    
+    if (isSchoolASehwa && !isSchoolBSehwa) {
+      return -1;
+    }
+    if (!isSchoolASehwa && isSchoolBSehwa) {
+      return 1;
+    }
+    
+    // 같은 학교이거나 둘 다 세화고가 아닌 경우, 학교 이름으로 정렬
+    if (schoolA !== schoolB) {
+      return schoolA.localeCompare(schoolB, 'ko');
+    }
+    
+    // 같은 학교 내에서는 학생 이름으로 내림차순 정렬
+    const nameA = a.student_name || '';
+    const nameB = b.student_name || '';
+    return nameB.localeCompare(nameA, 'ko');
+  });
+};
 
 // 학생 박스 컴포넌트
 const StudentBox: React.FC<{
@@ -103,6 +145,49 @@ const StudentBox: React.FC<{
   );
 };
 
+// 학생 테이블 행 컴포넌트 (출석 전용)
+const StudentTableRow: React.FC<{
+  student: Student;
+  isPrime: boolean;
+  isSub: boolean;
+  isAttended: boolean;
+  onToggleAttendance: () => void;
+  isUpdating: boolean;
+}> = ({ student, isPrime, isSub, isAttended, onToggleAttendance, isUpdating }) => {
+  return (
+    <Tr>
+      <Td border="1px solid" borderColor="gray.200">{student.school}</Td>
+      <Td border="1px solid" borderColor="gray.200">{student.grade}</Td>
+      <Td border="1px solid" borderColor="gray.200" fontWeight="semibold">{student.student_name}</Td>
+      <Td border="1px solid" borderColor="gray.200">{student.student_phone_num}</Td>
+      <Td border="1px solid" borderColor="gray.200">{student.student_parent_phone_num}</Td>
+      <Td border="1px solid" borderColor="gray.200" textAlign="center">
+        <Badge colorScheme={isPrime ? 'blue' : 'gray'}>
+          {isPrime ? '등록' : '미등록'}
+        </Badge>
+      </Td>
+      <Td border="1px solid" borderColor="gray.200" textAlign="center">
+        <Badge colorScheme={isSub ? 'green' : 'gray'}>
+          {isSub ? '등록' : '미등록'}
+        </Badge>
+      </Td>
+      <Td border="1px solid" borderColor="gray.200" textAlign="center">
+        <Button
+          size="xs"
+          bg={isAttended ? 'green.500' : 'gray.400'}
+          color="white"
+          _hover={{ bg: isAttended ? 'green.600' : 'gray.500' }}
+          onClick={onToggleAttendance}
+          isLoading={isUpdating}
+          width="80px"
+        >
+          {isAttended ? '출석완료' : '출석체크'}
+        </Button>
+      </Td>
+    </Tr>
+  );
+};
+
 // 클리닉 카드 컴포넌트
 const ClinicCard: React.FC<{
   clinic: Clinic;
@@ -112,6 +197,7 @@ const ClinicCard: React.FC<{
   const [updatingStudents, setUpdatingStudents] = useState<Set<number>>(new Set());
   const [localClinic, setLocalClinic] = useState<Clinic>(clinic);
   const [attendedStudents, setAttendedStudents] = useState<Set<number>>(new Set());
+  const [viewMode, setViewMode] = useState<ViewMode>('box');
   const toast = useToast();
   
   useEffect(() => {
@@ -136,19 +222,22 @@ const ClinicCard: React.FC<{
     ];
     
     const uniqueStudentIds = Array.from(new Set(clinicStudentIds));
-    return students.filter(student => uniqueStudentIds.includes(student.id));
+    const clinicStudents = students.filter(student => uniqueStudentIds.includes(student.id));
+    return sortStudents(clinicStudents);
   };
 
   // 해설 클리닉 학생들 필터링
   const getPrimeStudents = (): Student[] => {
     const primeStudentIds = localClinic.clinic_prime_students || [];
-    return students.filter(student => primeStudentIds.includes(student.id));
+    const primeStudents = students.filter(student => primeStudentIds.includes(student.id));
+    return sortStudents(primeStudents);
   };
 
   // 질문 클리닉 학생들 필터링
   const getSubStudents = (): Student[] => {
     const subStudentIds = localClinic.clinic_sub_students || [];
-    return students.filter(student => subStudentIds.includes(student.id));
+    const subStudents = students.filter(student => subStudentIds.includes(student.id));
+    return sortStudents(subStudents);
   };
 
   // 출석 체크 토글 처리
@@ -366,6 +455,28 @@ const ClinicCard: React.FC<{
               </HStack>
             </HStack>
           </VStack>
+          
+          {/* 보기 모드 전환 버튼 */}
+          <ButtonGroup isAttached>
+            <Button
+              leftIcon={<ViewIcon />}
+              size="sm"
+              colorScheme={viewMode === 'box' ? 'blue' : 'gray'}
+              variant={viewMode === 'box' ? 'solid' : 'outline'}
+              onClick={() => setViewMode('box')}
+            >
+              박스 형식
+            </Button>
+            <Button
+              leftIcon={<EditIcon />}
+              size="sm"
+              colorScheme={viewMode === 'table' ? 'blue' : 'gray'}
+              variant={viewMode === 'table' ? 'solid' : 'outline'}
+              onClick={() => setViewMode('table')}
+            >
+              표 형식
+            </Button>
+          </ButtonGroup>
         </HStack>
       </CardHeader>
       
@@ -378,11 +489,12 @@ const ClinicCard: React.FC<{
               이 클리닉에 등록된 학생이 없습니다.
             </Text>
           </Center>
-        ) : (
+        ) : viewMode === 'box' ? (
           <VStack spacing={6} align="stretch">
-            {/* 해설 클리닉 학생들 */}
-            {primeStudents.length > 0 && (
-              <Box>
+            {/* 해설 클리닉과 질문 클리닉을 가로로 50%씩 배치 */}
+            <HStack spacing={4} align="stretch">
+              {/* 해설 클리닉 학생들 - 왼쪽 50% */}
+              <Box width="50%">
                 <HStack spacing={2} mb={3} justify="space-between" align="center">
                   <HStack spacing={2}>
                     <Badge colorScheme="blue" size="md">
@@ -402,25 +514,31 @@ const ClinicCard: React.FC<{
                     일괄출석
                   </Button>
                 </HStack>
-                <SimpleGrid columns={[2, 3, 4, 5, 6]} spacing={3}>
-                  {primeStudents.map(student => (
-                    <StudentBox
-                      key={`prime-${student.id}`}
-                      student={student}
-                      isPrime={true}
-                      isSub={isStudentInSub(student.id)}
-                      isAttended={attendedStudents.has(student.id)}
-                      onToggleAttendance={() => handleToggleAttendance(student.id)}
-                      isUpdating={updatingStudents.has(student.id)}
-                    />
-                  ))}
-                </SimpleGrid>
+                {primeStudents.length > 0 ? (
+                  <SimpleGrid columns={[1, 2, 3]} spacing={3}>
+                    {primeStudents.map(student => (
+                      <StudentBox
+                        key={`prime-${student.id}`}
+                        student={student}
+                        isPrime={true}
+                        isSub={isStudentInSub(student.id)}
+                        isAttended={attendedStudents.has(student.id)}
+                        onToggleAttendance={() => handleToggleAttendance(student.id)}
+                        isUpdating={updatingStudents.has(student.id)}
+                      />
+                    ))}
+                  </SimpleGrid>
+                ) : (
+                  <Center py={8}>
+                    <Text color="gray.400" fontSize="sm">
+                      해설 클리닉에 등록된 학생이 없습니다.
+                    </Text>
+                  </Center>
+                )}
               </Box>
-            )}
 
-            {/* 질문 클리닉 학생들 */}
-            {subStudents.length > 0 && (
-              <Box>
+              {/* 질문 클리닉 학생들 - 오른쪽 50% */}
+              <Box width="50%">
                 <HStack spacing={2} mb={3} justify="space-between" align="center">
                   <HStack spacing={2}>
                     <Badge colorScheme="green" size="md">
@@ -440,21 +558,29 @@ const ClinicCard: React.FC<{
                     일괄출석
                   </Button>
                 </HStack>
-                <SimpleGrid columns={[2, 3, 4, 5, 6]} spacing={3}>
-                  {subStudents.map(student => (
-                    <StudentBox
-                      key={`sub-${student.id}`}
-                      student={student}
-                      isPrime={isStudentInPrime(student.id)}
-                      isSub={true}
-                      isAttended={attendedStudents.has(student.id)}
-                      onToggleAttendance={() => handleToggleAttendance(student.id)}
-                      isUpdating={updatingStudents.has(student.id)}
-                    />
-                  ))}
-                </SimpleGrid>
+                {subStudents.length > 0 ? (
+                  <SimpleGrid columns={[1, 2, 3]} spacing={3}>
+                    {subStudents.map(student => (
+                      <StudentBox
+                        key={`sub-${student.id}`}
+                        student={student}
+                        isPrime={isStudentInPrime(student.id)}
+                        isSub={true}
+                        isAttended={attendedStudents.has(student.id)}
+                        onToggleAttendance={() => handleToggleAttendance(student.id)}
+                        isUpdating={updatingStudents.has(student.id)}
+                      />
+                    ))}
+                  </SimpleGrid>
+                ) : (
+                  <Center py={8}>
+                    <Text color="gray.400" fontSize="sm">
+                      질문 클리닉에 등록된 학생이 없습니다.
+                    </Text>
+                  </Center>
+                )}
               </Box>
-            )}
+            </HStack>
 
             {/* 둘 다 등록하지 않은 학생들이 있을 경우 */}
             {clinicStudents.length > 0 && primeStudents.length === 0 && subStudents.length === 0 && (
@@ -484,6 +610,167 @@ const ClinicCard: React.FC<{
                       />
                     ))}
                 </SimpleGrid>
+              </Box>
+            )}
+          </VStack>
+        ) : (
+          // 표 형식 보기 - 해설/질문 클리닉 분리
+          <VStack spacing={6} align="stretch">
+            {/* 해설 클리닉 테이블 */}
+            {primeStudents.length > 0 && (
+              <Box>
+                <HStack spacing={2} mb={3} justify="space-between" align="center">
+                  <HStack spacing={2}>
+                    <Badge colorScheme="blue" size="md">
+                      숙제 해설 클리닉
+                    </Badge>
+                    <Text fontSize="sm" color="gray.600">
+                      {primeStudents.length}명
+                    </Text>
+                  </HStack>
+                  <Button
+                    size="sm"
+                    colorScheme="blue"
+                    variant="outline"
+                    onClick={() => handleBulkAttendance(primeStudents, '해설 클리닉')}
+                    isDisabled={primeStudents.every(student => attendedStudents.has(student.id))}
+                  >
+                    일괄출석
+                  </Button>
+                </HStack>
+                
+                <TableContainer border="1px solid" borderColor="gray.200" borderRadius="md">
+                  <Table variant="simple" size="sm" style={{ borderCollapse: 'collapse' }}>
+                    <Thead>
+                      <Tr>
+                        <Th border="1px solid" borderColor="gray.200">학교</Th>
+                        <Th border="1px solid" borderColor="gray.200">학년</Th>
+                        <Th border="1px solid" borderColor="gray.200">학생이름</Th>
+                        <Th border="1px solid" borderColor="gray.200">학생번호</Th>
+                        <Th border="1px solid" borderColor="gray.200">학부모번호</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">해설</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">질문</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">출석</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {primeStudents.map(student => (
+                        <StudentTableRow
+                          key={student.id}
+                          student={student}
+                          isPrime={isStudentInPrime(student.id)}
+                          isSub={isStudentInSub(student.id)}
+                          isAttended={attendedStudents.has(student.id)}
+                          onToggleAttendance={() => handleToggleAttendance(student.id)}
+                          isUpdating={updatingStudents.has(student.id)}
+                        />
+                      ))}
+                    </Tbody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+
+            {/* 질문 클리닉 테이블 */}
+            {subStudents.length > 0 && (
+              <Box>
+                <HStack spacing={2} mb={3} justify="space-between" align="center">
+                  <HStack spacing={2}>
+                    <Badge colorScheme="green" size="md">
+                      자유 질문 클리닉
+                    </Badge>
+                    <Text fontSize="sm" color="gray.600">
+                      {subStudents.length}명
+                    </Text>
+                  </HStack>
+                  <Button
+                    size="sm"
+                    colorScheme="green"
+                    variant="outline"
+                    onClick={() => handleBulkAttendance(subStudents, '질문 클리닉')}
+                    isDisabled={subStudents.every(student => attendedStudents.has(student.id))}
+                  >
+                    일괄출석
+                  </Button>
+                </HStack>
+                
+                <TableContainer border="1px solid" borderColor="gray.200" borderRadius="md">
+                  <Table variant="simple" size="sm" style={{ borderCollapse: 'collapse' }}>
+                    <Thead>
+                      <Tr>
+                        <Th border="1px solid" borderColor="gray.200">학교</Th>
+                        <Th border="1px solid" borderColor="gray.200">학년</Th>
+                        <Th border="1px solid" borderColor="gray.200">학생이름</Th>
+                        <Th border="1px solid" borderColor="gray.200">학생번호</Th>
+                        <Th border="1px solid" borderColor="gray.200">학부모번호</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">해설</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">질문</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">출석</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {subStudents.map(student => (
+                        <StudentTableRow
+                          key={student.id}
+                          student={student}
+                          isPrime={isStudentInPrime(student.id)}
+                          isSub={isStudentInSub(student.id)}
+                          isAttended={attendedStudents.has(student.id)}
+                          onToggleAttendance={() => handleToggleAttendance(student.id)}
+                          isUpdating={updatingStudents.has(student.id)}
+                        />
+                      ))}
+                    </Tbody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            )}
+
+            {/* 둘 다 등록하지 않은 학생들이 있을 경우 */}
+            {clinicStudents.length > 0 && primeStudents.length === 0 && subStudents.length === 0 && (
+              <Box>
+                <HStack spacing={2} mb={3}>
+                  <Badge colorScheme="orange" size="md">
+                    미배치 학생
+                  </Badge>
+                  <Text fontSize="sm" color="gray.600">
+                    {clinicStudents.filter(student => 
+                      !isStudentInPrime(student.id) && !isStudentInSub(student.id)
+                    ).length}명
+                  </Text>
+                </HStack>
+                
+                <TableContainer border="1px solid" borderColor="gray.200" borderRadius="md">
+                  <Table variant="simple" size="sm" style={{ borderCollapse: 'collapse' }}>
+                    <Thead>
+                      <Tr>
+                        <Th border="1px solid" borderColor="gray.200">학교</Th>
+                        <Th border="1px solid" borderColor="gray.200">학년</Th>
+                        <Th border="1px solid" borderColor="gray.200">학생이름</Th>
+                        <Th border="1px solid" borderColor="gray.200">학생번호</Th>
+                        <Th border="1px solid" borderColor="gray.200">학부모번호</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">해설</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">질문</Th>
+                        <Th border="1px solid" borderColor="gray.200" textAlign="center">출석</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {clinicStudents
+                        .filter(student => !isStudentInPrime(student.id) && !isStudentInSub(student.id))
+                        .map(student => (
+                          <StudentTableRow
+                            key={student.id}
+                            student={student}
+                            isPrime={isStudentInPrime(student.id)}
+                            isSub={isStudentInSub(student.id)}
+                            isAttended={attendedStudents.has(student.id)}
+                            onToggleAttendance={() => handleToggleAttendance(student.id)}
+                            isUpdating={updatingStudents.has(student.id)}
+                          />
+                        ))}
+                    </Tbody>
+                  </Table>
+                </TableContainer>
               </Box>
             )}
           </VStack>
