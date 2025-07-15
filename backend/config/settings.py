@@ -28,9 +28,16 @@ TOKEN_EXPIRED_AFTER_SECONDS = 7200  # 2시간
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # 보안 키 설정 (.env 파일에서 로드하거나 기본값 사용)
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY", "django-insecure-6n1aw_)2qdb36$kkhpxsth9wxi8sw$ort#2rdfad86_v1a0t&2"
-)
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        # 개발 환경에서만 기본 키 사용
+        SECRET_KEY = "django-insecure-dev-only-key"
+    else:
+        # 프로덕션 환경에서는 반드시 환경변수 설정 필요
+        raise ValueError(
+            "SECRET_KEY 환경변수가 설정되지 않았습니다. 프로덕션 환경에서는 필수입니다."
+        )
 
 # 디버그 모드 설정 (.env 파일에서 로드하거나 기본값으로 True 사용)
 DEBUG = os.environ.get("DEBUG", "True") == "True"
@@ -201,6 +208,31 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True  # MIME 타입 스니핑 방지
     SECURE_BROWSER_XSS_FILTER = True  # XSS 필터 활성화
     X_FRAME_OPTIONS = "DENY"  # 클릭재킹 방지
+
+    # 관리자 URL 보안 강화
+    ADMIN_URL = os.environ.get("ADMIN_URL", "admin/")  # 관리자 URL 커스터마이징
+
+    # 에러 로그 보안 설정
+    ADMINS = [
+        # 실제 적용 - 관리자 이메일 설정 (에러 발생 시 알림)
+        # ("Admin Name", "admin@yourdomain.com"),
+    ]
+
+    # 디버그 정보 완전 비활성화
+    DEBUG_PROPAGATE_EXCEPTIONS = False
+
+    # 보안 미들웨어 추가
+    MIDDLEWARE.insert(0, "django.middleware.security.SecurityMiddleware")
+
+    # 정적 파일 보안 설정
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
+    # 로그 레벨 강화
+    for logger_name in ["django", "django.request", "api", "api.auth", "auth"]:
+        if logger_name in LOGGING["loggers"]:
+            LOGGING["loggers"][logger_name][
+                "level"
+            ] = "WARNING"  # 프로덕션에서는 WARNING 레벨 이상만 로그
 
 # 로그 디렉토리 생성 (프로덕션 환경에서 필요)
 LOG_DIR = os.path.join(BASE_DIR, "logs")

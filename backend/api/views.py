@@ -1155,3 +1155,52 @@ class TodayClinicView(APIView):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# 헬스체크 엔드포인트 - Database 연결 상태 확인
+class HealthCheckView(APIView):
+    """
+    시스템 상태를 확인하는 헬스체크 엔드포인트
+    - 데이터베이스 연결 상태 확인
+    - 애플리케이션 기본 상태 확인
+    """
+
+    permission_classes = [permissions.AllowAny]  # 인증 없이 접근 가능
+
+    def get(self, request):
+        """
+        GET /api/health/
+        시스템 상태 확인 및 반환
+        """
+        try:
+            # 데이터베이스 연결 테스트
+            from django.db import connection
+
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")  # 간단한 쿼리로 DB 연결 확인
+
+            # 기본 모델 테스트
+            user_count = User.objects.count()
+
+            # 성공 응답
+            response_data = {
+                "status": "healthy",
+                "database": "connected",
+                "user_count": user_count,
+                "message": "All systems operational",
+            }
+
+            logger.info("[api/views.py] 헬스체크 성공")
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            # 실패 응답
+            response_data = {
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e),
+                "message": "System experiencing issues",
+            }
+
+            logger.error(f"[api/views.py] 헬스체크 실패: {str(e)}")
+            return Response(response_data, status=status.HTTP_503_SERVICE_UNAVAILABLE)

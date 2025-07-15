@@ -83,4 +83,10 @@ urlpatterns = [
     #     views.TeacherAvailableTimeUpdateView.as_view(),
     #     name="teacher_available_time_update",
     # ),
+    # 헬스체크 엔드포인트 - Database 연결 상태 확인
+    path(
+        "health/",
+        views.HealthCheckView.as_view(),
+        name="health_check",
+    ),
 ]
