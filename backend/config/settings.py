@@ -111,11 +111,19 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 # 데이터베이스 설정 (PostgreSQL 사용)
+# 환경변수 디버깅 (임시)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+# print(f"🔍 [DEBUG] DATABASE_URL 환경변수: {DATABASE_URL}")
+
+# 프로덕션 환경에서는 DATABASE_URL이 반드시 있어야 함
+if not DEBUG and not DATABASE_URL:
+    raise ValueError(
+        "프로덕션 환경에서는 DATABASE_URL 환경변수가 반드시 설정되어야 합니다."
+    )
+
 DATABASES = {
     "default": dj_database_url.config(
-        default=os.environ.get(
-            "DATABASE_URL", "postgres://postgres:postgres@localhost:5432/pms"
-        ),
+        default=DATABASE_URL or "postgres://postgres:postgres@localhost:5432/pms",
         conn_max_age=600,
     )
 }

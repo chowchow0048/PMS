@@ -123,23 +123,23 @@ class StudentViewSet(viewsets.ModelViewSet):
     def upload_excel(self, request):
         """Google Form 스프레드시트에서 생성된 엑셀 파일로 학생 명단 업로드"""
         logger.info("[api/views.py] 엑셀 파일 업로드 시작")
-        print("🔍 [DEBUG] 엑셀 파일 업로드 시작")
+        # print("🔍 [DEBUG] 엑셀 파일 업로드 시작")
 
         if "file" not in request.FILES:
-            print("❌ [DEBUG] 파일이 업로드되지 않았습니다.")
+            # print("❌ [DEBUG] 파일이 업로드되지 않았습니다.")
             return Response(
                 {"error": "파일이 업로드되지 않았습니다."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         excel_file = request.FILES["file"]
-        print(f"🔍 [DEBUG] 업로드된 파일: {excel_file.name}")
-        print(f"🔍 [DEBUG] 파일 크기: {excel_file.size} bytes")
-        print(f"🔍 [DEBUG] 파일 타입: {excel_file.content_type}")
+        # print(f"🔍 [DEBUG] 업로드된 파일: {excel_file.name}")
+        # print(f"🔍 [DEBUG] 파일 크기: {excel_file.size} bytes")
+        # print(f"🔍 [DEBUG] 파일 타입: {excel_file.content_type}")
 
         # 파일 확장자 검증
         if not excel_file.name.endswith((".xlsx", ".xls")):
-            print(f"❌ [DEBUG] 잘못된 파일 확장자: {excel_file.name}")
+            # print(f"❌ [DEBUG] 잘못된 파일 확장자: {excel_file.name}")
             return Response(
                 {"error": "엑셀 파일(.xlsx, .xls)만 업로드 가능합니다."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -151,14 +151,14 @@ class StudentViewSet(viewsets.ModelViewSet):
                 f"temp/{excel_file.name}", ContentFile(excel_file.read())
             )
             file_path = default_storage.path(file_name)
-            print(f"🔍 [DEBUG] 임시 파일 저장 경로: {file_path}")
+            # print(f"🔍 [DEBUG] 임시 파일 저장 경로: {file_path}")
 
             # 엑셀 파일 읽기
-            print("🔍 [DEBUG] 엑셀 파일 읽기 시도...")
+            # print("🔍 [DEBUG] 엑셀 파일 읽기 시도...")
             df = pd.read_excel(file_path)
-            print(f"🔍 [DEBUG] 엑셀 파일 읽기 완료: {len(df)}행")
-            print(f"🔍 [DEBUG] 컬럼 목록: {list(df.columns)}")
-            print(f"🔍 [DEBUG] 데이터 샘플 (첫 3행):\n{df.head(3)}")
+            # print(f"🔍 [DEBUG] 엑셀 파일 읽기 완료: {len(df)}행")
+            # print(f"🔍 [DEBUG] 컬럼 목록: {list(df.columns)}")
+            # print(f"🔍 [DEBUG] 데이터 샘플 (첫 3행):\n{df.head(3)}")
 
             logger.info(f"[api/views.py] 엑셀 파일 읽기 완료: {len(df)}행")
 
@@ -168,7 +168,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
             # 최소 필요 컬럼 수 확인 (A~F열, 최소 6개)
             if len(df.columns) < 6:
-                print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (최소 6개 필요)")
+                # print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (최소 6개 필요)")
                 default_storage.delete(file_name)
                 return Response(
                     {
@@ -185,11 +185,11 @@ class StudentViewSet(viewsets.ModelViewSet):
                 "error_students": [],
             }
 
-            print(f"🔍 [DEBUG] 데이터 처리 시작: {len(df)}행")
+            # print(f"🔍 [DEBUG] 데이터 처리 시작: {len(df)}행")
 
             # 각 행 처리
             for index, row in df.iterrows():
-                print(f"🔍 [DEBUG] 행 {index + 2} 처리 중...")
+                # print(f"🔍 [DEBUG] 행 {index + 2} 처리 중...")
                 try:
                     # 컬럼 순서 기반으로 데이터 추출
                     # 0: 응답생성날짜, 1: 학교, 2: 학년, 3: 이름, 4: 학생전화번호, 5: 학부모전화번호
@@ -227,16 +227,16 @@ class StudentViewSet(viewsets.ModelViewSet):
                         if len(parent_phone) == 10 and parent_phone.startswith("1"):
                             parent_phone = "0" + parent_phone
 
-                    print(
-                        f"🔍 [DEBUG] 행 {index + 2}: 학생명={name}, 학교={school}, 학년={grade}"
-                    )
-                    print(
-                        f"🔍 [DEBUG] 행 {index + 2}: 학생번호={student_phone}, 학부모번호={parent_phone}"
-                    )
+                    # print(
+                    #     f"🔍 [DEBUG] 행 {index + 2}: 학생명={name}, 학교={school}, 학년={grade}"
+                    # )
+                    # print(
+                    #     f"🔍 [DEBUG] 행 {index + 2}: 학생번호={student_phone}, 학부모번호={parent_phone}"
+                    # )
 
                     # 빈 값 검증
                     if not all([school, grade, name, student_phone, parent_phone]):
-                        print(f"❌ [DEBUG] 행 {index + 2}: 필수 정보 누락")
+                        # print(f"❌ [DEBUG] 행 {index + 2}: 필수 정보 누락")
                         results["error_students"].append(
                             {
                                 "row": index + 2,  # 엑셀 행 번호 (헤더 포함)
@@ -255,9 +255,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                     elif school in ["연합반"]:
                         school = "연합반"
                     else:
-                        print(
-                            f"❌ [DEBUG] 행 {index + 2}: 지원하지 않는 학교 '{original_school}'"
-                        )
+                        # print(
+                        #     f"❌ [DEBUG] 행 {index + 2}: 지원하지 않는 학교 '{original_school}'"
+                        # )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
@@ -276,9 +276,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                     elif grade in ["3", "3학년"]:
                         grade = "3학년"
                     else:
-                        print(
-                            f"❌ [DEBUG] 행 {index + 2}: 지원하지 않는 학년 '{original_grade}'"
-                        )
+                        # print(
+                        #     f"❌ [DEBUG] 행 {index + 2}: 지원하지 않는 학년 '{original_grade}'"
+                        # )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
@@ -288,9 +288,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                         )
                         continue
 
-                    print(
-                        f"🔍 [DEBUG] 행 {index + 2}: 정규화 완료 - 학교={school}, 학년={grade}"
-                    )
+                    # print(
+                    #     f"🔍 [DEBUG] 행 {index + 2}: 정규화 완료 - 학교={school}, 학년={grade}"
+                    # )
 
                     # 중복 검사 (학교, 학년, 이름, 학부모번호로 확인)
                     existing_student = Student.objects.filter(
@@ -301,9 +301,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                     ).first()
 
                     if existing_student:
-                        print(
-                            f"⚠️ [DEBUG] 행 {index + 2}: 중복 학생 발견 (ID: {existing_student.id})"
-                        )
+                        # print(
+                        #     f"⚠️ [DEBUG] 행 {index + 2}: 중복 학생 발견 (ID: {existing_student.id})"
+                        # )
                         results["duplicate_students"].append(
                             {
                                 "row": index + 2,
@@ -329,7 +329,7 @@ class StudentViewSet(viewsets.ModelViewSet):
                     except Subject.DoesNotExist:
                         pass
 
-                    print(f"🔍 [DEBUG] 행 {index + 2}: 새 학생 생성 시도...")
+                    # print(f"🔍 [DEBUG] 행 {index + 2}: 새 학생 생성 시도...")
                     new_student = Student.objects.create(
                         student_name=name,
                         school=school,
@@ -348,16 +348,16 @@ class StudentViewSet(viewsets.ModelViewSet):
                         }
                     )
 
-                    print(
-                        f"✅ [DEBUG] 행 {index + 2}: 새 학생 추가 완료 (ID: {new_student.id})"
-                    )
+                    # print(
+                    #     f"✅ [DEBUG] 행 {index + 2}: 새 학생 추가 완료 (ID: {new_student.id})"
+                    # )
                     logger.info(
                         f"[api/views.py] 새 학생 추가: {name} ({school} {grade})"
                     )
 
                 except Exception as e:
                     error_msg = str(e)
-                    print(f"❌ [DEBUG] 행 {index + 2} 처리 오류: {error_msg}")
+                    # print(f"❌ [DEBUG] 행 {index + 2} 처리 오류: {error_msg}")
                     logger.error(
                         f"[api/views.py] 행 {index + 2} 처리 오류: {error_msg}"
                     )
@@ -371,11 +371,11 @@ class StudentViewSet(viewsets.ModelViewSet):
 
             # 임시 파일 삭제
             default_storage.delete(file_name)
-            print("🔍 [DEBUG] 임시 파일 삭제 완료")
+            # print("🔍 [DEBUG] 임시 파일 삭제 완료")
 
-            print(
-                f"✅ [DEBUG] 처리 완료 - 추가: {len(results['added_students'])}명, 중복: {len(results['duplicate_students'])}명, 오류: {len(results['error_students'])}명"
-            )
+            # print(
+            #     f"✅ [DEBUG] 처리 완료 - 추가: {len(results['added_students'])}명, 중복: {len(results['duplicate_students'])}명, 오류: {len(results['error_students'])}명"
+            # )
 
             logger.info(
                 f"[api/views.py] 엑셀 업로드 완료: 추가 {len(results['added_students'])}명, 중복 {len(results['duplicate_students'])}명, 오류 {len(results['error_students'])}명"
@@ -385,7 +385,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             error_msg = str(e)
-            print(f"❌ [DEBUG] 엑셀 파일 처리 중 전체 오류: {error_msg}")
+            # print(f"❌ [DEBUG] 엑셀 파일 처리 중 전체 오류: {error_msg}")
             logger.error(f"[api/views.py] 엑셀 파일 처리 오류: {error_msg}")
             logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
 
@@ -393,7 +393,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             try:
                 if "file_name" in locals():
                     default_storage.delete(file_name)
-                    print("🔍 [DEBUG] 오류 발생 시 임시 파일 삭제 완료")
+                    # print("🔍 [DEBUG] 오류 발생 시 임시 파일 삭제 완료")
             except:
                 pass
 
@@ -438,23 +438,23 @@ class ClinicViewSet(viewsets.ModelViewSet):
     def upload_clinic_enrollment(self, request):
         """보충 신청 엑셀 파일로 클리닉 등록 처리"""
         logger.info("[api/views.py] 보충 신청 엑셀 파일 업로드 시작")
-        print("🔍 [DEBUG] 보충 신청 엑셀 파일 업로드 시작")
+        # print("🔍 [DEBUG] 보충 신청 엑셀 파일 업로드 시작")
 
         if "file" not in request.FILES:
-            print("❌ [DEBUG] 파일이 업로드되지 않았습니다.")
+            # print("❌ [DEBUG] 파일이 업로드되지 않았습니다.")
             return Response(
                 {"error": "파일이 업로드되지 않았습니다."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         excel_file = request.FILES["file"]
-        print(f"🔍 [DEBUG] 업로드된 파일: {excel_file.name}")
-        print(f"🔍 [DEBUG] 파일 크기: {excel_file.size} bytes")
-        print(f"🔍 [DEBUG] 파일 타입: {excel_file.content_type}")
+        # print(f"🔍 [DEBUG] 업로드된 파일: {excel_file.name}")
+        # print(f"🔍 [DEBUG] 파일 크기: {excel_file.size} bytes")
+        # print(f"🔍 [DEBUG] 파일 타입: {excel_file.content_type}")
 
         # 파일 확장자 검증
         if not excel_file.name.endswith((".xlsx", ".xls")):
-            print(f"❌ [DEBUG] 잘못된 파일 확장자: {excel_file.name}")
+            # print(f"❌ [DEBUG] 잘못된 파일 확장자: {excel_file.name}")
             return Response(
                 {"error": "엑셀 파일(.xlsx, .xls)만 업로드 가능합니다."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -466,20 +466,20 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 f"temp/{excel_file.name}", ContentFile(excel_file.read())
             )
             file_path = default_storage.path(file_name)
-            print(f"🔍 [DEBUG] 임시 파일 저장 경로: {file_path}")
+            # print(f"🔍 [DEBUG] 임시 파일 저장 경로: {file_path}")
 
             # 엑셀 파일 읽기
-            print("🔍 [DEBUG] 보충 신청 엑셀 파일 읽기 시도...")
+            # print("🔍 [DEBUG] 보충 신청 엑셀 파일 읽기 시도...")
             df = pd.read_excel(file_path)
-            print(f"🔍 [DEBUG] 보충 신청 엑셀 파일 읽기 완료: {len(df)}행")
-            print(f"🔍 [DEBUG] 컬럼 목록: {list(df.columns)}")
-            print(f"🔍 [DEBUG] 데이터 샘플 (첫 3행):\n{df.head(3)}")
+            # print(f"🔍 [DEBUG] 보충 신청 엑셀 파일 읽기 완료: {len(df)}행")
+            # print(f"🔍 [DEBUG] 컬럼 목록: {list(df.columns)}")
+            # print(f"🔍 [DEBUG] 데이터 샘플 (첫 3행):\n{df.head(3)}")
 
             logger.info(f"[api/views.py] 보충 신청 엑셀 파일 읽기 완료: {len(df)}행")
 
             # 컬럼 구조 확인 (총 5개 컬럼 필요)
             if len(df.columns) < 5:
-                print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (5개 필요)")
+                # print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (5개 필요)")
                 default_storage.delete(file_name)
                 return Response(
                     {
@@ -501,15 +501,16 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 "금": "fri",
                 "금요일": "fri",
             }
-            print(f"🔍 [DEBUG] 요일 매핑 딕셔너리: {day_mapping}")
+            # print(f"🔍 [DEBUG] 요일 매핑 딕셔너리: {day_mapping}")
 
             # 기존 클리닉 정보 확인
             existing_clinics = Clinic.objects.all()
-            print(f"🔍 [DEBUG] 기존 클리닉 수: {existing_clinics.count()}개")
+            # print(f"🔍 [DEBUG] 기존 클리닉 수: {existing_clinics.count()}개")
             for clinic in existing_clinics:
-                print(
-                    f"🔍 [DEBUG] 클리닉: {clinic.clinic_day} - {clinic.clinic_teacher.user_name}"
-                )
+                # print(
+                #     f"🔍 [DEBUG] 클리닉: {clinic.clinic_day} - {clinic.clinic_teacher.user_name}"
+                # )
+                pass
 
             # 데이터 처리 결과 저장
             results = {
@@ -519,11 +520,11 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 "error_students": [],
             }
 
-            print(f"🔍 [DEBUG] 보충 신청 데이터 처리 시작: {len(df)}행")
+            # print(f"🔍 [DEBUG] 보충 신청 데이터 처리 시작: {len(df)}행")
 
             # 각 행 처리
             for index, row in df.iterrows():
-                print(f"🔍 [DEBUG] 행 {index + 2} 처리 중...")
+                # print(f"🔍 [DEBUG] 행 {index + 2} 처리 중...")
                 try:
                     # 컬럼 순서 기반으로 데이터 추출
                     # 0: 타임스탬프, 1: 학생이름, 2: 학생핸드폰번호, 3: 숙제해설요일, 4: 자유질문요일
@@ -547,18 +548,18 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         if len(student_phone) == 10 and student_phone.startswith("1"):
                             student_phone = "0" + student_phone
 
-                    print(
-                        f"🔍 [DEBUG] 행 {index + 2}: 학생명={student_name}, 전화번호={student_phone}"
-                    )
-                    print(
-                        f"🔍 [DEBUG] 행 {index + 2}: 숙제해설={prime_days_text}, 자유질문={sub_days_text}"
-                    )
+                    # print(
+                    #     f"🔍 [DEBUG] 행 {index + 2}: 학생명={student_name}, 전화번호={student_phone}"
+                    # )
+                    # print(
+                    #     f"🔍 [DEBUG] 행 {index + 2}: 숙제해설={prime_days_text}, 자유질문={sub_days_text}"
+                    # )
 
                     # 빈 값 검증
                     if not all([student_name, student_phone]):
-                        print(
-                            f"❌ [DEBUG] 행 {index + 2}: 학생 이름 또는 전화번호 누락"
-                        )
+                        # print(
+                        #     f"❌ [DEBUG] 행 {index + 2}: 학생 이름 또는 전화번호 누락"
+                        # )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
@@ -569,24 +570,25 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         continue
 
                     # 학생 찾기 (이름과 전화번호로 매칭)
-                    print(f"🔍 [DEBUG] 행 {index + 2}: 학생 검색 시도...")
+                    # print(f"🔍 [DEBUG] 행 {index + 2}: 학생 검색 시도...")
                     student = Student.objects.filter(
                         student_name=student_name, student_phone_num=student_phone
                     ).first()
 
                     if not student:
-                        print(f"❌ [DEBUG] 행 {index + 2}: 학생을 찾을 수 없음")
+                        # print(f"❌ [DEBUG] 행 {index + 2}: 학생을 찾을 수 없음")
                         # 전체 학생 목록에서 이름으로라도 찾아보기
                         similar_students = Student.objects.filter(
                             student_name=student_name
                         )
-                        print(
-                            f"🔍 [DEBUG] 행 {index + 2}: 동일 이름 학생 수: {similar_students.count()}명"
-                        )
+                        # print(
+                        #     f"🔍 [DEBUG] 행 {index + 2}: 동일 이름 학생 수: {similar_students.count()}명"
+                        # )
                         for s in similar_students:
-                            print(
-                                f"🔍 [DEBUG] 행 {index + 2}: 동일 이름 학생 - {s.student_name} ({s.student_phone_num})"
-                            )
+                            # print(
+                            #     f"🔍 [DEBUG] 행 {index + 2}: 동일 이름 학생 - {s.student_name} ({s.student_phone_num})"
+                            # )
+                            pass
 
                         results["not_found_students"].append(
                             {
@@ -597,7 +599,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         )
                         continue
 
-                    print(f"✅ [DEBUG] 행 {index + 2}: 학생 발견 (ID: {student.id})")
+                    # print(f"✅ [DEBUG] 행 {index + 2}: 학생 발견 (ID: {student.id})")
 
                     # 숙제 해설 요일 파싱 및 처리
                     prime_enrollments = []
@@ -606,23 +608,23 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         "none",
                         "",
                     ]:
-                        print(
-                            f"🔍 [DEBUG] 행 {index + 2}: 숙제해설 요일 파싱 - '{prime_days_text}'"
-                        )
+                        # print(
+                        #     f"🔍 [DEBUG] 행 {index + 2}: 숙제해설 요일 파싱 - '{prime_days_text}'"
+                        # )
                         prime_days = [
                             day.strip()
                             for day in prime_days_text.replace(" ", "").split(",")
                         ]
-                        print(
-                            f"🔍 [DEBUG] 행 {index + 2}: 파싱된 숙제해설 요일: {prime_days}"
-                        )
+                        # print(
+                        #     f"🔍 [DEBUG] 행 {index + 2}: 파싱된 숙제해설 요일: {prime_days}"
+                        # )
 
                         for day_kr in prime_days:
                             if day_kr in day_mapping:
                                 day_en = day_mapping[day_kr]
-                                print(
-                                    f"🔍 [DEBUG] 행 {index + 2}: {day_kr} -> {day_en} 클리닉 검색..."
-                                )
+                                # print(
+                                #     f"🔍 [DEBUG] 행 {index + 2}: {day_kr} -> {day_en} 클리닉 검색..."
+                                # )
                                 clinic = Clinic.objects.filter(
                                     clinic_day=day_en
                                 ).first()
@@ -630,20 +632,22 @@ class ClinicViewSet(viewsets.ModelViewSet):
                                     # ManyToMany 관계에서 학생 추가
                                     clinic.clinic_prime_students.add(student)
                                     prime_enrollments.append(f"{day_kr}(숙제해설)")
-                                    print(
-                                        f"✅ [DEBUG] 행 {index + 2}: {day_kr} 숙제해설 클리닉 등록 완료"
-                                    )
+                                    # print(
+                                    #     f"✅ [DEBUG] 행 {index + 2}: {day_kr} 숙제해설 클리닉 등록 완료"
+                                    # )
                                     logger.info(
                                         f"[api/views.py] {student_name} -> {day_kr} 숙제해설 클리닉 등록"
                                     )
                                 else:
-                                    print(
-                                        f"❌ [DEBUG] 행 {index + 2}: {day_kr}({day_en}) 클리닉을 찾을 수 없음"
-                                    )
+                                    # print(
+                                    #     f"❌ [DEBUG] 행 {index + 2}: {day_kr}({day_en}) 클리닉을 찾을 수 없음"
+                                    # )
+                                    pass
                             else:
-                                print(
-                                    f"❌ [DEBUG] 행 {index + 2}: 매핑되지 않는 요일 '{day_kr}'"
-                                )
+                                # print(
+                                #     f"❌ [DEBUG] 행 {index + 2}: 매핑되지 않는 요일 '{day_kr}'"
+                                # )
+                                pass
 
                     # 자유 질문 요일 파싱 및 처리
                     sub_enrollments = []
@@ -652,23 +656,23 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         "none",
                         "",
                     ]:
-                        print(
-                            f"🔍 [DEBUG] 행 {index + 2}: 자유질문 요일 파싱 - '{sub_days_text}'"
-                        )
+                        # print(
+                        #     f"🔍 [DEBUG] 행 {index + 2}: 자유질문 요일 파싱 - '{sub_days_text}'"
+                        # )
                         sub_days = [
                             day.strip()
                             for day in sub_days_text.replace(" ", "").split(",")
                         ]
-                        print(
-                            f"🔍 [DEBUG] 행 {index + 2}: 파싱된 자유질문 요일: {sub_days}"
-                        )
+                        # print(
+                        #     f"🔍 [DEBUG] 행 {index + 2}: 파싱된 자유질문 요일: {sub_days}"
+                        # )
 
                         for day_kr in sub_days:
                             if day_kr in day_mapping:
                                 day_en = day_mapping[day_kr]
-                                print(
-                                    f"🔍 [DEBUG] 행 {index + 2}: {day_kr} -> {day_en} 클리닉 검색..."
-                                )
+                                # print(
+                                #     f"🔍 [DEBUG] 행 {index + 2}: {day_kr} -> {day_en} 클리닉 검색..."
+                                # )
                                 clinic = Clinic.objects.filter(
                                     clinic_day=day_en
                                 ).first()
@@ -676,20 +680,22 @@ class ClinicViewSet(viewsets.ModelViewSet):
                                     # ManyToMany 관계에서 학생 추가
                                     clinic.clinic_sub_students.add(student)
                                     sub_enrollments.append(f"{day_kr}(자유질문)")
-                                    print(
-                                        f"✅ [DEBUG] 행 {index + 2}: {day_kr} 자유질문 클리닉 등록 완료"
-                                    )
+                                    # print(
+                                    #     f"✅ [DEBUG] 행 {index + 2}: {day_kr} 자유질문 클리닉 등록 완료"
+                                    # )
                                     logger.info(
                                         f"[api/views.py] {student_name} -> {day_kr} 자유질문 클리닉 등록"
                                     )
                                 else:
-                                    print(
-                                        f"❌ [DEBUG] 행 {index + 2}: {day_kr}({day_en}) 클리닉을 찾을 수 없음"
-                                    )
+                                    # print(
+                                    #     f"❌ [DEBUG] 행 {index + 2}: {day_kr}({day_en}) 클리닉을 찾을 수 없음"
+                                    # )
+                                    pass
                             else:
-                                print(
-                                    f"❌ [DEBUG] 행 {index + 2}: 매핑되지 않는 요일 '{day_kr}'"
-                                )
+                                # print(
+                                #     f"❌ [DEBUG] 행 {index + 2}: 매핑되지 않는 요일 '{day_kr}'"
+                                # )
+                                pass
 
                     results["processed_students"].append(
                         {
@@ -701,12 +707,12 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         }
                     )
 
-                    print(f"✅ [DEBUG] 행 {index + 2}: 보충 신청 처리 완료")
+                    # print(f"✅ [DEBUG] 행 {index + 2}: 보충 신청 처리 완료")
                     logger.info(f"[api/views.py] 보충 신청 처리 완료: {student_name}")
 
                 except Exception as e:
                     error_msg = str(e)
-                    print(f"❌ [DEBUG] 행 {index + 2} 처리 오류: {error_msg}")
+                    # print(f"❌ [DEBUG] 행 {index + 2} 처리 오류: {error_msg}")
                     logger.error(
                         f"[api/views.py] 행 {index + 2} 처리 오류: {error_msg}"
                     )
@@ -724,11 +730,11 @@ class ClinicViewSet(viewsets.ModelViewSet):
 
             # 임시 파일 삭제
             default_storage.delete(file_name)
-            print("🔍 [DEBUG] 임시 파일 삭제 완료")
+            # print("🔍 [DEBUG] 임시 파일 삭제 완료")
 
-            print(
-                f"✅ [DEBUG] 보충 신청 처리 완료 - 처리: {len(results['processed_students'])}명, 미발견: {len(results['not_found_students'])}명, 오류: {len(results['error_students'])}명"
-            )
+            # print(
+            #     f"✅ [DEBUG] 보충 신청 처리 완료 - 처리: {len(results['processed_students'])}명, 미발견: {len(results['not_found_students'])}명, 오류: {len(results['error_students'])}명"
+            # )
 
             logger.info(
                 f"[api/views.py] 보충 신청 엑셀 업로드 완료: 처리 {len(results['processed_students'])}명, "
@@ -739,7 +745,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             error_msg = str(e)
-            print(f"❌ [DEBUG] 보충 신청 엑셀 파일 처리 중 전체 오류: {error_msg}")
+            # print(f"❌ [DEBUG] 보충 신청 엑셀 파일 처리 중 전체 오류: {error_msg}")
             logger.error(f"[api/views.py] 보충 신청 엑셀 파일 처리 오류: {error_msg}")
             logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
 
@@ -747,7 +753,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
             try:
                 if "file_name" in locals():
                     default_storage.delete(file_name)
-                    print("🔍 [DEBUG] 오류 발생 시 임시 파일 삭제 완료")
+                    # print("🔍 [DEBUG] 오류 발생 시 임시 파일 삭제 완료")
             except:
                 pass
 
