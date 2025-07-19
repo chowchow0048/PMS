@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { Student } from '@/components/student-placement/StudentItem';
 // import { Teacher } from '@/components/student-placement/TeacherBox';  // 보충 시스템 개편으로 주석처리
-import { log } from 'console';
 
 // 보충 시스템 개편으로 임시 Teacher 타입 정의 (기존 코드 유지를 위해)
 type Teacher = {
