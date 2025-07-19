@@ -43,7 +43,9 @@ if not SECRET_KEY:
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 # 접근 허용 호스트 설정
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = os.environ.get(
+    "ALLOWED_HOSTS", "localhost,127.0.0.1,healthcheck.railway.app,.railway.app"
+).split(",")
 
 
 # Application definition
