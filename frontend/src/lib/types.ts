@@ -106,7 +106,7 @@ export interface Clinic {
 
 // 요일 선택지 타입
 export interface DayChoice {
-  value: 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+  value: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
   label: string;
 }
 
