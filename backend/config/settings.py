@@ -154,7 +154,8 @@ try:
         "default": dj_database_url.config(
             default=DATABASE_URL or "postgres://postgres:postgres@localhost:5432/pms",
             conn_max_age=600,
-            conn_health_checks=True,  # 연결 상태 확인 추가
+            # conn_health_checks=True,  # 연결 상태 확인 추가
+            conn_health_checks=False,  # 연결 상태 확인 비활성화
         )
     }
     print(
