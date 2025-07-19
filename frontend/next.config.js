@@ -22,19 +22,26 @@ const nextConfig = {
       removeConsole: true,
     },
   }),
-  // 개발 환경 최적화 (Webpack 전용)
-  ...(!process.env.TURBOPACK && {
-    webpack: (config, { dev, isServer }) => {
-      if (dev && !isServer) {
-        // 개발 환경에서 빠른 새로고침을 위한 설정
-        config.watchOptions = {
-          poll: 1000,
-          aggregateTimeout: 300,
-        };
-      }
-      return config;
-    },
-  }),
+  // webpack 설정 (Path alias 포함)
+  webpack: (config, { dev, isServer }) => {
+    const path = require('path');
+    
+    // Path alias 설정 (Vercel 빌드 호환성 향상)
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.join(__dirname, 'src'),
+    };
+    
+    // 개발 환경에서만 추가 최적화 설정
+    if (dev && !isServer && !process.env.TURBOPACK) {
+      // 개발 환경에서 빠른 새로고침을 위한 설정
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
+    return config;
+  },
   // 프록시 설정 제거 - 직접 백엔드 URL 사용
   // async rewrites() {
   //   return [
