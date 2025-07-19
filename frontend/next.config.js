@@ -1,6 +1,13 @@
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-});
+// 안전한 bundle analyzer 로드
+let withBundleAnalyzer;
+try {
+  withBundleAnalyzer = require('@next/bundle-analyzer')({
+    enabled: process.env.ANALYZE === 'true',
+  });
+} catch (error) {
+  // 프로덕션 환경에서 @next/bundle-analyzer가 없을 경우 기본 함수 사용
+  withBundleAnalyzer = (config) => config;
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

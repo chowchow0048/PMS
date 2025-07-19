@@ -238,6 +238,9 @@ SESSION_SAVE_EVERY_REQUEST = True  # 매 요청마다 세션 갱신
 
 # 프로덕션 보안 설정
 if not DEBUG:
+    # Railway 프록시 헤더 신뢰 설정 (무한 리다이렉트 방지)
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
     # HTTPS 설정 (프로덕션 환경)
     SECURE_SSL_REDIRECT = True  # HTTP를 HTTPS로 리다이렉트
     # 헬스체크는 HTTP 리다이렉트에서 예외처리 (Railway 내부 헬스체크용)
