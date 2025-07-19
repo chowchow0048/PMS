@@ -270,12 +270,7 @@ if not DEBUG:
     # 정적 파일 보안 설정
     STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
-    # 로그 레벨 강화
-    for logger_name in ["django", "django.request", "api", "api.auth", "auth"]:
-        if logger_name in LOGGING["loggers"]:
-            LOGGING["loggers"][logger_name][
-                "level"
-            ] = "WARNING"  # 프로덕션에서는 WARNING 레벨 이상만 로그
+    # 로그 레벨 강화는 LOGGING 설정 이후에 적용 (아래로 이동됨)
 
 # 로그 디렉토리 생성 (프로덕션 환경에서 필요)
 LOG_DIR = os.path.join(BASE_DIR, "logs")
@@ -369,3 +364,11 @@ if DEBUG:
     LOGGING["loggers"]["api"]["handlers"].append("api_file")
     LOGGING["loggers"]["api.auth"]["handlers"].append("auth_file")
     LOGGING["loggers"]["auth"]["handlers"].append("auth_file")
+
+# 프로덕션 환경에서 로그 레벨 강화 (LOGGING 정의 이후 적용)
+if not DEBUG:
+    for logger_name in ["django", "django.request", "api", "api.auth", "auth"]:
+        if logger_name in LOGGING["loggers"]:
+            LOGGING["loggers"][logger_name][
+                "level"
+            ] = "WARNING"  # 프로덕션에서는 WARNING 레벨 이상만 로그
