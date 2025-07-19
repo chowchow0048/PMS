@@ -44,6 +44,7 @@ from django.core.files.base import ContentFile
 import os
 from django.db.models import Q
 from datetime import datetime
+from django.conf import settings
 
 # 로거 설정
 logger = logging.getLogger("api.auth")
@@ -1178,35 +1179,80 @@ class HealthCheckView(APIView):
         GET /api/health/
         시스템 상태 확인 및 반환
         """
+        response_data = {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "database": "checking...",
+            "environment": "production" if not settings.DEBUG else "development",
+        }
+
         try:
             # 데이터베이스 연결 테스트
             from django.db import connection
+            from django.conf import settings
 
+            print(f"🔍 [HEALTH] 헬스체크 시작 - {datetime.now()}")
+            print(
+                f"🔍 [HEALTH] DATABASE_URL: {settings.DATABASES['default']['HOST']}:{settings.DATABASES['default']['PORT']}"
+            )
+
+            # 데이터베이스 연결 확인
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")  # 간단한 쿼리로 DB 연결 확인
+                result = cursor.fetchone()
+                print(f"✅ [HEALTH] 데이터베이스 연결 성공: {result}")
 
             # 기본 모델 테스트
             user_count = User.objects.count()
+            print(f"✅ [HEALTH] 사용자 수 조회 성공: {user_count}")
 
             # 성공 응답
-            response_data = {
-                "status": "healthy",
-                "database": "connected",
-                "user_count": user_count,
-                "message": "All systems operational",
-            }
+            response_data.update(
+                {
+                    "status": "healthy",
+                    "database": "connected",
+                    "user_count": user_count,
+                    "database_engine": settings.DATABASES["default"]["ENGINE"],
+                    "database_host": settings.DATABASES["default"]["HOST"],
+                    "database_port": settings.DATABASES["default"]["PORT"],
+                    "database_name": settings.DATABASES["default"]["NAME"],
+                    "message": "All systems operational",
+                }
+            )
 
+            print(f"✅ [HEALTH] 헬스체크 성공")
             logger.info("[api/views.py] 헬스체크 성공")
             return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            # 실패 응답
-            response_data = {
-                "status": "unhealthy",
-                "database": "disconnected",
-                "error": str(e),
-                "message": "System experiencing issues",
-            }
+            error_msg = str(e)
+            print(f"❌ [HEALTH] 헬스체크 실패: {error_msg}")
+            print(f"❌ [HEALTH] 스택 트레이스: {traceback.format_exc()}")
 
-            logger.error(f"[api/views.py] 헬스체크 실패: {str(e)}")
+            # 환경변수 확인 (민감한 정보 제외)
+            import os
+
+            env_info = {
+                "DATABASE_URL_EXISTS": bool(os.environ.get("DATABASE_URL")),
+                "PGHOST": os.environ.get("PGHOST", "Not set"),
+                "PGPORT": os.environ.get("PGPORT", "Not set"),
+                "PGUSER": os.environ.get("PGUSER", "Not set"),
+                "PGDATABASE": os.environ.get("PGDATABASE", "Not set"),
+                "DEBUG": settings.DEBUG,
+            }
+            print(f"🔍 [HEALTH] 환경변수 정보: {env_info}")
+
+            # 실패 응답
+            response_data.update(
+                {
+                    "status": "unhealthy",
+                    "database": "disconnected",
+                    "error": error_msg,
+                    "error_type": type(e).__name__,
+                    "environment_info": env_info,
+                    "message": "Database connection failed",
+                }
+            )
+
+            logger.error(f"[api/views.py] 헬스체크 실패: {error_msg}")
             return Response(response_data, status=status.HTTP_503_SERVICE_UNAVAILABLE)

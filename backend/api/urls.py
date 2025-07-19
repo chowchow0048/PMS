@@ -13,6 +13,8 @@ router.register(r"clinics", views.ClinicViewSet)
 # router.register(r"comments", views.CommentViewSet)  # 보충 시스템 개편으로 주석처리
 
 urlpatterns = [
+    # 헬스체크 API (Railway 배포용)
+    path("health/", views.HealthCheckView.as_view(), name="health_check"),
     # 엑셀 업로드 API (라우터 등록 전에 배치하여 충돌 방지)
     path(
         "students/upload-excel/",
@@ -47,46 +49,15 @@ urlpatterns = [
         ),
         name="mypage_clinic_detail",
     ),
-    # 보충 시스템 개편으로 주석처리
-    # path(
-    #     "mypage/comments/",
-    #     views.CommentViewSet.as_view({"get": "list", "post": "create"}),
-    #     name="mypage_comments",
-    # ),
-    # path(
-    #     "mypage/comments/<int:pk>/",
-    #     views.CommentViewSet.as_view(
-    #         {"get": "retrieve", "put": "update", "delete": "destroy"}
-    #     ),
-    #     name="mypage_comment_detail",
-    # ),
     # 학생 배치 관련 API
     path(
-        "student-placement/students/",
-        views.StudentViewSet.as_view({"get": "list"}),
-        name="student_placement_students",
-    ),
-    path(
-        "student-placement/placement/",
+        "student-placement/",
         views.StudentPlacementView.as_view({"get": "list"}),
-        name="student_placement_list",
+        name="student_placement",
     ),
     path(
-        "student-placement/placement/update/",
+        "student-placement/update/",
         views.StudentPlacementView.as_view({"post": "update_placements"}),
         name="student_placement_update",
-    ),
-    # 보충 시스템 개편으로 주석처리
-    # # 선생님 시간표 수정 API
-    # path(
-    #     "teachers/<int:teacher_id>/available-time/",
-    #     views.TeacherAvailableTimeUpdateView.as_view(),
-    #     name="teacher_available_time_update",
-    # ),
-    # 헬스체크 엔드포인트 - Database 연결 상태 확인
-    path(
-        "health/",
-        views.HealthCheckView.as_view(),
-        name="health_check",
     ),
 ]

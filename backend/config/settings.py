@@ -111,9 +111,34 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 # 데이터베이스 설정 (PostgreSQL 사용)
-# 환경변수 디버깅 (임시)
+# 환경변수 디버깅 (Railway 배포 시 확인용)
 DATABASE_URL = os.environ.get("DATABASE_URL")
-# print(f"🔍 [DEBUG] DATABASE_URL 환경변수: {DATABASE_URL}")
+print(f"🔍 [DEBUG] DATABASE_URL 환경변수: {DATABASE_URL}")
+
+# Railway 환경에서 DATABASE_URL 확인
+if DATABASE_URL:
+    print(f"✅ [DEBUG] DATABASE_URL 발견: {DATABASE_URL[:50]}...")
+else:
+    print("❌ [DEBUG] DATABASE_URL 환경변수가 설정되지 않음")
+    # 다른 환경변수들 확인 (Railway에서 제공하는 개별 변수들)
+    pghost = os.environ.get("PGHOST")
+    pgport = os.environ.get("PGPORT")
+    pguser = os.environ.get("PGUSER")
+    pgpassword = os.environ.get("PGPASSWORD")
+    pgdatabase = os.environ.get("PGDATABASE")
+
+    print(f"🔍 [DEBUG] PGHOST: {pghost}")
+    print(f"🔍 [DEBUG] PGPORT: {pgport}")
+    print(f"🔍 [DEBUG] PGUSER: {pguser}")
+    print(f"🔍 [DEBUG] PGPASSWORD: {'*' * len(pgpassword) if pgpassword else 'None'}")
+    print(f"🔍 [DEBUG] PGDATABASE: {pgdatabase}")
+
+    # 개별 환경변수들로 DATABASE_URL 구성
+    if all([pghost, pgport, pguser, pgpassword, pgdatabase]):
+        DATABASE_URL = (
+            f"postgres://{pguser}:{pgpassword}@{pghost}:{pgport}/{pgdatabase}"
+        )
+        print(f"✅ [DEBUG] DATABASE_URL 자동 구성: {DATABASE_URL[:50]}...")
 
 # 프로덕션 환경에서는 DATABASE_URL이 반드시 있어야 함
 if not DEBUG and not DATABASE_URL:
@@ -121,12 +146,22 @@ if not DEBUG and not DATABASE_URL:
         "프로덕션 환경에서는 DATABASE_URL 환경변수가 반드시 설정되어야 합니다."
     )
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=DATABASE_URL or "postgres://postgres:postgres@localhost:5432/pms",
-        conn_max_age=600,
+# 데이터베이스 연결 설정
+try:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL or "postgres://postgres:postgres@localhost:5432/pms",
+            conn_max_age=600,
+            conn_health_checks=True,  # 연결 상태 확인 추가
+        )
+    }
+    print(
+        f"✅ [DEBUG] 데이터베이스 설정 완료: {DATABASES['default']['HOST']}:{DATABASES['default']['PORT']}"
     )
-}
+except Exception as e:
+    print(f"❌ [DEBUG] 데이터베이스 설정 오류: {e}")
+    if not DEBUG:
+        raise
 
 
 # Password validation
