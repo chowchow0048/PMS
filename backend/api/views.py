@@ -1179,12 +1179,22 @@ class HealthCheckView(APIView):
         GET /api/health/
         기본 시스템 상태 확인 및 반환
         """
+        # Railway 헬스체크 디버깅용 로그
+        print(f"🏥 [HEALTH] === RAILWAY 헬스체크 시작 === {datetime.now()}")
+        print(f"🏥 [HEALTH] 요청 HOST: {request.get_host()}")
+        print(f"🏥 [HEALTH] 요청 경로: {request.path}")
+        print(f"🏥 [HEALTH] 요청 메소드: {request.method}")
+        print(f"🏥 [HEALTH] DEBUG 모드: {settings.DEBUG}")
+        print(f"🏥 [HEALTH] ALLOWED_HOSTS: {settings.ALLOWED_HOSTS}")
+
         response_data = {
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
             "environment": "production" if not settings.DEBUG else "development",
             "message": "Application is running",
             "database": "checking...",
+            "request_host": request.get_host(),
+            "request_path": request.path,
         }
 
         try:
@@ -1232,12 +1242,14 @@ class HealthCheckView(APIView):
                 print(f"⚠️ [HEALTH] 데이터베이스 연결 실패 (앱은 정상): {db_error}")
 
             print(f"✅ [HEALTH] 기본 헬스체크 성공")
+            print(f"🏥 [HEALTH] === RAILWAY 헬스체크 완료 === 200 OK")
             logger.info("[api/views.py] 헬스체크 성공 - 기본 상태 확인")
             return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
             error_msg = str(e)
             print(f"❌ [HEALTH] 헬스체크 실패: {error_msg}")
+            print(f"🏥 [HEALTH] === RAILWAY 헬스체크 실패 === 503 SERVICE_UNAVAILABLE")
 
             response_data.update(
                 {

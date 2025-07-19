@@ -239,6 +239,9 @@ SESSION_SAVE_EVERY_REQUEST = True  # 매 요청마다 세션 갱신
 if not DEBUG:
     # HTTPS 설정 (프로덕션 환경)
     SECURE_SSL_REDIRECT = True  # HTTP를 HTTPS로 리다이렉트
+    # 헬스체크는 HTTP 리다이렉트에서 예외처리 (Railway 내부 헬스체크용)
+    SECURE_SSL_REDIRECT_EXEMPT = [r"^api/health/$"]  # 헬스체크 경로만 HTTP 허용
+
     SECURE_HSTS_SECONDS = 31536000  # HSTS 헤더 설정 (1년)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # 서브도메인에도 HSTS 적용
     SECURE_HSTS_PRELOAD = True  # HSTS 프리로드 목록에 추가 가능
