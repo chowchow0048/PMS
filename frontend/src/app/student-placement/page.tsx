@@ -47,7 +47,7 @@ function StudentPlacementPageContent() {
   // 데이터 로딩 함수
   const fetchData = async () => {
     try {
-      console.log('🔍 [student-placement/page.tsx] fetchData 함수 시작');
+      // console.log('🔍 [student-placement/page.tsx] fetchData 함수 시작');
       setLoading(true);
       
       // 학생, 선생님, 클리닉 데이터 동시 로딩
@@ -57,7 +57,7 @@ function StudentPlacementPageContent() {
         getClinics()
       ]);
 
-      console.log('🔍 [student-placement/page.tsx] 클리닉 데이터 로딩 완료:', clinicsData);
+      // console.log('🔍 [student-placement/page.tsx] 클리닉 데이터 로딩 완료:', clinicsData);
       
       // 데이터 처리
       const teachersArray = Array.isArray(teachersData) ? teachersData : [];
@@ -80,9 +80,9 @@ function StudentPlacementPageContent() {
       setUnassignedStudents(unassigned);
       setAssignedStudents(assigned);
       
-      console.log('🔍 [student-placement/page.tsx] 모든 데이터 로딩 완료');
+      // console.log('🔍 [student-placement/page.tsx] 모든 데이터 로딩 완료');
     } catch (error) {
-      console.error('❌ [student-placement/page.tsx] fetchData에서 오류 발생:', error);
+      // console.error('❌ [student-placement/page.tsx] fetchData에서 오류 발생:', error);
       
       toast({
         title: '데이터 로딩 실패',
@@ -326,7 +326,7 @@ function StudentPlacementPageContent() {
   };
 
   // 학생이 특정 요일에 이미 배치되어 있는지 확인하는 함수
-  const isStudentAlreadyAssignedToDay = (studentId: number, day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri'): boolean => {
+  const isStudentAlreadyAssignedToDay = (studentId: number, day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'): boolean => {
     const targetClinic = clinics.find(clinic => clinic.clinic_day === day);
     if (!targetClinic) return false;
     
@@ -341,9 +341,9 @@ function StudentPlacementPageContent() {
   };
 
   // 클리닉에 학생 배치 처리 함수
-  const handleStudentDropToClinic = async (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri', students: Student[]) => {
+  const handleStudentDropToClinic = async (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun', students: Student[]) => {
     try {
-      console.log('🔍 [student-placement/page.tsx] 클리닉 배치 시도:', day, students);
+      // console.log('🔍 [student-placement/page.tsx] 클리닉 배치 시도:', day, students);
       
       // 해당 요일의 클리닉 찾기
       const targetClinic = clinics.find(clinic => clinic.clinic_day === day);

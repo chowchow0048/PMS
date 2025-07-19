@@ -5,12 +5,12 @@ import { Clinic } from '@/lib/types';
 import { Student, ItemTypes } from './StudentItem';
 
 interface ClinicDayBoxProps {
-  day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+  day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
   dayLabel: string;
   clinics: Clinic[];
   onClinicClick: (clinic: Clinic) => void;
-  onStudentDrop?: (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri', students: Student[]) => void;
-  isStudentAlreadyAssigned?: (studentId: number, day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri') => boolean;
+  onStudentDrop?: (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun', students: Student[]) => void;
+  isStudentAlreadyAssigned?: (studentId: number, day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun') => boolean;
 }
 
 const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
