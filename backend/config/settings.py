@@ -27,6 +27,9 @@ TOKEN_EXPIRED_AFTER_SECONDS = 7200  # 2시간
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
+# 디버그 모드 설정 (SECRET_KEY 검증보다 먼저 정의되어야 함)
+DEBUG = os.environ.get("DEBUG", "True") == "True"
+
 # 보안 키 설정 (.env 파일에서 로드하거나 기본값 사용)
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
@@ -38,9 +41,6 @@ if not SECRET_KEY:
         raise ValueError(
             "SECRET_KEY 환경변수가 설정되지 않았습니다. 프로덕션 환경에서는 필수입니다."
         )
-
-# 디버그 모드 설정 (.env 파일에서 로드하거나 기본값으로 True 사용)
-DEBUG = os.environ.get("DEBUG", "True") == "True"
 
 # 접근 허용 호스트 설정
 ALLOWED_HOSTS = os.environ.get(
@@ -84,6 +84,16 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
 ).split(",")
+
+# 프로덕션 환경에서 Vercel 도메인 패턴 허용
+if not DEBUG:
+    # Vercel 도메인 패턴 허용 (*.vercel.app)
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r"^https://.*\.vercel\.app$",  # 모든 *.vercel.app 도메인 허용
+        r"^https://pms-murex\.vercel\.app$",  # 메인 도메인
+    ]
+else:
+    CORS_ALLOWED_ORIGIN_REGEXES = []
 
 # 메인 URL 설정
 ROOT_URLCONF = "config.urls"
