@@ -47,6 +47,11 @@ ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS", "localhost,127.0.0.1,healthcheck.railway.app,.railway.app"
 ).split(",")
 
+# 디버깅용: ALLOWED_HOSTS 출력
+print(f"🔍 [DEBUG] ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+print(f"🔍 [DEBUG] DEBUG 모드: {DEBUG}")
+print(f"🔍 [DEBUG] SECRET_KEY 길이: {len(SECRET_KEY) if SECRET_KEY else 0}")
+
 
 # Application definition
 
