@@ -256,10 +256,9 @@ if not DEBUG:
     # Railway 프록시 헤더 신뢰 설정 (무한 리다이렉트 방지)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-    # HTTPS 설정 (프로덕션 환경)
-    SECURE_SSL_REDIRECT = True  # HTTP를 HTTPS로 리다이렉트
-    # 헬스체크는 HTTP 리다이렉트에서 예외처리 (Railway 내부 헬스체크용)
-    SECURE_SSL_REDIRECT_EXEMPT = [r"^api/health/$"]  # 헬스체크 경로만 HTTP 허용
+    # HTTPS 설정 (Railway 환경에서는 SSL 리다이렉트 비활성화)
+    SECURE_SSL_REDIRECT = False  # Railway에서는 프록시가 HTTPS 처리
+    # Railway 환경에서는 내부 HTTP → 외부 HTTPS 변환이므로 Django 레벨에서 리다이렉트 불필요
 
     SECURE_HSTS_SECONDS = 31536000  # HSTS 헤더 설정 (1년)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # 서브도메인에도 HSTS 적용
