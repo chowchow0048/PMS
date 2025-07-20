@@ -48,9 +48,9 @@ ALLOWED_HOSTS = os.environ.get(
 ).split(",")
 
 # 디버깅용: ALLOWED_HOSTS 출력
-print(f"🔍 [DEBUG] ALLOWED_HOSTS: {ALLOWED_HOSTS}")
-print(f"🔍 [DEBUG] DEBUG 모드: {DEBUG}")
-print(f"🔍 [DEBUG] SECRET_KEY 길이: {len(SECRET_KEY) if SECRET_KEY else 0}")
+# print(f"🔍 [DEBUG] ALLOWED_HOSTS: {ALLOWED_HOSTS}")
+# print(f"🔍 [DEBUG] DEBUG 모드: {DEBUG}")
+# print(f"🔍 [DEBUG] SECRET_KEY 길이: {len(SECRET_KEY) if SECRET_KEY else 0}")
 
 
 # Application definition
@@ -75,6 +75,7 @@ INSTALLED_APPS = [
 # 미들웨어 설정 (요청 처리 파이프라인)
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # 정적 파일 서빙 (프로덕션용)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # CORS 미들웨어 (API 요청 허용)
     "django.middleware.common.CommonMiddleware",
@@ -130,38 +131,38 @@ WSGI_APPLICATION = "config.wsgi.application"
 # 데이터베이스 설정 (PostgreSQL 사용)
 # 환경변수 디버깅 (Railway 배포 시 확인용)
 DATABASE_URL = os.environ.get("DATABASE_URL")
-print(f"🔍 [DEBUG] DATABASE_URL 환경변수: {DATABASE_URL}")
+# print(f"🔍 [DEBUG] DATABASE_URL 환경변수: {DATABASE_URL}")
 
-# Railway 환경에서 DATABASE_URL 확인
-if DATABASE_URL:
-    print(f"✅ [DEBUG] DATABASE_URL 발견: {DATABASE_URL[:50]}...")
-else:
-    print("❌ [DEBUG] DATABASE_URL 환경변수가 설정되지 않음")
-    # 다른 환경변수들 확인 (Railway에서 제공하는 개별 변수들)
-    pghost = os.environ.get("PGHOST")
-    pgport = os.environ.get("PGPORT")
-    pguser = os.environ.get("PGUSER")
-    pgpassword = os.environ.get("PGPASSWORD")
-    pgdatabase = os.environ.get("PGDATABASE")
+# # Railway 환경에서 DATABASE_URL 확인
+# if DATABASE_URL:
+#     print(f"✅ [DEBUG] DATABASE_URL 발견: {DATABASE_URL[:50]}...")
+# else:
+#     print("❌ [DEBUG] DATABASE_URL 환경변수가 설정되지 않음")
+#     # 다른 환경변수들 확인 (Railway에서 제공하는 개별 변수들)
+#     pghost = os.environ.get("PGHOST")
+#     pgport = os.environ.get("PGPORT")
+#     pguser = os.environ.get("PGUSER")
+#     pgpassword = os.environ.get("PGPASSWORD")
+#     pgdatabase = os.environ.get("PGDATABASE")
 
-    print(f"🔍 [DEBUG] PGHOST: {pghost}")
-    print(f"🔍 [DEBUG] PGPORT: {pgport}")
-    print(f"🔍 [DEBUG] PGUSER: {pguser}")
-    print(f"🔍 [DEBUG] PGPASSWORD: {'*' * len(pgpassword) if pgpassword else 'None'}")
-    print(f"🔍 [DEBUG] PGDATABASE: {pgdatabase}")
+#     print(f"🔍 [DEBUG] PGHOST: {pghost}")
+#     print(f"🔍 [DEBUG] PGPORT: {pgport}")
+#     print(f"🔍 [DEBUG] PGUSER: {pguser}")
+#     print(f"🔍 [DEBUG] PGPASSWORD: {'*' * len(pgpassword) if pgpassword else 'None'}")
+#     print(f"🔍 [DEBUG] PGDATABASE: {pgdatabase}")
 
-    # 개별 환경변수들로 DATABASE_URL 구성
-    if all([pghost, pgport, pguser, pgpassword, pgdatabase]):
-        DATABASE_URL = (
-            f"postgres://{pguser}:{pgpassword}@{pghost}:{pgport}/{pgdatabase}"
-        )
-        print(f"✅ [DEBUG] DATABASE_URL 자동 구성: {DATABASE_URL[:50]}...")
+#     # 개별 환경변수들로 DATABASE_URL 구성
+#     if all([pghost, pgport, pguser, pgpassword, pgdatabase]):
+#         DATABASE_URL = (
+#             f"postgres://{pguser}:{pgpassword}@{pghost}:{pgport}/{pgdatabase}"
+#         )
+#         print(f"✅ [DEBUG] DATABASE_URL 자동 구성: {DATABASE_URL[:50]}...")
 
 # 프로덕션 환경에서는 DATABASE_URL이 반드시 있어야 함
-if not DEBUG and not DATABASE_URL:
-    raise ValueError(
-        "프로덕션 환경에서는 DATABASE_URL 환경변수가 반드시 설정되어야 합니다."
-    )
+# if not DEBUG and not DATABASE_URL:
+#     raise ValueError(
+#         "프로덕션 환경에서는 DATABASE_URL 환경변수가 반드시 설정되어야 합니다."
+#     )
 
 # 데이터베이스 연결 설정
 try:
@@ -218,6 +219,9 @@ USE_TZ = True
 # 정적 파일 설정
 STATIC_URL = "static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+
+# WhiteNoise 정적 파일 스토리지 (프로덕션용)
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # 미디어 파일 설정
 MEDIA_URL = "/media/"
@@ -290,8 +294,8 @@ if not DEBUG:
     # 보안 미들웨어 추가
     MIDDLEWARE.insert(0, "django.middleware.security.SecurityMiddleware")
 
-    # 정적 파일 보안 설정
-    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    # 정적 파일 보안 설정 (WhiteNoise 사용)
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
     # 로그 레벨 강화는 LOGGING 설정 이후에 적용 (아래로 이동됨)
 
