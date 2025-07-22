@@ -31,10 +31,11 @@ import {
   Spinner,
   Center
 } from '@chakra-ui/react';
-import { SearchIcon, AttachmentIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
+import { SearchIcon, AttachmentIcon, DownloadIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 import { useDrop } from 'react-dnd';
 import StudentItem, { Student, ItemTypes } from './StudentItem';
 import { uploadStudentExcel, uploadClinicEnrollmentExcel } from '@/lib/api';
+import * as XLSX from 'xlsx';
 
 // 미배치 학생 영역 컴포넌트 props 인터페이스
 interface UnassignedStudentAreaProps {
@@ -131,6 +132,15 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
     }
   };
 
+  // 엑셀 양식 다운로드 핸들러
+  const handleDownloadTemplate = () => {
+    const headers = ['학교', '학년', '이름', '학생 전화번호', '학부모 전화번호'];
+    const worksheet = XLSX.utils.aoa_to_sheet([headers]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '학생 명단');
+    XLSX.writeFile(workbook, '학생_명단_양식.xlsx');
+  };
+
   // 엑셀 업로드 핸들러
   const handleUploadExcel = async () => {
     if (!selectedFile) {
@@ -151,13 +161,28 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       if (uploadType === 'student') {
         result = await uploadStudentExcel(selectedFile);
         
-        toast({
-          title: '학생 명단 업로드 완료',
-          description: `총 ${result.total_rows}행 중 ${result.added_students.length}명 추가, ${result.duplicate_students.length}명 중복, ${result.error_students.length}명 오류`,
-          status: 'success',
-          duration: 5000,
-          isClosable: true,
-        });
+        const successCount = result.added_students?.length || 0;
+        const duplicateCount = result.duplicate_students?.length || 0;
+        const errorCount = result.error_students?.length || 0;
+
+        if (errorCount > 0) {
+            toast({
+                title: '일부 학생 업로드 실패',
+                description: `총 ${result.total_rows}행 중 ${successCount}명 추가, ${duplicateCount}명 중복, ${errorCount}명 오류`,
+                status: 'warning',
+                duration: 7000,
+                isClosable: true,
+            });
+        } else {
+            toast({
+                title: '학생 명단 업로드 완료',
+                description: `총 ${result.total_rows}행 중 ${successCount}명 추가, ${duplicateCount}명 중복`,
+                status: 'success',
+                duration: 5000,
+                isClosable: true,
+            });
+        }
+
       } else {
         result = await uploadClinicEnrollmentExcel(selectedFile);
         
@@ -178,11 +203,21 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       }
     } catch (error: any) {
       console.error('엑셀 업로드 오류:', error);
+      const errorData = error.response?.data;
+      let description = '파일 업로드 중 오류가 발생했습니다.';
+
+      if (errorData?.error_students && errorData.error_students.length > 0) {
+        const firstError = errorData.error_students[0];
+        description = `행 ${firstError.row}: ${firstError.name} - ${firstError.error}`;
+      } else if (errorData?.error) {
+        description = errorData.error;
+      }
+
       toast({
         title: '업로드 실패',
-        description: error.response?.data?.error || '파일 업로드 중 오류가 발생했습니다.',
+        description: description,
         status: 'error',
-        duration: 5000,
+        duration: 7000,
         isClosable: true,
       });
     } finally {
@@ -516,7 +551,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                      {uploadType === 'student' ? (
                        <>
                          엑셀 파일에는 다음 컬럼이 포함되어야 합니다:<br />
-                         <strong>학교, 학년, 이름, 학생번호, 학부모번호</strong>
+                         <strong>학교, 학년, 이름, 학부모 전화번호</strong> (학생 전화번호는 선택사항)
                        </>
                      ) : (
                        <>
@@ -528,9 +563,21 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                  </Box>
                </Alert>
 
-              {/* 파일 선택 */}
+              {/* 파일 선택 및 양식 다운로드 */}
               <Box>
-                <Text mb={2} fontWeight="medium">파일 선택</Text>
+                <Flex justify="space-between" align="center" mb={2}>
+                    <Text fontWeight="medium">파일 선택</Text>
+                    {uploadType === 'student' && (
+                        <Button 
+                            size="sm" 
+                            leftIcon={<DownloadIcon />} 
+                            onClick={handleDownloadTemplate}
+                            variant="outline"
+                        >
+                            엑셀 양식 다운로드
+                        </Button>
+                    )}
+                </Flex>
                 <Input
                   type="file"
                   accept=".xlsx,.xls"

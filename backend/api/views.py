@@ -122,9 +122,9 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"])
     def upload_excel(self, request):
-        """Google Form 스프레드시트에서 생성된 엑셀 파일로 학생 명단 업로드"""
-        logger.info("[api/views.py] 엑셀 파일 업로드 시작")
-        # print("🔍 [DEBUG] 엑셀 파일 업로드 시작")
+        """학생 명단 업로드용 엑셀 파일 처리"""
+        logger.info("[api/views.py] 학생 명단 엑셀 파일 업로드 시작")
+        # print("🔍 [DEBUG] 학생 명단 엑셀 파일 업로드 시작")
 
         if "file" not in request.FILES:
             # print("❌ [DEBUG] 파일이 업로드되지 않았습니다.")
@@ -155,25 +155,25 @@ class StudentViewSet(viewsets.ModelViewSet):
             # print(f"🔍 [DEBUG] 임시 파일 저장 경로: {file_path}")
 
             # 엑셀 파일 읽기
-            # print("🔍 [DEBUG] 엑셀 파일 읽기 시도...")
+            # print("🔍 [DEBUG] 학생 명단 엑셀 파일 읽기 시도...")
             df = pd.read_excel(file_path)
-            # print(f"🔍 [DEBUG] 엑셀 파일 읽기 완료: {len(df)}행")
+            # print(f"🔍 [DEBUG] 학생 명단 엑셀 파일 읽기 완료: {len(df)}행")
             # print(f"🔍 [DEBUG] 컬럼 목록: {list(df.columns)}")
             # print(f"🔍 [DEBUG] 데이터 샘플 (첫 3행):\n{df.head(3)}")
 
-            logger.info(f"[api/views.py] 엑셀 파일 읽기 완료: {len(df)}행")
+            logger.info(f"[api/views.py] 학생 명단 엑셀 파일 읽기 완료: {len(df)}행")
 
-            # Google Form 스프레드시트 컬럼 확인
-            # 컬럼 구조: A열(응답생성날짜), B열(학교), C열(학년), D열(이름), E열(학생전화번호), F열(학부모전화번호), G~R열(시간대), S열(희망선생)
+            # 학생 명단 업로드 양식 컬럼 확인
+            # 프론트엔드 양식 구조: A열(학교), B열(학년), C열(이름), D열(학생전화번호), E열(학부모전화번호)
             logger.info(f"[api/views.py] 엑셀 컬럼 목록: {list(df.columns)}")
 
-            # 최소 필요 컬럼 수 확인 (A~F열, 최소 6개)
-            if len(df.columns) < 6:
-                # print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (최소 6개 필요)")
+            # 최소 필요 컬럼 수 확인 (학교, 학년, 이름, 학부모전화번호 = 4개 필수)
+            if len(df.columns) < 4:
+                # print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (최소 4개 필요)")
                 default_storage.delete(file_name)
                 return Response(
                     {
-                        "error": "Google Form 스프레드시트 형식이 아닙니다. 최소 6개 컬럼이 필요합니다."
+                        "error": "학생 명단 양식이 올바르지 않습니다. 최소 4개 컬럼(학교, 학년, 이름, 학부모전화번호)이 필요합니다."
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -186,21 +186,21 @@ class StudentViewSet(viewsets.ModelViewSet):
                 "error_students": [],
             }
 
-            # print(f"🔍 [DEBUG] 데이터 처리 시작: {len(df)}행")
+            # print(f"🔍 [DEBUG] 학생 명단 데이터 처리 시작: {len(df)}행")
 
             # 각 행 처리
             for index, row in df.iterrows():
                 # print(f"🔍 [DEBUG] 행 {index + 2} 처리 중...")
                 try:
-                    # 컬럼 순서 기반으로 데이터 추출
-                    # 0: 응답생성날짜, 1: 학교, 2: 학년, 3: 이름, 4: 학생전화번호, 5: 학부모전화번호
-                    timestamp = str(row.iloc[0]).strip() if len(row) > 0 else ""
-                    school = str(row.iloc[1]).strip() if len(row) > 1 else ""
-                    grade = str(row.iloc[2]).strip() if len(row) > 2 else ""
-                    name = str(row.iloc[3]).strip() if len(row) > 3 else ""
+                    # 프론트엔드 양식에 맞는 컬럼 순서로 데이터 추출
+                    # 0: 학교, 1: 학년, 2: 이름, 3: 학생전화번호(선택), 4: 학부모전화번호(필수)
+                    school = str(row.iloc[0]).strip() if len(row) > 0 else ""
+                    grade = str(row.iloc[1]).strip() if len(row) > 1 else ""
+                    name = str(row.iloc[2]).strip() if len(row) > 2 else ""
 
                     # 전화번호 처리 - 앞의 0이 잘리는 문제 해결
-                    student_phone_raw = row.iloc[4] if len(row) > 4 else ""
+                    # 학생 전화번호 (선택사항)
+                    student_phone_raw = row.iloc[3] if len(row) > 3 else ""
                     if pd.isna(student_phone_raw):
                         student_phone = ""
                     else:
@@ -214,7 +214,8 @@ class StudentViewSet(viewsets.ModelViewSet):
                         if len(student_phone) == 10 and student_phone.startswith("1"):
                             student_phone = "0" + student_phone
 
-                    parent_phone_raw = row.iloc[5] if len(row) > 5 else ""
+                    # 학부모 전화번호 (필수)
+                    parent_phone_raw = row.iloc[4] if len(row) > 4 else ""
                     if pd.isna(parent_phone_raw):
                         parent_phone = ""
                     else:
@@ -235,14 +236,51 @@ class StudentViewSet(viewsets.ModelViewSet):
                     #     f"🔍 [DEBUG] 행 {index + 2}: 학생번호={student_phone}, 학부모번호={parent_phone}"
                     # )
 
-                    # 빈 값 검증
-                    if not all([school, grade, name, student_phone, parent_phone]):
-                        # print(f"❌ [DEBUG] 행 {index + 2}: 필수 정보 누락")
+                    # 빈 값 검증 (학생 전화번호는 선택사항)
+                    if not all([school, grade, name, parent_phone]):
                         results["error_students"].append(
                             {
-                                "row": index + 2,  # 엑셀 행 번호 (헤더 포함)
+                                "row": index + 2,
                                 "name": name,
-                                "error": "필수 정보가 누락되었습니다.",
+                                "error": "학교, 학년, 이름, 학부모 전화번호는 필수입니다.",
+                            }
+                        )
+                        continue
+
+                    # 이름 유효성 검사 (숫자 포함 여부)
+                    if any(char.isdigit() for char in name):
+                        results["error_students"].append(
+                            {
+                                "row": index + 2,
+                                "name": name,
+                                "error": f"이름에 숫자가 포함될 수 없습니다: {name}",
+                            }
+                        )
+                        continue
+
+                    # 전화번호 유효성 검사 (학생, 학부모)
+                    def is_valid_phone(phone):
+                        if not phone:  # 비어있는 경우 유효
+                            return True
+                        phone_digits = phone.replace("-", "")
+                        return phone_digits.isdigit() and len(phone_digits) in [10, 11]
+
+                    if not is_valid_phone(student_phone):
+                        results["error_students"].append(
+                            {
+                                "row": index + 2,
+                                "name": name,
+                                "error": f"학생 전화번호 형식이 올바르지 않습니다: {student_phone}",
+                            }
+                        )
+                        continue
+
+                    if not is_valid_phone(parent_phone):
+                        results["error_students"].append(
+                            {
+                                "row": index + 2,
+                                "name": name,
+                                "error": f"학부모 전화번호 형식이 올바르지 않습니다: {parent_phone}",
                             }
                         )
                         continue
