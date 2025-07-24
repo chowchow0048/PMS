@@ -66,13 +66,17 @@ mypage_logger = logging.getLogger("mypage")
 class UserViewSet(viewsets.ModelViewSet):
     """사용자 뷰셋 - 읽기 전용"""
 
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by("id")  # 페이지네이션을 위한 순서 지정
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         """요청 파라미터에 따라 필터링된 사용자 목록 반환"""
-        queryset = User.objects.all()
+        queryset = User.objects.all().order_by("id")  # 페이지네이션을 위한 순서 지정
+
+        # students 엔드포인트로 접근한 경우 기본적으로 학생만 필터링 (backward compatibility)
+        if hasattr(self, "basename") and self.basename == "students":
+            queryset = queryset.filter(is_student=True)
 
         # 활성화된 사용자만 필터링
         # is_activated = self.request.query_params.get("is_activated")  # 보충 시스템 개편으로 주석처리 - 더 이상 사용되지 않는 필드
@@ -437,12 +441,16 @@ class SubjectViewSet(viewsets.ModelViewSet):
 
 
 class ClinicViewSet(viewsets.ModelViewSet):
-    queryset = Clinic.objects.all()
+    queryset = Clinic.objects.all().order_by(
+        "-id"
+    )  # 페이지네이션을 위한 순서 지정 (최신순)
     serializer_class = ClinicSerializer
 
     def get_queryset(self):
         """요청 파라미터에 따라 필터링된 클리닉 목록 반환"""
-        queryset = Clinic.objects.all()
+        queryset = Clinic.objects.all().order_by(
+            "-id"
+        )  # 페이지네이션을 위한 순서 지정 (최신순)
 
         # 특정 선생님의 클리닉만 필터링
         teacher_id = self.request.query_params.get("teacher_id")

@@ -6,6 +6,10 @@ from . import views
 router = DefaultRouter()
 # 뷰셋 등록 - Student 모델 삭제로 StudentViewSet 제거
 # router.register(r"students", views.StudentViewSet)  # Student 모델 삭제로 주석처리
+# backward compatibility를 위한 students 엔드포인트 (UserViewSet을 사용)
+router.register(
+    r"students", views.UserViewSet, basename="students"
+)  # deprecated - users 사용 권장
 router.register(r"users", views.UserViewSet)  # is_student 필터링으로 학생 관리
 router.register(r"subjects", views.SubjectViewSet)
 # router.register(r"times", views.TimeViewSet)  # 보충 시스템 개편으로 주석처리
