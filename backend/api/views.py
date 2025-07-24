@@ -13,17 +13,18 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from django.db import transaction
 from core.models import (
-    Student,
+    # Student,  # Student 모델 삭제로 주석처리
     Subject,
     # Time,  # 보충 시스템 개편으로 주석처리
     Clinic,
     # Comment,  # 보충 시스템 개편으로 주석처리
     User,
     StudentPlacement,
+    WeeklyReservationPeriod,  # 주간 예약 기간 관리
 )
 from .serializers import (
     UserSerializer,
-    StudentSerializer,
+    # StudentSerializer,  # Student 모델 삭제로 주석처리
     SubjectSerializer,
     # TimeSerializer,  # 보충 시스템 개편으로 주석처리
     ClinicSerializer,
@@ -32,6 +33,8 @@ from .serializers import (
     LoginSerializer,
     StudentPlacementSerializer,
     StudentPlacementUpdateSerializer,
+    StudentUserGenerationSerializer,  # 새로 추가
+    WeeklyReservationPeriodSerializer,  # 주간 예약 기간 serializer 추가
 )
 import logging
 import traceback
@@ -45,6 +48,13 @@ import os
 from django.db.models import Q
 from datetime import datetime
 from django.conf import settings
+from core.utils import (
+    with_reservation_lock,
+    with_rate_limit,
+    log_performance,
+    ClinicReservationOptimizer,
+    DatabaseOptimizer,
+)
 
 # 로거 설정
 logger = logging.getLogger("api.auth")
@@ -65,82 +75,54 @@ class UserViewSet(viewsets.ModelViewSet):
         queryset = User.objects.all()
 
         # 활성화된 사용자만 필터링
-        is_activated = self.request.query_params.get("is_activated")
-        if is_activated is not None:
-            queryset = queryset.filter(is_activated=(is_activated.lower() == "true"))
+        # is_activated = self.request.query_params.get("is_activated")  # 보충 시스템 개편으로 주석처리 - 더 이상 사용되지 않는 필드
+        # if is_activated is not None:
+        #     queryset = queryset.filter(is_activated=(is_activated.lower() == "true"))
 
         # 관리자만 필터링
-        is_manager = self.request.query_params.get("is_manager")
-        if is_manager is not None:
-            queryset = queryset.filter(is_manager=(is_manager.lower() == "true"))
+        # is_manager = self.request.query_params.get("is_manager")  # 보충 시스템 개편으로 주석처리 - 더 이상 사용되지 않는 필드
+        # if is_manager is not None:
+        #     queryset = queryset.filter(is_manager=(is_manager.lower() == "true"))
 
         # 활성 상태 필터링
         is_active = self.request.query_params.get("is_active")
         if is_active is not None:
             queryset = queryset.filter(is_active=(is_active.lower() == "true"))
 
+        # 강사 필터링 (새로 추가)
+        is_teacher = self.request.query_params.get("is_teacher")
+        if is_teacher is not None:
+            queryset = queryset.filter(is_teacher=(is_teacher.lower() == "true"))
+
+        # 슈퍼유저 필터링 (새로 추가)
+        is_superuser = self.request.query_params.get("is_superuser")
+        if is_superuser is not None:
+            queryset = queryset.filter(is_superuser=(is_superuser.lower() == "true"))
+
+        # 학생 사용자 필터링 (새로 추가)
+        is_student = self.request.query_params.get("is_student")
+        if is_student is not None:
+            queryset = queryset.filter(is_student=(is_student.lower() == "true"))
+
         logger.info(f"[api/views.py] 사용자 조회 결과: {queryset.count()} 명")
 
         return queryset
 
-
-class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.all()
-    serializer_class = StudentSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        """요청 파라미터에 따라 필터링된 학생 목록 반환"""
-        queryset = Student.objects.all()
-
-        # 보충 시스템 개편으로 주석처리 - 더 이상 teacher 배정 개념 없음
-        # # 특정 선생님에게 배정된 학생만 필터링
-        # teacher_id = self.request.query_params.get("teacher_id")
-        # if teacher_id is not None:
-        #     queryset = queryset.filter(assigned_teacher_id=teacher_id)
-        #
-        # # 미배정 학생만 필터링
-        # unassigned = self.request.query_params.get("unassigned")
-        # if unassigned is not None and unassigned.lower() == "true":
-        #     queryset = queryset.filter(assigned_teacher__isnull=True)
-
-        return queryset
-
-    def update(self, request, *args, **kwargs):
-        """학생 정보 업데이트 (부분 업데이트 허용)"""
-        logger.info(f"[api/views.py] 학생 정보 업데이트 요청: {request.data}")
-
-        # 부분 업데이트 허용
-        partial = kwargs.pop("partial", True)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-
-        logger.info(f"[api/views.py] 학생 정보 업데이트 성공: {instance.id}")
-        return Response(serializer.data)
-
     @action(detail=False, methods=["post"])
-    def upload_excel(self, request):
-        """학생 명단 업로드용 엑셀 파일 처리"""
+    def upload_student_excel(self, request):
+        """학생 명단 엑셀 파일로 학생 사용자(is_student=True) 추가"""
         logger.info("[api/views.py] 학생 명단 엑셀 파일 업로드 시작")
-        # print("🔍 [DEBUG] 학생 명단 엑셀 파일 업로드 시작")
 
         if "file" not in request.FILES:
-            # print("❌ [DEBUG] 파일이 업로드되지 않았습니다.")
             return Response(
                 {"error": "파일이 업로드되지 않았습니다."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         excel_file = request.FILES["file"]
-        # print(f"🔍 [DEBUG] 업로드된 파일: {excel_file.name}")
-        # print(f"🔍 [DEBUG] 파일 크기: {excel_file.size} bytes")
-        # print(f"🔍 [DEBUG] 파일 타입: {excel_file.content_type}")
 
         # 파일 확장자 검증
         if not excel_file.name.endswith((".xlsx", ".xls")):
-            # print(f"❌ [DEBUG] 잘못된 파일 확장자: {excel_file.name}")
             return Response(
                 {"error": "엑셀 파일(.xlsx, .xls)만 업로드 가능합니다."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -152,24 +134,13 @@ class StudentViewSet(viewsets.ModelViewSet):
                 f"temp/{excel_file.name}", ContentFile(excel_file.read())
             )
             file_path = default_storage.path(file_name)
-            # print(f"🔍 [DEBUG] 임시 파일 저장 경로: {file_path}")
 
             # 엑셀 파일 읽기
-            # print("🔍 [DEBUG] 학생 명단 엑셀 파일 읽기 시도...")
             df = pd.read_excel(file_path)
-            # print(f"🔍 [DEBUG] 학생 명단 엑셀 파일 읽기 완료: {len(df)}행")
-            # print(f"🔍 [DEBUG] 컬럼 목록: {list(df.columns)}")
-            # print(f"🔍 [DEBUG] 데이터 샘플 (첫 3행):\n{df.head(3)}")
-
             logger.info(f"[api/views.py] 학생 명단 엑셀 파일 읽기 완료: {len(df)}행")
-
-            # 학생 명단 업로드 양식 컬럼 확인
-            # 프론트엔드 양식 구조: A열(학교), B열(학년), C열(이름), D열(학생전화번호), E열(학부모전화번호)
-            logger.info(f"[api/views.py] 엑셀 컬럼 목록: {list(df.columns)}")
 
             # 최소 필요 컬럼 수 확인 (학교, 학년, 이름, 학부모전화번호 = 4개 필수)
             if len(df.columns) < 4:
-                # print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (최소 4개 필요)")
                 default_storage.delete(file_name)
                 return Response(
                     {
@@ -186,11 +157,8 @@ class StudentViewSet(viewsets.ModelViewSet):
                 "error_students": [],
             }
 
-            # print(f"🔍 [DEBUG] 학생 명단 데이터 처리 시작: {len(df)}행")
-
             # 각 행 처리
             for index, row in df.iterrows():
-                # print(f"🔍 [DEBUG] 행 {index + 2} 처리 중...")
                 try:
                     # 프론트엔드 양식에 맞는 컬럼 순서로 데이터 추출
                     # 0: 학교, 1: 학년, 2: 이름, 3: 학생전화번호(선택), 4: 학부모전화번호(필수)
@@ -205,12 +173,10 @@ class StudentViewSet(viewsets.ModelViewSet):
                         student_phone = ""
                     else:
                         if isinstance(student_phone_raw, (int, float)):
-                            # 숫자형인 경우 문자열로 변환하고 앞에 0 추가
                             student_phone = str(int(student_phone_raw)).zfill(11)
                         else:
                             student_phone = str(student_phone_raw).strip()
 
-                        # 전화번호가 10자리이고 1로 시작하면 앞에 0 추가
                         if len(student_phone) == 10 and student_phone.startswith("1"):
                             student_phone = "0" + student_phone
 
@@ -220,21 +186,12 @@ class StudentViewSet(viewsets.ModelViewSet):
                         parent_phone = ""
                     else:
                         if isinstance(parent_phone_raw, (int, float)):
-                            # 숫자형인 경우 문자열로 변환하고 앞에 0 추가
                             parent_phone = str(int(parent_phone_raw)).zfill(11)
                         else:
                             parent_phone = str(parent_phone_raw).strip()
 
-                        # 전화번호가 10자리이고 1로 시작하면 앞에 0 추가
                         if len(parent_phone) == 10 and parent_phone.startswith("1"):
                             parent_phone = "0" + parent_phone
-
-                    # print(
-                    #     f"🔍 [DEBUG] 행 {index + 2}: 학생명={name}, 학교={school}, 학년={grade}"
-                    # )
-                    # print(
-                    #     f"🔍 [DEBUG] 행 {index + 2}: 학생번호={student_phone}, 학부모번호={parent_phone}"
-                    # )
 
                     # 빈 값 검증 (학생 전화번호는 선택사항)
                     if not all([school, grade, name, parent_phone]):
@@ -286,7 +243,6 @@ class StudentViewSet(viewsets.ModelViewSet):
                         continue
 
                     # 학교명 정규화
-                    original_school = school
                     if school in ["세화고등학교", "세화고"]:
                         school = "세화고"
                     elif school in ["세화여자고등학교", "세화여고"]:
@@ -294,9 +250,6 @@ class StudentViewSet(viewsets.ModelViewSet):
                     elif school in ["연합반"]:
                         school = "연합반"
                     else:
-                        # print(
-                        #     f"❌ [DEBUG] 행 {index + 2}: 지원하지 않는 학교 '{original_school}'"
-                        # )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
@@ -307,7 +260,6 @@ class StudentViewSet(viewsets.ModelViewSet):
                         continue
 
                     # 학년 정규화
-                    original_grade = grade
                     if grade in ["1", "1학년"]:
                         grade = "1학년"
                     elif grade in ["2", "2학년"]:
@@ -315,9 +267,6 @@ class StudentViewSet(viewsets.ModelViewSet):
                     elif grade in ["3", "3학년"]:
                         grade = "3학년"
                     else:
-                        # print(
-                        #     f"❌ [DEBUG] 행 {index + 2}: 지원하지 않는 학년 '{original_grade}'"
-                        # )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
@@ -327,76 +276,112 @@ class StudentViewSet(viewsets.ModelViewSet):
                         )
                         continue
 
-                    # print(
-                    #     f"🔍 [DEBUG] 행 {index + 2}: 정규화 완료 - 학교={school}, 학년={grade}"
-                    # )
-
                     # 중복 검사 (학교, 학년, 이름, 학부모번호로 확인)
-                    existing_student = Student.objects.filter(
+                    existing_user = User.objects.filter(
+                        is_student=True,
                         school=school,
                         grade=grade,
-                        student_name=name,
+                        name=name,
                         student_parent_phone_num=parent_phone,
                     ).first()
 
-                    if existing_student:
-                        # print(
-                        #     f"⚠️ [DEBUG] 행 {index + 2}: 중복 학생 발견 (ID: {existing_student.id})"
-                        # )
+                    if existing_user:
                         results["duplicate_students"].append(
                             {
                                 "row": index + 2,
                                 "name": name,
                                 "school": school,
                                 "grade": grade,
-                                "existing_id": existing_student.id,
+                                "existing_id": existing_user.id,
                             }
                         )
                         continue
 
-                    # 새 학생 생성
+                    # 8자리 학생 ID 생성
+                    def generate_student_username(school, grade, user_id):
+                        # 현재 연도의 마지막 2자리
+                        current_year = "25"  # 2025년
+
+                        # 학교 코드 매핑
+                        school_code_map = {
+                            "세화고": "01",
+                            "세화여고": "02",
+                            "연합반": "03",
+                        }
+
+                        # 학년 코드 매핑
+                        grade_code_map = {
+                            "예비고1": "0",
+                            "1학년": "1",
+                            "2학년": "2",
+                            "3학년": "3",
+                        }
+
+                        school_code = school_code_map.get(school, "99")
+                        grade_code = grade_code_map.get(grade, "9")
+
+                        # 사용자 ID를 3자리로 변환 (예: 1 -> 001)
+                        user_id_padded = str(user_id).zfill(3)
+
+                        # 8자리 ID 생성
+                        return (
+                            f"{current_year}{school_code}{grade_code}{user_id_padded}"
+                        )
+
                     # 기본 과목을 physics1으로 설정
                     default_subject = None
                     try:
-                        # physics1 과목을 기본값으로 우선 설정
                         default_subject = Subject.objects.filter(
                             subject="physics1"
                         ).first()
                         if not default_subject:
-                            # physics1이 없으면 첫 번째 과목 사용
                             default_subject = Subject.objects.first()
                     except Subject.DoesNotExist:
                         pass
 
-                    # print(f"🔍 [DEBUG] 행 {index + 2}: 새 학생 생성 시도...")
-                    new_student = Student.objects.create(
-                        student_name=name,
-                        school=school,
-                        grade=grade,
+                    # 새 학생 사용자 생성
+                    new_user = User.objects.create_user(
+                        username=f"temp_{name}_{index}",  # 임시 username (나중에 실제 ID로 변경)
+                        name=name,
+                        phone_num=student_phone,
                         student_phone_num=student_phone,
                         student_parent_phone_num=parent_phone,
-                        student_subject=default_subject,  # physics1 기본 과목 설정
+                        school=school,
+                        grade=grade,
+                        subject=default_subject,
+                        is_student=True,
+                        is_teacher=False,
+                        is_staff=False,
+                        is_superuser=False,
+                        password=f"temp_{name}_{index}",  # 임시 비밀번호 (나중에 변경)
                     )
+
+                    # 실제 8자리 학생 ID 생성 및 업데이트
+                    student_username = generate_student_username(
+                        school, grade, new_user.id
+                    )
+                    new_user.username = student_username
+                    new_user.set_password(
+                        student_username
+                    )  # 비밀번호를 학생 ID와 동일하게 설정
+                    new_user.save()
 
                     results["added_students"].append(
                         {
-                            "id": new_student.id,
+                            "id": new_user.id,
                             "name": name,
                             "school": school,
                             "grade": grade,
+                            "username": student_username,
                         }
                     )
 
-                    # print(
-                    #     f"✅ [DEBUG] 행 {index + 2}: 새 학생 추가 완료 (ID: {new_student.id})"
-                    # )
                     logger.info(
-                        f"[api/views.py] 새 학생 추가: {name} ({school} {grade})"
+                        f"[api/views.py] 새 학생 사용자 추가: {name} ({school} {grade}) - ID: {student_username}"
                     )
 
                 except Exception as e:
                     error_msg = str(e)
-                    # print(f"❌ [DEBUG] 행 {index + 2} 처리 오류: {error_msg}")
                     logger.error(
                         f"[api/views.py] 행 {index + 2} 처리 오류: {error_msg}"
                     )
@@ -410,11 +395,6 @@ class StudentViewSet(viewsets.ModelViewSet):
 
             # 임시 파일 삭제
             default_storage.delete(file_name)
-            # print("🔍 [DEBUG] 임시 파일 삭제 완료")
-
-            # print(
-            #     f"✅ [DEBUG] 처리 완료 - 추가: {len(results['added_students'])}명, 중복: {len(results['duplicate_students'])}명, 오류: {len(results['error_students'])}명"
-            # )
 
             logger.info(
                 f"[api/views.py] 엑셀 업로드 완료: 추가 {len(results['added_students'])}명, 중복 {len(results['duplicate_students'])}명, 오류 {len(results['error_students'])}명"
@@ -424,7 +404,6 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             error_msg = str(e)
-            # print(f"❌ [DEBUG] 엑셀 파일 처리 중 전체 오류: {error_msg}")
             logger.error(f"[api/views.py] 엑셀 파일 처리 오류: {error_msg}")
             logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
 
@@ -432,7 +411,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             try:
                 if "file_name" in locals():
                     default_storage.delete(file_name)
-                    # print("🔍 [DEBUG] 오류 발생 시 임시 파일 삭제 완료")
             except:
                 pass
 
@@ -440,6 +418,11 @@ class StudentViewSet(viewsets.ModelViewSet):
                 {"error": f"파일 처리 중 오류가 발생했습니다: {error_msg}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+# StudentViewSet 완전 삭제 - Student 모델 통합으로 인해 더 이상 필요하지 않음
+# User 모델에서 is_student=True인 사용자들이 학생 역할을 수행
+# 학생 관련 기능은 UserViewSet에서 is_student 필터링으로 처리
 
 
 class SubjectViewSet(viewsets.ModelViewSet):
@@ -474,354 +457,297 @@ class ClinicViewSet(viewsets.ModelViewSet):
         return queryset
 
     @action(detail=False, methods=["post"])
-    def upload_clinic_enrollment(self, request):
-        """보충 신청 엑셀 파일로 클리닉 등록 처리"""
-        logger.info("[api/views.py] 보충 신청 엑셀 파일 업로드 시작")
-        # print("🔍 [DEBUG] 보충 신청 엑셀 파일 업로드 시작")
-
-        if "file" not in request.FILES:
-            # print("❌ [DEBUG] 파일이 업로드되지 않았습니다.")
-            return Response(
-                {"error": "파일이 업로드되지 않았습니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        excel_file = request.FILES["file"]
-        # print(f"🔍 [DEBUG] 업로드된 파일: {excel_file.name}")
-        # print(f"🔍 [DEBUG] 파일 크기: {excel_file.size} bytes")
-        # print(f"🔍 [DEBUG] 파일 타입: {excel_file.content_type}")
-
-        # 파일 확장자 검증
-        if not excel_file.name.endswith((".xlsx", ".xls")):
-            # print(f"❌ [DEBUG] 잘못된 파일 확장자: {excel_file.name}")
-            return Response(
-                {"error": "엑셀 파일(.xlsx, .xls)만 업로드 가능합니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+    @with_rate_limit(action="clinic_reservation", limit=5, window=60)
+    @log_performance("클리닉 예약")
+    def reserve_clinic(self, request):
+        """
+        학생이 클리닉을 예약하는 API (선착순 시스템)
+        동시접속 보호: Rate limiting, 성능 로깅 적용
+        """
+        logger.info("[api/views.py] 클리닉 예약 요청 시작")
 
         try:
-            # 임시 파일 저장
-            file_name = default_storage.save(
-                f"temp/{excel_file.name}", ContentFile(excel_file.read())
-            )
-            file_path = default_storage.path(file_name)
-            # print(f"🔍 [DEBUG] 임시 파일 저장 경로: {file_path}")
+            # 요청 데이터 추출
+            user_id = request.data.get("user_id")
+            clinic_id = request.data.get("clinic_id")
 
-            # 엑셀 파일 읽기
-            # print("🔍 [DEBUG] 보충 신청 엑셀 파일 읽기 시도...")
-            df = pd.read_excel(file_path)
-            # print(f"🔍 [DEBUG] 보충 신청 엑셀 파일 읽기 완료: {len(df)}행")
-            # print(f"🔍 [DEBUG] 컬럼 목록: {list(df.columns)}")
-            # print(f"🔍 [DEBUG] 데이터 샘플 (첫 3행):\n{df.head(3)}")
+            if not user_id or not clinic_id:
+                return Response(
+                    {"error": "user_id와 clinic_id가 필요합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            logger.info(f"[api/views.py] 보충 신청 엑셀 파일 읽기 완료: {len(df)}행")
+            # 사용자 및 클리닉 유효성 검사
+            try:
+                # user = User.objects.get(id=user_id, is_student=True)  # 보충 시스템 개편으로 주석처리 - 모든 사용자 예약 가능
+                user = User.objects.get(
+                    id=user_id
+                )  # 모든 종류의 사용자가 클리닉 예약 가능 (학생 < 강사 < 관리자 < 슈퍼유저)
+                clinic = DatabaseOptimizer.get_clinic_with_lock(clinic_id)
+            except User.DoesNotExist:
+                return Response(
+                    # {"error": "유효하지 않은 학생 사용자입니다."},  # 보충 시스템 개편으로 주석처리
+                    {
+                        "error": "유효하지 않은 사용자입니다."
+                    },  # 모든 사용자 대상으로 메시지 변경
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            except Clinic.DoesNotExist:
+                return Response(
+                    {"error": "유효하지 않은 클리닉입니다."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
-            # 컬럼 구조 확인 (총 5개 컬럼 필요)
-            if len(df.columns) < 5:
-                # print(f"❌ [DEBUG] 컬럼 수 부족: {len(df.columns)}개 (5개 필요)")
-                default_storage.delete(file_name)
+                # 클리닉 활성화 상태 확인 (간단한 시스템)
+            if not clinic.is_active:
                 return Response(
                     {
-                        "error": "보충 신청 양식이 올바르지 않습니다. 5개 컬럼이 필요합니다."
+                        "error": "reservation_closed",
+                        "message": "보충 예약 가능 기간이 아닙니다.",
+                        "clinic_status": "inactive",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # 요일 매핑 딕셔너리
-            day_mapping = {
-                "월": "mon",
-                "월요일": "mon",
-                "화": "tue",
-                "화요일": "tue",
-                "수": "wed",
-                "수요일": "wed",
-                "목": "thu",
-                "목요일": "thu",
-                "금": "fri",
-                "금요일": "fri",
-            }
-            # print(f"🔍 [DEBUG] 요일 매핑 딕셔너리: {day_mapping}")
+            # 트랜잭션 내에서 예약 처리 (동시성 문제 방지)
+            with transaction.atomic():
+                # 이미 예약했는지 확인
+                if clinic.clinic_students.filter(id=user_id).exists():
+                    return Response(
+                        {"error": "이미 해당 클리닉에 예약되어 있습니다."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
-            # 기존 클리닉 정보 확인
-            existing_clinics = Clinic.objects.all()
-            # print(f"🔍 [DEBUG] 기존 클리닉 수: {existing_clinics.count()}개")
-            for clinic in existing_clinics:
-                # print(
-                #     f"🔍 [DEBUG] 클리닉: {clinic.clinic_day} - {clinic.clinic_teacher.user_name}"
-                # )
-                pass
-
-            # 데이터 처리 결과 저장
-            results = {
-                "total_rows": len(df),
-                "processed_students": [],
-                "not_found_students": [],
-                "error_students": [],
-            }
-
-            # print(f"🔍 [DEBUG] 보충 신청 데이터 처리 시작: {len(df)}행")
-
-            # 각 행 처리
-            for index, row in df.iterrows():
-                # print(f"🔍 [DEBUG] 행 {index + 2} 처리 중...")
-                try:
-                    # 컬럼 순서 기반으로 데이터 추출
-                    # 0: 타임스탬프, 1: 학생이름, 2: 학생핸드폰번호, 3: 숙제해설요일, 4: 자유질문요일
-                    timestamp = str(row.iloc[0]).strip() if len(row) > 0 else ""
-                    student_name = str(row.iloc[1]).strip() if len(row) > 1 else ""
-                    student_phone_raw = row.iloc[2] if len(row) > 2 else ""
-                    prime_days_text = str(row.iloc[3]).strip() if len(row) > 3 else ""
-                    sub_days_text = str(row.iloc[4]).strip() if len(row) > 4 else ""
-
-                    # 전화번호 처리 (앞의 0이 잘리는 문제 해결)
-                    if pd.isna(student_phone_raw):
-                        student_phone = ""
-                    else:
-                        if isinstance(student_phone_raw, (int, float)):
-                            # 숫자형인 경우 문자열로 변환하고 앞에 0 추가
-                            student_phone = str(int(student_phone_raw)).zfill(11)
-                        else:
-                            student_phone = str(student_phone_raw).strip()
-
-                        # 전화번호가 10자리이고 1로 시작하면 앞에 0 추가
-                        if len(student_phone) == 10 and student_phone.startswith("1"):
-                            student_phone = "0" + student_phone
-
-                    # print(
-                    #     f"🔍 [DEBUG] 행 {index + 2}: 학생명={student_name}, 전화번호={student_phone}"
-                    # )
-                    # print(
-                    #     f"🔍 [DEBUG] 행 {index + 2}: 숙제해설={prime_days_text}, 자유질문={sub_days_text}"
-                    # )
-
-                    # 빈 값 검증
-                    if not all([student_name, student_phone]):
-                        # print(
-                        #     f"❌ [DEBUG] 행 {index + 2}: 학생 이름 또는 전화번호 누락"
-                        # )
-                        results["error_students"].append(
-                            {
-                                "row": index + 2,
-                                "name": student_name,
-                                "error": "학생 이름 또는 전화번호가 누락되었습니다.",
-                            }
-                        )
-                        continue
-
-                    # 학생 찾기 (이름과 전화번호로 매칭)
-                    # print(f"🔍 [DEBUG] 행 {index + 2}: 학생 검색 시도...")
-                    student = Student.objects.filter(
-                        student_name=student_name, student_phone_num=student_phone
-                    ).first()
-
-                    if not student:
-                        # print(f"❌ [DEBUG] 행 {index + 2}: 학생을 찾을 수 없음")
-                        # 전체 학생 목록에서 이름으로라도 찾아보기
-                        similar_students = Student.objects.filter(
-                            student_name=student_name
-                        )
-                        # print(
-                        #     f"🔍 [DEBUG] 행 {index + 2}: 동일 이름 학생 수: {similar_students.count()}명"
-                        # )
-                        for s in similar_students:
-                            # print(
-                            #     f"🔍 [DEBUG] 행 {index + 2}: 동일 이름 학생 - {s.student_name} ({s.student_phone_num})"
-                            # )
-                            pass
-
-                        results["not_found_students"].append(
-                            {
-                                "row": index + 2,
-                                "name": student_name,
-                                "phone": student_phone,
-                            }
-                        )
-                        continue
-
-                    # print(f"✅ [DEBUG] 행 {index + 2}: 학생 발견 (ID: {student.id})")
-
-                    # 숙제 해설 요일 파싱 및 처리
-                    prime_enrollments = []
-                    if prime_days_text and prime_days_text.lower() not in [
-                        "nan",
-                        "none",
-                        "",
-                    ]:
-                        # print(
-                        #     f"🔍 [DEBUG] 행 {index + 2}: 숙제해설 요일 파싱 - '{prime_days_text}'"
-                        # )
-                        prime_days = [
-                            day.strip()
-                            for day in prime_days_text.replace(" ", "").split(",")
-                        ]
-                        # print(
-                        #     f"🔍 [DEBUG] 행 {index + 2}: 파싱된 숙제해설 요일: {prime_days}"
-                        # )
-
-                        for day_kr in prime_days:
-                            if day_kr in day_mapping:
-                                day_en = day_mapping[day_kr]
-                                # print(
-                                #     f"🔍 [DEBUG] 행 {index + 2}: {day_kr} -> {day_en} 클리닉 검색..."
-                                # )
-                                clinic = Clinic.objects.filter(
-                                    clinic_day=day_en
-                                ).first()
-                                if clinic:
-                                    # ManyToMany 관계에서 학생 추가
-                                    clinic.clinic_prime_students.add(student)
-                                    prime_enrollments.append(f"{day_kr}(숙제해설)")
-                                    # print(
-                                    #     f"✅ [DEBUG] 행 {index + 2}: {day_kr} 숙제해설 클리닉 등록 완료"
-                                    # )
-                                    logger.info(
-                                        f"[api/views.py] {student_name} -> {day_kr} 숙제해설 클리닉 등록"
-                                    )
-                                else:
-                                    # print(
-                                    #     f"❌ [DEBUG] 행 {index + 2}: {day_kr}({day_en}) 클리닉을 찾을 수 없음"
-                                    # )
-                                    pass
-                            else:
-                                # print(
-                                #     f"❌ [DEBUG] 행 {index + 2}: 매핑되지 않는 요일 '{day_kr}'"
-                                # )
-                                pass
-
-                    # 자유 질문 요일 파싱 및 처리
-                    sub_enrollments = []
-                    if sub_days_text and sub_days_text.lower() not in [
-                        "nan",
-                        "none",
-                        "",
-                    ]:
-                        # print(
-                        #     f"🔍 [DEBUG] 행 {index + 2}: 자유질문 요일 파싱 - '{sub_days_text}'"
-                        # )
-                        sub_days = [
-                            day.strip()
-                            for day in sub_days_text.replace(" ", "").split(",")
-                        ]
-                        # print(
-                        #     f"🔍 [DEBUG] 행 {index + 2}: 파싱된 자유질문 요일: {sub_days}"
-                        # )
-
-                        for day_kr in sub_days:
-                            if day_kr in day_mapping:
-                                day_en = day_mapping[day_kr]
-                                # print(
-                                #     f"🔍 [DEBUG] 행 {index + 2}: {day_kr} -> {day_en} 클리닉 검색..."
-                                # )
-                                clinic = Clinic.objects.filter(
-                                    clinic_day=day_en
-                                ).first()
-                                if clinic:
-                                    # ManyToMany 관계에서 학생 추가
-                                    clinic.clinic_sub_students.add(student)
-                                    sub_enrollments.append(f"{day_kr}(자유질문)")
-                                    # print(
-                                    #     f"✅ [DEBUG] 행 {index + 2}: {day_kr} 자유질문 클리닉 등록 완료"
-                                    # )
-                                    logger.info(
-                                        f"[api/views.py] {student_name} -> {day_kr} 자유질문 클리닉 등록"
-                                    )
-                                else:
-                                    # print(
-                                    #     f"❌ [DEBUG] 행 {index + 2}: {day_kr}({day_en}) 클리닉을 찾을 수 없음"
-                                    # )
-                                    pass
-                            else:
-                                # print(
-                                #     f"❌ [DEBUG] 행 {index + 2}: 매핑되지 않는 요일 '{day_kr}'"
-                                # )
-                                pass
-
-                    results["processed_students"].append(
+                # 정원 확인
+                if clinic.is_full():
+                    logger.warning(
+                        f"[api/views.py] 클리닉 정원 초과: clinic_id={clinic_id}, "
+                        f"current={clinic.get_current_students_count()}, capacity={clinic.clinic_capacity}"
+                    )
+                    return Response(
                         {
-                            "id": student.id,
-                            "name": student_name,
-                            "phone": student_phone,
-                            "prime_enrollments": prime_enrollments,
-                            "sub_enrollments": sub_enrollments,
-                        }
+                            "error": "occupied",
+                            "message": "해당 시간대는 이미 마감되었습니다.",
+                            "current_count": clinic.get_current_students_count(),
+                            "capacity": clinic.clinic_capacity,
+                        },
+                        status=status.HTTP_409_CONFLICT,
                     )
 
-                    # print(f"✅ [DEBUG] 행 {index + 2}: 보충 신청 처리 완료")
-                    logger.info(f"[api/views.py] 보충 신청 처리 완료: {student_name}")
+                    # 예약 성공
+                clinic.clinic_students.add(user)
 
-                except Exception as e:
-                    error_msg = str(e)
-                    # print(f"❌ [DEBUG] 행 {index + 2} 처리 오류: {error_msg}")
-                    logger.error(
-                        f"[api/views.py] 행 {index + 2} 처리 오류: {error_msg}"
-                    )
-                    results["error_students"].append(
-                        {
-                            "row": index + 2,
-                            "name": (
-                                student_name
-                                if "student_name" in locals()
-                                else "알 수 없음"
-                            ),
-                            "error": error_msg,
-                        }
-                    )
+                # 예약 성공 시 캐시 무효화
+                ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
 
-            # 임시 파일 삭제
-            default_storage.delete(file_name)
-            # print("🔍 [DEBUG] 임시 파일 삭제 완료")
+                logger.info(
+                    f"[api/views.py] 클리닉 예약 성공: user_id={user_id}, "
+                    f"clinic_id={clinic_id}, user_name={user.name}"
+                )
 
-            # print(
-            #     f"✅ [DEBUG] 보충 신청 처리 완료 - 처리: {len(results['processed_students'])}명, 미발견: {len(results['not_found_students'])}명, 오류: {len(results['error_students'])}명"
-            # )
-
-            logger.info(
-                f"[api/views.py] 보충 신청 엑셀 업로드 완료: 처리 {len(results['processed_students'])}명, "
-                f"미발견 {len(results['not_found_students'])}명, 오류 {len(results['error_students'])}명"
-            )
-
-            return Response(results, status=status.HTTP_200_OK)
+                return Response(
+                    {
+                        "success": True,
+                        "message": "클리닉 예약이 완료되었습니다.",
+                        "clinic_info": {
+                            "id": clinic.id,
+                            "day": clinic.get_clinic_day_display(),
+                            "time": clinic.clinic_time,
+                            "room": clinic.clinic_room,
+                            "subject": clinic.clinic_subject.subject,
+                            "teacher": clinic.clinic_teacher.name,
+                        },
+                        "remaining_spots": clinic.get_remaining_spots(),
+                    },
+                    status=status.HTTP_200_OK,
+                )
 
         except Exception as e:
             error_msg = str(e)
-            # print(f"❌ [DEBUG] 보충 신청 엑셀 파일 처리 중 전체 오류: {error_msg}")
-            logger.error(f"[api/views.py] 보충 신청 엑셀 파일 처리 오류: {error_msg}")
+            logger.error(f"[api/views.py] 클리닉 예약 오류: {error_msg}")
             logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
 
-            # 임시 파일 삭제 (오류 발생 시에도)
-            try:
-                if "file_name" in locals():
-                    default_storage.delete(file_name)
-                    # print("🔍 [DEBUG] 오류 발생 시 임시 파일 삭제 완료")
-            except:
-                pass
-
             return Response(
-                {"error": f"파일 처리 중 오류가 발생했습니다: {error_msg}"},
+                {"error": f"클리닉 예약 중 오류가 발생했습니다: {error_msg}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["post"])
+    def cancel_reservation(self, request):
+        """
+        학생이 클리닉 예약을 취소하는 API
+        """
+        logger.info("[api/views.py] 클리닉 예약 취소 요청 시작")
 
-# 보충 시스템 개편으로 주석처리
-# class CommentViewSet(viewsets.ModelViewSet):
-#     queryset = Comment.objects.all()
-#     serializer_class = CommentSerializer
-#
-#     def get_queryset(self):
-#         """요청 파라미터에 따라 필터링된 코멘트 목록 반환"""
-#         queryset = Comment.objects.all()
-#
-#         # 특정 학생의 코멘트만 필터링
-#         student_id = self.request.query_params.get("student_id")
-#         if student_id is not None:
-#             queryset = queryset.filter(comment_student_id=student_id)
-#
-#         # 특정 작성자의 코멘트만 필터링
-#         author_id = self.request.query_params.get("author_id")
-#         if author_id is not None:
-#             queryset = queryset.filter(comment_author_id=author_id)
-#
-#         return queryset
+        try:
+            user_id = request.data.get("user_id")
+            clinic_id = request.data.get("clinic_id")
+
+            if not user_id or not clinic_id:
+                return Response(
+                    {"error": "user_id와 clinic_id가 필요합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 사용자 및 클리닉 유효성 검사
+            try:
+                # user = User.objects.get(id=user_id, is_student=True)  # 보충 시스템 개편으로 주석처리 - 모든 사용자 예약 취소 가능
+                user = User.objects.get(
+                    id=user_id
+                )  # 모든 종류의 사용자가 클리닉 예약 취소 가능 (학생 < 강사 < 관리자 < 슈퍼유저)
+                clinic = Clinic.objects.get(id=clinic_id)
+            except User.DoesNotExist:
+                return Response(
+                    # {"error": "유효하지 않은 학생 사용자입니다."},  # 보충 시스템 개편으로 주석처리
+                    {
+                        "error": "유효하지 않은 사용자입니다."
+                    },  # 모든 사용자 대상으로 메시지 변경
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            except Clinic.DoesNotExist:
+                return Response(
+                    {"error": "유효하지 않은 클리닉입니다."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # 예약되어 있는지 확인
+            if not clinic.clinic_students.filter(id=user_id).exists():
+                return Response(
+                    {"error": "해당 클리닉에 예약되어 있지 않습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+                # 예약 취소
+            clinic.clinic_students.remove(user)
+
+            # 예약 취소 시 캐시 무효화
+            ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
+
+            logger.info(
+                f"[api/views.py] 클리닉 예약 취소 성공: user_id={user_id}, "
+                f"clinic_id={clinic_id}, user_name={user.name}"
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "클리닉 예약이 취소되었습니다.",
+                    "remaining_spots": clinic.get_remaining_spots(),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[api/views.py] 클리닉 예약 취소 오류: {error_msg}")
+            logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
+
+            return Response(
+                {"error": f"클리닉 예약 취소 중 오류가 발생했습니다: {error_msg}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["get"])
+    @log_performance("주간 스케줄 조회")
+    def weekly_schedule(self, request):
+        """
+        주간 클리닉 스케줄 조회 API (5x4 그리드 데이터)
+        성능 최적화: 캐싱, 쿼리 최적화 적용
+        """
+        logger.info("[api/views.py] 주간 클리닉 스케줄 조회 시작")
+
+        # 캐시된 데이터 확인
+        cached_data = ClinicReservationOptimizer.get_cached_schedule()
+        if cached_data:
+            logger.info("[api/views.py] 캐시된 스케줄 데이터 반환")
+            return Response(cached_data, status=status.HTTP_200_OK)
+
+        try:
+            # 최적화된 클리닉 데이터 조회
+            clinics = DatabaseOptimizer.optimize_clinic_query()
+
+            # DB에 실제로 존재하는 요일들만 동적으로 조회 (올바른 순서로 정렬)
+            day_order = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+            days_in_db_set = set(
+                clinics.values_list("clinic_day", flat=True).distinct()
+            )
+            days_in_db = [day for day in day_order if day in days_in_db_set]
+            times_in_db = list(
+                clinics.values_list("clinic_time", flat=True)
+                .distinct()
+                .order_by("clinic_time")
+            )
+
+            # 기본값 설정 (DB에 데이터가 없는 경우)
+            days = days_in_db if days_in_db else ["mon", "tue", "wed", "thu", "fri"]
+            times = times_in_db if times_in_db else ["18:00", "19:00", "20:00", "21:00"]
+
+            schedule_grid = {}
+
+            for day in days:
+                schedule_grid[day] = {}
+                for time in times:
+                    # 해당 요일/시간의 클리닉 찾기
+                    clinic = clinics.filter(clinic_day=day, clinic_time=time).first()
+
+                    if clinic:
+                        schedule_grid[day][time] = {
+                            "clinic_id": clinic.id,
+                            "teacher_name": clinic.clinic_teacher.name,
+                            "subject": clinic.clinic_subject.subject,
+                            "room": clinic.clinic_room,
+                            "capacity": clinic.clinic_capacity,
+                            "current_count": clinic.get_current_students_count(),
+                            "remaining_spots": clinic.get_remaining_spots(),
+                            "is_full": clinic.is_full(),
+                            "students": [
+                                {
+                                    "id": student.id,
+                                    "name": student.name,
+                                    "username": student.username,
+                                }
+                                for student in clinic.clinic_students.all()
+                            ],
+                        }
+                    else:
+                        schedule_grid[day][time] = {
+                            "clinic_id": None,
+                            "teacher_name": None,
+                            "subject": None,
+                            "room": None,
+                            "capacity": 0,
+                            "current_count": 0,
+                            "remaining_spots": 0,
+                            "is_full": False,
+                            "students": [],
+                        }
+
+            logger.info(
+                f"[api/views.py] 주간 클리닉 스케줄 조회 완료: {len(clinics)}개 클리닉"
+            )
+
+            response_data = {
+                "schedule": schedule_grid,
+                "days": days,
+                "times": times,
+                "total_clinics": len(clinics),
+            }
+
+            # 응답 데이터를 캐시에 저장 (5분간)
+            ClinicReservationOptimizer.set_cached_schedule(response_data, timeout=300)
+            logger.info("[api/views.py] 스케줄 데이터 캐시 저장 완료")
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[api/views.py] 주간 클리닉 스케줄 조회 오류: {error_msg}")
+            logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
+
+            return Response(
+                {"error": f"스케줄 조회 중 오류가 발생했습니다: {error_msg}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class LoginView(APIView):
@@ -855,8 +781,13 @@ class LoginView(APIView):
                     if user.is_superuser:
                         # 슈퍼유저는 관리자 페이지로
                         pass
-                    elif user.is_staff and not user.is_superuser:
-                        # 관리자는 학생 배치 페이지로
+                    elif user.is_student:
+                        # 학생은 클리닉 예약 페이지로 (우선순위 높음)
+                        redirect_path = "/clinic/reserve"
+                    elif (
+                        user.is_staff and not user.is_superuser and not user.is_student
+                    ):
+                        # 관리자는 학생 배치 페이지로 (학생이 아닌 경우만)
                         redirect_path = "/student-placement"
                     elif (
                         user.is_teacher
@@ -1009,12 +940,12 @@ class StudentPlacementView(viewsets.ViewSet):
             logger.info("[api/views.py] StudentPlacementView.list 시작")
             logger.info(f"[api/views.py] 인증된 사용자: {request.user.username}")
 
-            # 학생 데이터 로드
-            students = Student.objects.all()
+            # 학생 데이터 로드 - User 모델에서 is_student=True인 사용자들
+            students = User.objects.filter(is_student=True)
             logger.info(f"[api/views.py] 학생 데이터 로드 완료: {students.count()}명")
 
-            # 학생 데이터 직렬화
-            student_serializer = StudentSerializer(students, many=True)
+            # 학생 데이터 직렬화 - UserSerializer 사용 (is_student=True인 사용자들)
+            student_serializer = UserSerializer(students, many=True)
             logger.info(
                 f"[api/views.py] 학생 데이터 직렬화 완료: {len(student_serializer.data)}개"
             )
@@ -1169,9 +1100,9 @@ class TodayClinicView(APIView):
             # 클리닉 데이터 직렬화
             clinic_serializer = ClinicSerializer(clinics, many=True)
 
-            # 모든 학생 데이터 조회 (클리닉 관리를 위해)
-            students = Student.objects.all()
-            student_serializer = StudentSerializer(students, many=True)
+            # 모든 학생 데이터 조회 (클리닉 관리를 위해) - User 모델 기반으로 변경
+            students = User.objects.filter(is_student=True)
+            student_serializer = UserSerializer(students, many=True)
 
             response_data = {
                 "today": today_day,

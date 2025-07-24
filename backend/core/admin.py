@@ -2,42 +2,71 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
-# 보충 시스템 개편으로 Time, Comment 모델 제거
-from .models import Student, Subject, Clinic, StudentPlacement
+# Student 모델 삭제로 import에서 제거
+from .models import Subject, Clinic, StudentPlacement, WeeklyReservationPeriod
 import datetime
 from django import forms
 
 User = get_user_model()
 
 
-# User 관리자 설정
+# User 관리자 설정 - 학생 정보도 포함하도록 확장
 class CustomUserAdmin(UserAdmin):
     model = User
     list_display = (
         "id",
         "username",
-        "user_name",
+        "name",  # user_name → name
         "is_teacher",
+        "is_student",
         "is_staff",
         "is_superuser",
+        "school",
+        "grade",
     )
-    list_filter = ("is_teacher", "is_staff", "is_superuser")
+    list_filter = (
+        "is_teacher",
+        "is_student",
+        "is_staff",
+        "is_superuser",
+        "school",
+        "grade",
+    )
     fieldsets = (
         (None, {"fields": ("username", "password")}),
         (
             "개인정보",
             {
                 "fields": (
-                    "user_name",
-                    "user_phone_num",
-                    "user_subject",
-                    "max_student_num",
+                    "name",  # user_name → name
+                    "phone_num",  # user_phone_num → phone_num
+                    "subject",  # user_subject → subject
                 )
             },
         ),
-        # 보충 시스템 개편으로 available_time 필드 제거
-        # ("수업 가능 시간", {"fields": ("available_time",)}),
-        ("권한", {"fields": ("is_teacher", "is_staff", "is_superuser", "is_active")}),
+        (
+            "학생 정보 (학생인 경우만)",
+            {
+                "fields": (
+                    "student_phone_num",
+                    "student_parent_phone_num",
+                    "school",
+                    "grade",
+                )
+            },
+        ),
+        (
+            "권한",
+            {
+                "fields": (
+                    "is_teacher",
+                    "is_student",
+                    "is_staff",
+                    "is_superuser",
+                    "is_active",
+                )
+            },
+        ),
     )
     add_fieldsets = (
         (
@@ -46,10 +75,11 @@ class CustomUserAdmin(UserAdmin):
                 "classes": ("wide",),
                 "fields": (
                     "username",
-                    "user_name",
+                    "name",  # user_name → name
                     "password1",
                     "password2",
                     "is_teacher",
+                    "is_student",
                     "is_staff",
                     "is_superuser",
                     "is_active",
@@ -57,132 +87,12 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
-    # 보충 시스템 개편으로 available_time 필드 제거
-    # filter_horizontal = (
-    #     "available_time",
-    # )  # ManyToManyField를 위한 filter_horizontal 추가
-    search_fields = ("username", "user_name")
+    search_fields = ("username", "name")  # user_name → name
     ordering = ("username",)
 
 
-# Student 관리자 설정
-class StudentAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "student_name",
-        "school",
-        "grade",
-        "student_phone_num",
-        "student_parent_phone_num",
-        "get_subject",
-        # 보충 시스템 개편으로 get_teacher 제거
-        # "get_teacher",
-    )
-    fieldsets = (
-        (
-            "개인 정보",
-            {
-                "fields": (
-                    "student_name",
-                    "school",
-                    "grade",
-                    "student_phone_num",
-                    "student_parent_phone_num",
-                    "student_subject",
-                    # 보충 시스템 개편으로 expected_teacher, assigned_teacher 제거
-                    # "expected_teacher",
-                    # "assigned_teacher",
-                )
-            },
-        ),
-        # 보충 시스템 개편으로 available_time 필드 제거
-        # (
-        #     "수업 가능 시간",
-        #     {"fields": ("available_time",)},
-        # ),
-    )
-    # 보충 시스템 개편으로 available_time 필드 제거
-    # filter_horizontal = (
-    #     "available_time",
-    # )  # ManyToManyField를 위한 filter_horizontal 추가
-    list_filter = ("student_subject", "school", "grade")  # assigned_teacher 제거
-    search_fields = ("student_name", "student_phone_num", "student_parent_phone_num")
-    actions = [
-        "duplicate_students",
-        "change_student_school_to_sewha",
-        "change_student_school_to_sewha_girls",
-        "change_student_school_to_combined",
-        "set_student_grade_to_1",
-        "set_student_grade_to_2",
-        "set_student_grade_to_3",
-    ]
-
-    def duplicate_students(self, request, queryset):
-        # 선택된 학생들에 대해 반복
-        for student in queryset:
-            # 1부터 20까지 반복하여 복사본 생성
-            for i in range(1, 21):
-                # 새로운 학생 이름 생성 (기존 이름 + 숫자)
-                new_name = f"{student.student_name}{i}"
-
-                # 새로운 학생 객체 생성
-                new_student = Student(
-                    student_name=new_name,
-                    student_phone_num=student.student_phone_num,
-                    student_parent_phone_num=student.student_parent_phone_num,
-                    student_subject=student.student_subject,
-                    school=student.school,
-                    grade=student.grade,
-                    # 보충 시스템 개편으로 assigned_teacher 제거
-                    # assigned_teacher=student.assigned_teacher,
-                )
-
-                # 새 학생 저장
-                new_student.save()
-
-        # 성공 메시지 표시
-        self.message_user(request, f"선택한 학생의 복사본이 성공적으로 생성되었습니다.")
-
-    def change_student_school_to_sewha(self, request, queryset):
-        for student in queryset:
-            student.school = "세화고"
-            student.save()
-
-    def change_student_school_to_sewha_girls(self, request, queryset):
-        for student in queryset:
-            student.school = "세화여고"
-            student.save()
-
-    def change_student_school_to_combined(self, request, queryset):
-        for student in queryset:
-            student.school = "연합반"
-            student.save()
-
-    def set_student_grade_to_1(self, request, queryset):
-        for student in queryset:
-            student.grade = "1학년"
-            student.save()
-
-    def set_student_grade_to_2(self, request, queryset):
-        for student in queryset:
-            student.grade = "2학년"
-            student.save()
-
-    def set_student_grade_to_3(self, request, queryset):
-        for student in queryset:
-            student.grade = "3학년"
-            student.save()
-
-    def get_subject(self, obj):
-        return obj.student_subject.subject if obj.student_subject else "-"
-
-    get_subject.short_description = "과목"
-
-    # 보충 시스템 개편으로 get_teacher 메소드 제거
-    # def get_teacher(self, obj):
-    #     return obj.assigned_teacher.user_name if obj.assigned_teacher else "미배정"
-    #
-    # get_teacher.short_description = "담당 선생님"
+# StudentAdmin 삭제 - User 모델로 통합됨
+# Student 모델이 삭제되었으므로 더 이상 필요하지 않음
 
 
 # Subject 관리자 설정
@@ -191,18 +101,37 @@ class SubjectAdmin(admin.ModelAdmin):
     search_fields = ("subject",)
 
 
-# Clinic 관리자 설정 (보충 시스템 개편에 맞게 수정)
+# Clinic 관리자 설정 (선착순 보충 예약 시스템에 맞게 수정)
 class ClinicAdmin(admin.ModelAdmin):
-    list_display = ("get_teacher", "get_subject", "get_day", "id")
-    list_filter = ("clinic_subject", "clinic_teacher", "clinic_day")
-    filter_horizontal = (
-        "clinic_prime_students",
-        "clinic_sub_students",
-        "clinic_unassigned_students",
+    list_display = (
+        "get_teacher",
+        "get_subject",
+        "get_day",
+        "get_time",
+        "get_room",
+        "get_capacity",
+        "get_current_count",
+        "get_active_status",
+        "id",
     )
+    list_filter = (
+        "is_active",  # 활성화 상태 필터 추가
+        "clinic_subject",
+        "clinic_teacher",
+        "clinic_day",
+        "clinic_time",
+        "clinic_room",
+    )
+    filter_horizontal = ("clinic_students",)
+    actions = [
+        "activate_clinics",
+        "deactivate_clinics",
+        "reset_clinic_students",
+        "create_weekly_clinics1",
+    ]
 
     def get_teacher(self, obj):
-        return obj.clinic_teacher.user_name
+        return obj.clinic_teacher.name  # user_name → name
 
     get_teacher.short_description = "선생님"
 
@@ -216,20 +145,134 @@ class ClinicAdmin(admin.ModelAdmin):
 
     get_day.short_description = "요일"
 
+    def get_time(self, obj):
+        return obj.clinic_time
 
-# StudentPlacement 관리자 설정 (새로 추가)
+    get_time.short_description = "시간"
+
+    def get_room(self, obj):
+        return obj.clinic_room
+
+    get_room.short_description = "강의실"
+
+    def get_capacity(self, obj):
+        return obj.clinic_capacity
+
+    get_capacity.short_description = "정원"
+
+    def get_current_count(self, obj):
+        return f"{obj.get_current_students_count()}/{obj.clinic_capacity}"
+
+    get_current_count.short_description = "현재인원/정원"
+
+    def get_active_status(self, obj):
+        return obj.is_active
+
+    get_active_status.short_description = "활성화 상태"
+    get_active_status.boolean = True
+
+    # 클리닉 관리 액션들
+    def activate_clinics(self, request, queryset):
+        """선택한 클리닉들을 활성화"""
+        count = queryset.update(is_active=True)
+        self.message_user(request, f"{count}개의 클리닉이 활성화되었습니다.")
+
+    activate_clinics.short_description = "선택한 클리닉 활성화"
+
+    def deactivate_clinics(self, request, queryset):
+        """선택한 클리닉들을 비활성화"""
+        count = queryset.update(is_active=False)
+        self.message_user(request, f"{count}개의 클리닉이 비활성화되었습니다.")
+
+    deactivate_clinics.short_description = "선택한 클리닉 비활성화"
+
+    def reset_clinic_students(self, request, queryset):
+        """선택한 클리닉들의 학생 예약을 모두 초기화"""
+        total_reset = 0
+        for clinic in queryset:
+            student_count = clinic.clinic_students.count()
+            clinic.clinic_students.clear()
+            total_reset += student_count
+
+        self.message_user(
+            request,
+            f"{queryset.count()}개 클리닉에서 총 {total_reset}명의 학생 예약이 초기화되었습니다.",
+        )
+
+    reset_clinic_students.short_description = "선택한 클리닉의 학생 예약 초기화"
+
+    def create_weekly_clinics1(self, request, queryset):
+        """모든 요일(월~토)에 18:00-21:00 클리닉 생성"""
+        from .models import Subject, User
+
+        # 기본 설정
+        days = ["mon", "tue", "wed", "thu", "fri", "sat"]
+        times = ["18:00", "19:00", "20:00", "21:00"]
+        rooms = [
+            "1강의실",
+        ]
+
+        try:
+            # 기본 과목 가져오기
+            default_subject = Subject.objects.filter(subject="physics1").first()
+            if not default_subject:
+                default_subject = Subject.objects.first()
+
+            if not default_subject:
+                self.message_user(
+                    request, "과목이 없습니다. 먼저 과목을 생성해주세요.", level="ERROR"
+                )
+                return
+
+            # 기본 강사 가져오기 (첫 번째 강사)
+            default_teacher = User.objects.filter(is_teacher=True).first()
+
+            created_count = 0
+
+            for day in days:
+                for time in times:
+                    for room in rooms:
+                        # 이미 존재하는지 확인
+                        if not Clinic.objects.filter(
+                            clinic_day=day, clinic_time=time, clinic_room=room
+                        ).exists():
+                            Clinic.objects.create(
+                                clinic_teacher=default_teacher,
+                                clinic_day=day,
+                                clinic_time=time,
+                                clinic_room=room,
+                                clinic_capacity=6,
+                                clinic_subject=default_subject,
+                                is_active=False,  # 기본적으로 비활성화 상태로 생성
+                            )
+                            created_count += 1
+
+            self.message_user(
+                request,
+                f"{created_count}개의 클리닉이 생성되었습니다. (기본: 비활성화 상태)",
+            )
+
+        except Exception as e:
+            self.message_user(request, f"클리닉 생성 중 오류: {str(e)}", level="ERROR")
+
+    create_weekly_clinics1.short_description = (
+        "클리닉 생성 (월~토, 18:00-21:00, 1강의실)"
+    )
+
+
+# StudentPlacement 관리자 설정 - User 모델 기반으로 수정
 class StudentPlacementAdmin(admin.ModelAdmin):
     list_display = ("get_student", "get_teacher", "get_subject", "created_at")
     list_filter = ("subject", "teacher", "created_at")
-    search_fields = ("student__student_name", "teacher__user_name")
+    search_fields = ("student__name", "teacher__name")  # student_name, user_name → name
 
     def get_student(self, obj):
-        return obj.student.student_name
+        return obj.student.name  # Student 모델 → User 모델
 
     get_student.short_description = "학생"
 
     def get_teacher(self, obj):
-        return obj.teacher.user_name
+        return obj.teacher.name  # user_name → name
 
     get_teacher.short_description = "선생님"
 
@@ -239,12 +282,88 @@ class StudentPlacementAdmin(admin.ModelAdmin):
     get_subject.short_description = "과목"
 
 
+# WeeklyReservationPeriod 관리자 설정 (주간 예약 기간 관리)
+class WeeklyReservationPeriodAdmin(admin.ModelAdmin):
+    list_display = (
+        "get_week_range",
+        "get_status",
+        "get_reservation_period",
+        "total_clinics",
+        "total_reservations",
+        "created_at",
+    )
+    list_filter = ("status", "week_start_date", "created_at")
+    search_fields = ("week_start_date", "week_end_date")
+    readonly_fields = ("created_at", "updated_at")
+    actions = ["create_next_week_period", "close_period", "reset_reservations"]
+
+    def get_week_range(self, obj):
+        return f"{obj.week_start_date} ~ {obj.week_end_date}"
+
+    get_week_range.short_description = "주 기간"
+
+    def get_status(self, obj):
+        return obj.get_status_display()
+
+    get_status.short_description = "상태"
+
+    def get_reservation_period(self, obj):
+        return f"{obj.reservation_start.strftime('%m/%d %H:%M')} ~ {obj.reservation_end.strftime('%m/%d %H:%M')}"
+
+    get_reservation_period.short_description = "예약 기간"
+
+    def create_next_week_period(self, request, queryset):
+        """다음 주 예약 기간 생성"""
+        try:
+            period, created = WeeklyReservationPeriod.create_weekly_period()
+            if created:
+                self.message_user(
+                    request, f"다음 주 예약 기간이 생성되었습니다: {period}"
+                )
+            else:
+                self.message_user(
+                    request, f"해당 주 예약 기간이 이미 존재합니다: {period}"
+                )
+        except Exception as e:
+            self.message_user(
+                request, f"예약 기간 생성 중 오류: {str(e)}", level="ERROR"
+            )
+
+    create_next_week_period.short_description = "다음 주 예약 기간 생성"
+
+    def close_period(self, request, queryset):
+        """선택된 예약 기간들을 마감 상태로 변경"""
+        count = queryset.update(status="closed")
+        self.message_user(request, f"{count}개의 예약 기간이 마감되었습니다.")
+
+    close_period.short_description = "선택된 기간 마감"
+
+    def reset_reservations(self, request, queryset):
+        """선택된 기간의 모든 클리닉 예약 초기화"""
+        total_reset = 0
+        for period in queryset:
+            # 해당 기간의 모든 클리닉에서 학생 예약 제거
+            for clinic in period.clinics.all():
+                clinic.clinic_students.clear()
+                total_reset += 1
+
+            # 기간 상태를 pending으로 변경
+            period.status = "pending"
+            period.total_reservations = 0
+            period.save()
+
+        self.message_user(request, f"{total_reset}개 클리닉의 예약이 초기화되었습니다.")
+
+    reset_reservations.short_description = "선택된 기간의 예약 초기화"
+
+
 # 관리자 사이트에 모델 등록
 admin.site.register(User, CustomUserAdmin)
-admin.site.register(Student, StudentAdmin)
+# admin.site.register(Student, StudentAdmin)  # Student 모델 삭제로 주석처리
 admin.site.register(Subject, SubjectAdmin)
 admin.site.register(Clinic, ClinicAdmin)
 admin.site.register(StudentPlacement, StudentPlacementAdmin)
+admin.site.register(WeeklyReservationPeriod, WeeklyReservationPeriodAdmin)
 
 # 보충 시스템 개편으로 Time, Comment 모델 제거
 # admin.site.register(Time, TimeAdmin)
