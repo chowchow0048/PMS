@@ -485,40 +485,40 @@ class ClinicViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # 사용자 및 클리닉 유효성 검사
+            # 사용자 유효성 검사 (트랜잭션 외부에서 수행)
             try:
-                # user = User.objects.get(id=user_id, is_student=True)  # 보충 시스템 개편으로 주석처리 - 모든 사용자 예약 가능
                 user = User.objects.get(
                     id=user_id
                 )  # 모든 종류의 사용자가 클리닉 예약 가능 (학생 < 강사 < 관리자 < 슈퍼유저)
-                clinic = DatabaseOptimizer.get_clinic_with_lock(clinic_id)
             except User.DoesNotExist:
                 return Response(
-                    # {"error": "유효하지 않은 학생 사용자입니다."},  # 보충 시스템 개편으로 주석처리
                     {
                         "error": "유효하지 않은 사용자입니다."
                     },  # 모든 사용자 대상으로 메시지 변경
                     status=status.HTTP_404_NOT_FOUND,
                 )
-            except Clinic.DoesNotExist:
-                return Response(
-                    {"error": "유효하지 않은 클리닉입니다."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+
+            # 트랜잭션 내에서 클리닉 조회 및 예약 처리 (동시성 문제 방지)
+            with transaction.atomic():
+                # 클리닉 조회 (select_for_update를 트랜잭션 내에서 사용)
+                try:
+                    clinic = DatabaseOptimizer.get_clinic_with_lock(clinic_id)
+                except Clinic.DoesNotExist:
+                    return Response(
+                        {"error": "유효하지 않은 클리닉입니다."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
 
                 # 클리닉 활성화 상태 확인 (간단한 시스템)
-            if not clinic.is_active:
-                return Response(
-                    {
-                        "error": "reservation_closed",
-                        "message": "보충 예약 가능 기간이 아닙니다.",
-                        "clinic_status": "inactive",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # 트랜잭션 내에서 예약 처리 (동시성 문제 방지)
-            with transaction.atomic():
+                if not clinic.is_active:
+                    return Response(
+                        {
+                            "error": "reservation_closed",
+                            "message": "보충 예약 가능 기간이 아닙니다.",
+                            "clinic_status": "inactive",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 # 이미 예약했는지 확인
                 if clinic.clinic_students.filter(id=user_id).exists():
                     return Response(
@@ -597,36 +597,39 @@ class ClinicViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # 사용자 및 클리닉 유효성 검사
+            # 사용자 유효성 검사 (트랜잭션 외부에서 수행)
             try:
-                # user = User.objects.get(id=user_id, is_student=True)  # 보충 시스템 개편으로 주석처리 - 모든 사용자 예약 취소 가능
                 user = User.objects.get(
                     id=user_id
                 )  # 모든 종류의 사용자가 클리닉 예약 취소 가능 (학생 < 강사 < 관리자 < 슈퍼유저)
-                clinic = Clinic.objects.get(id=clinic_id)
             except User.DoesNotExist:
                 return Response(
-                    # {"error": "유효하지 않은 학생 사용자입니다."},  # 보충 시스템 개편으로 주석처리
                     {
                         "error": "유효하지 않은 사용자입니다."
                     },  # 모든 사용자 대상으로 메시지 변경
                     status=status.HTTP_404_NOT_FOUND,
                 )
-            except Clinic.DoesNotExist:
-                return Response(
-                    {"error": "유효하지 않은 클리닉입니다."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
 
-            # 예약되어 있는지 확인
-            if not clinic.clinic_students.filter(id=user_id).exists():
-                return Response(
-                    {"error": "해당 클리닉에 예약되어 있지 않습니다."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # 트랜잭션 내에서 클리닉 조회 및 예약 취소 처리
+            with transaction.atomic():
+                # 클리닉 조회
+                try:
+                    clinic = Clinic.objects.get(id=clinic_id)
+                except Clinic.DoesNotExist:
+                    return Response(
+                        {"error": "유효하지 않은 클리닉입니다."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+                # 예약되어 있는지 확인
+                if not clinic.clinic_students.filter(id=user_id).exists():
+                    return Response(
+                        {"error": "해당 클리닉에 예약되어 있지 않습니다."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
                 # 예약 취소
-            clinic.clinic_students.remove(user)
+                clinic.clinic_students.remove(user)
 
             # 예약 취소 시 캐시 무효화
             ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
