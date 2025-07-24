@@ -326,11 +326,17 @@ class DatabaseOptimizer:
 
     @staticmethod
     def get_clinic_with_lock(clinic_id):
-        """락과 함께 클리닉 조회"""
+        """락과 함께 클리닉 조회 (PostgreSQL OUTER JOIN 호환성 수정)"""
         from .models import Clinic
 
-        return (
-            Clinic.objects.select_for_update()
-            .select_related("clinic_teacher", "clinic_subject", "weekly_period")
-            .get(id=clinic_id)
-        )
+        # PostgreSQL에서 FOR UPDATE는 OUTER JOIN의 nullable side에 적용할 수 없음
+        # 따라서 메인 테이블만 락을 걸고, 관련 객체는 별도로 조회
+        clinic = Clinic.objects.select_for_update().get(id=clinic_id)
+
+        # 필요한 관련 객체들을 별도로 조회하여 캐시에 저장 (N+1 문제 방지)
+        if clinic.clinic_teacher_id:
+            _ = clinic.clinic_teacher  # lazy loading으로 조회
+        if clinic.clinic_subject_id:
+            _ = clinic.clinic_subject  # lazy loading으로 조회
+
+        return clinic
