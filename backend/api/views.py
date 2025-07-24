@@ -545,8 +545,8 @@ class ClinicViewSet(viewsets.ModelViewSet):
                     # 예약 성공
                 clinic.clinic_students.add(user)
 
-                # 예약 성공 시 캐시 무효화
-                ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
+                # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
+                # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
 
                 logger.info(
                     f"[api/views.py] 클리닉 예약 성공: user_id={user_id}, "
@@ -631,8 +631,8 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 # 예약 취소
                 clinic.clinic_students.remove(user)
 
-            # 예약 취소 시 캐시 무효화
-            ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
+            # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
+            # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
 
             logger.info(
                 f"[api/views.py] 클리닉 예약 취소 성공: user_id={user_id}, "
@@ -667,11 +667,11 @@ class ClinicViewSet(viewsets.ModelViewSet):
         """
         logger.info("[api/views.py] 주간 클리닉 스케줄 조회 시작")
 
-        # 캐시된 데이터 확인
-        cached_data = ClinicReservationOptimizer.get_cached_schedule()
-        if cached_data:
-            logger.info("[api/views.py] 캐시된 스케줄 데이터 반환")
-            return Response(cached_data, status=status.HTTP_200_OK)
+        # 캐시 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
+        # cached_data = ClinicReservationOptimizer.get_cached_schedule()
+        # if cached_data:
+        #     logger.info("[api/views.py] 캐시된 스케줄 데이터 반환")
+        #     return Response(cached_data, status=status.HTTP_200_OK)
 
         try:
             # 최적화된 클리닉 데이터 조회
@@ -744,9 +744,9 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 "total_clinics": len(clinics),
             }
 
-            # 응답 데이터를 캐시에 저장 (5분간)
-            ClinicReservationOptimizer.set_cached_schedule(response_data, timeout=300)
-            logger.info("[api/views.py] 스케줄 데이터 캐시 저장 완료")
+            # 캐시 저장 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
+            # ClinicReservationOptimizer.set_cached_schedule(response_data, timeout=300)
+            # logger.info("[api/views.py] 스케줄 데이터 캐시 저장 완료")
 
             return Response(response_data, status=status.HTTP_200_OK)
 
