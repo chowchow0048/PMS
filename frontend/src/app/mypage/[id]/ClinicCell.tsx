@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import styles from './ClinicCell.module.css';
 import pageStyles from './page.module.css';
 import { useClinic } from './ClinicContext';
-// import StudentItem from './StudentItem';
+import StudentItem from './StudentItem.deprecated';
 import { bg } from 'date-fns/locale';
 
 // 시간 정보 타입 정의 (실제 API 응답 구조에 맞게 수정)
@@ -51,8 +51,8 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time, teacher }) => {
   const clinic = getClinicByDayAndTime(day, time);
   
   // 현재 시간에 시작하는 학생들만 필터링
-  const studentsStartingAtThisTime = clinic?.students.filter(
-    student => (clinic.startTime || clinic.time) === time
+  const studentsStartingAtThisTime = clinic?.students?.filter(
+    student => clinic.time === time
   ) || [];
   
   // 해당 시간이 강사의 available_time에 포함되는지 확인
@@ -104,7 +104,7 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time, teacher }) => {
   
   // 셀에 표시할 학생 정보 구성
   const getDisplayContent = () => {
-    if (!clinic || clinic.students.length === 0) {
+    if (!clinic || !clinic.students || clinic.students.length === 0) {
       return null;
     }
     
@@ -117,7 +117,7 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time, teacher }) => {
           key={firstStudent.id}
           student={firstStudent}
           onDragStart={(e) => handleDragStart(e, firstStudent)}
-          startTime={clinic.startTime || time}
+          startTime={clinic.time || time}
           currentTime={time}
         />
       );
@@ -130,7 +130,7 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time, teacher }) => {
             key={firstStudent.id}
             student={firstStudent}
             onDragStart={(e) => handleDragStart(e, firstStudent)}
-            startTime={clinic.startTime || time}
+            startTime={clinic.time || time}
             currentTime={time}
           />
           <div className={styles.otherStudents}>외 {remainingCount}명</div>

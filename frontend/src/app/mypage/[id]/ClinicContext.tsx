@@ -10,17 +10,17 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 //   Clinic
 // } from './clinicService.deprecated';
 
-// 임시 타입 정의 (기존 코드 호환성을 위해)
-interface Student {
-  id: number;
+// lib/types.ts에서 정의된 타입들을 가져와서 사용
+import { User, Clinic as LibClinic } from '@/lib/types';
+
+// 로컬 Student 타입 (User 기반으로 확장)
+interface Student extends User {
   student_name: string;
-  name?: string; // 호환성을 위해 추가
-  student_phone_num?: string; // 호환성을 위해 추가
   status?: 'unassigned' | 'assigned' | 'clinic-assigned'; // 호환성을 위해 추가
 }
 
-interface Clinic {
-  id: number;
+// 로컬 Clinic 타입 (라이브러리 Clinic 기반으로 확장)
+interface Clinic extends Omit<LibClinic, 'clinic_students'> {
   day: string;
   time: string;
   students: Student[];
