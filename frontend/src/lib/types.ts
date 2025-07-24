@@ -6,6 +6,7 @@ export interface User {
   first_name?: string;
   last_name?: string;
   name: string; // 사용자 이름
+  user_name?: string; // 백엔드 호환성을 위한 필드 (일부 API에서 사용)
   phone_num?: string; // 전화번호
   subject?: number; // 담당 과목 ID 또는 수강 과목 ID
   is_teacher: boolean; // 강사 여부

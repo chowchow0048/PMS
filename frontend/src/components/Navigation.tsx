@@ -154,8 +154,7 @@ export default function Navigation() {
                   }}
                   rightIcon={<ChevronDownIcon />}
                 >
-                  {/* {user?.user_name || user?.username} */}
-                  {user?.name}
+                  {user?.name || user?.user_name || user?.username}
                 </MenuButton>
                 <MenuList>
                   {/* 관리자/슈퍼유저만 학생 배치 페이지 접근 가능 */}

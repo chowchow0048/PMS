@@ -2,19 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-
-// 사용자 타입 정의 (백엔드 User 모델과 일치)
-export interface User {
-  id: number;
-  username: string;
-  user_name: string;
-  email: string;
-  is_staff: boolean;          // Django 기본 관리자 권한
-  is_superuser: boolean;      // Django 슈퍼유저 권한
-  is_teacher: boolean;        // 커스텀 강사 권한
-  is_student: boolean;        // 커스텀 학생 권한 (선착순 예약 시스템용)
-  is_active: boolean;         // Django 기본 계정 활성화 상태
-}
+import { User } from './types'; // lib/types.ts에서 통합된 User 타입 사용
 
 // 인증 컨텍스트 타입 정의
 interface AuthContextType {
