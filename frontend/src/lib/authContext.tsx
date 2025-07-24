@@ -12,6 +12,7 @@ export interface User {
   is_staff: boolean;          // Django 기본 관리자 권한
   is_superuser: boolean;      // Django 슈퍼유저 권한
   is_teacher: boolean;        // 커스텀 강사 권한
+  is_student: boolean;        // 커스텀 학생 권한 (선착순 예약 시스템용)
   is_active: boolean;         // Django 기본 계정 활성화 상태
 }
 

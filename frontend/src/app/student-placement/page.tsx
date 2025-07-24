@@ -7,20 +7,17 @@ import { Box, Flex, Container, Heading, Grid, GridItem, Spinner, Center, useToas
 import UnassignedStudentArea from '@/components/student-placement/UnassignedStudentArea';
 import ClinicDayBox from '@/components/student-placement/ClinicDayBox';
 import ClinicManagementModal from '@/components/student-placement/ClinicManagementModal';
-import { Student, Time } from '@/components/student-placement/StudentItem';
-import { Clinic, DAY_CHOICES } from '@/lib/types';
+import { Student, User, Clinic, DAY_CHOICES } from '@/lib/types'; // types.ts에서 import
+import { Time } from '@/components/student-placement/StudentItem'; // Time은 StudentItem에서 import
 import { getStudents, getTeachers, getClinics, assignStudent, unassignStudent, assignStudentToClinic } from '@/lib/api';
 import { AuthGuard } from '@/lib/authGuard';
 
-// 보충 시스템 개편으로 임시 Teacher 타입 정의 (기존 코드 유지를 위해)
-type Teacher = {
-  id: number;
-  user_name: string;
-  user_subject: any;
-  max_student_num: number;
-  is_teacher: boolean;
-  is_staff: boolean;
-  is_superuser: boolean;
+// Teacher 타입을 User 기반으로 정의 (is_teacher=true인 User)
+type Teacher = User & {
+  is_teacher: true;
+  user_name: string; // name과 동일하지만 기존 코드 호환성을 위해
+  user_subject: any; // subject와 동일
+  max_student_num: number; // 기본값 설정 필요
 };
 
 // 학생 배치 페이지 컴포넌트 (관리자 전용)
@@ -96,9 +93,10 @@ function StudentPlacementPageContent() {
     }
   };
 
-  // 클리닉 클릭 처리
-  const handleClinicClick = (clinic: Clinic) => {
-    setSelectedClinic(clinic);
+  // 클리닉 클릭 처리 (요일별로 변경)
+  const handleClinicClick = (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun') => {
+    // 더미 클리닉 설정 (모달에서 요일 정보 전달용)
+    setSelectedClinic({ id: 0, clinic_day: day } as Clinic);
     onOpen();
   };
 
@@ -117,47 +115,6 @@ function StudentPlacementPageContent() {
       </Center>
     );
   }
-
-  // 보충 시스템 개편으로 주석처리 - 더 이상 개별 배치 개념 없음
-  // // 학생 배치 처리 함수 (단일)
-  // const handleAssignStudent = async (studentId: number, teacherId: number) => {
-  //   try {
-  //     // API 호출
-  //     await assignStudent(studentId, teacherId);
-  //     
-  //     // 상태 업데이트
-  //     const student = [...unassignedStudents, ...Object.values(assignedStudents).flat()]
-  //       .find(s => s.id === studentId);
-  //     
-  //     if (!student) return;
-  //     
-  //     // 현재 배치된 선생님에게서 학생 제거
-  //     const newUnassignedStudents = unassignedStudents.filter(s => s.id !== studentId);
-  //     const newAssignedStudents = { ...assignedStudents };
-  //     
-  //     // 모든 선생님의 학생 목록에서 해당 학생 제거
-  //     Object.keys(newAssignedStudents).forEach(key => {
-  //       const tId = Number(key);
-  //       newAssignedStudents[tId] = newAssignedStudents[tId].filter(s => s.id !== studentId);
-  //     });
-  //     
-  //     // 새로운 선생님에게 학생 배치
-  //     newAssignedStudents[teacherId] = [...newAssignedStudents[teacherId], student];
-  //     
-  //     setUnassignedStudents(newUnassignedStudents);
-  //     setAssignedStudents(newAssignedStudents);
-  //     
-  //   } catch (error) {
-  //     console.error('학생 배치 오류:', error);
-  //     toast({ 
-  //       title: '학생 배치 실패',
-  //       description: '서버 오류가 발생했습니다. 다시 시도해주세요.',
-  //       status: 'error',
-  //       duration: 1000,
-  //       isClosable: true,
-  //     });
-  //   }
-  // };
   
   // 임시 더미 함수 (기존 코드 호환성을 위해)
   const handleAssignStudent = async (studentId: number, teacherId: number) => {
@@ -170,45 +127,6 @@ function StudentPlacementPageContent() {
       isClosable: true,
     });
   };
-
-  // 보충 시스템 개편으로 주석처리 - 더 이상 개별 배치 개념 없음
-  // // 다중 학생 배치 처리 함수
-  // const handleAssignMultipleStudents = async (students: Student[], teacherId: number) => {
-  //   try {
-  //     // 모든 학생에 대해 API 호출
-  //     await Promise.all(students.map(student => assignStudent(student.id, teacherId)));
-  //     
-  //     // 상태 업데이트
-  //     const studentIds = students.map(s => s.id);
-  //     
-  //     // 미배치 학생 목록에서 해당 학생들 제거
-  //     const newUnassignedStudents = unassignedStudents.filter(s => !studentIds.includes(s.id));
-  //     const newAssignedStudents = { ...assignedStudents };
-  //     
-  //     // 모든 선생님의 학생 목록에서 해당 학생들 제거
-  //     Object.keys(newAssignedStudents).forEach(key => {
-  //       const tId = Number(key);
-  //       newAssignedStudents[tId] = newAssignedStudents[tId].filter(s => !studentIds.includes(s.id));
-  //     });
-  //     
-  //     // 새로운 선생님에게 학생들 배치
-  //     newAssignedStudents[teacherId] = [...newAssignedStudents[teacherId], ...students];
-  //     
-  //     setUnassignedStudents(newUnassignedStudents);
-  //     setAssignedStudents(newAssignedStudents);
-  //     
-  //   } catch (error) {
-  //     console.error('다중 학생 배치 오류:', error);
-  //     toast({ 
-  //       title: '학생 배치 실패',
-  //       description: '서버 오류가 발생했습니다. 다시 시도해주세요.',
-  //       status: 'error',
-  //       duration: 1000,
-  //       isClosable: true,
-  //     });
-  //   }
-  // };
-  
   // 임시 더미 함수 (기존 코드 호환성을 위해)
   const handleAssignMultipleStudents = async (students: Student[], teacherId: number) => {
     console.warn('handleAssignMultipleStudents: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
@@ -220,50 +138,6 @@ function StudentPlacementPageContent() {
       isClosable: true,
     });
   };
-
-  // 보충 시스템 개편으로 주석처리 - 더 이상 개별 배치 개념 없음
-  // // 학생 미배치 처리 함수
-  // const handleUnassignStudent = async (studentId: number) => {
-  //   try {
-  //     // API 호출
-  //     await unassignStudent(studentId);
-  //     
-  //     // 상태 업데이트
-  //     let student: Student | undefined;
-  //     
-  //     // 배치된 학생 중에서 찾기
-  //     Object.values(assignedStudents).forEach(students => {
-  //       const found = students.find(s => s.id === studentId);
-  //       if (found) student = found;
-  //     });
-  //     
-  //     if (!student) return;
-  //     
-  //     // 모든 선생님에게서 해당 학생 제거
-  //     const newAssignedStudents = { ...assignedStudents };
-  //     Object.keys(newAssignedStudents).forEach(key => {
-  //       const teacherId = Number(key);
-  //       newAssignedStudents[teacherId] = newAssignedStudents[teacherId].filter(s => s.id !== studentId);
-  //     });
-  //     
-  //     // 미배치 학생 목록에 추가 (이름순으로 정렬)
-  //     const newUnassignedList = [...unassignedStudents, student];
-  //     newUnassignedList.sort((a, b) => a.student_name.localeCompare(b.student_name, 'ko'));
-  //     
-  //     setUnassignedStudents(newUnassignedList);
-  //     setAssignedStudents(newAssignedStudents);
-  //     
-  //   } catch (error) {
-  //     console.error('학생 미배치 처리 오류:', error);
-  //     toast({
-  //       title: '학생 미배치 처리 실패',
-  //       description: '서버 오류가 발생했습니다. 다시 시도해주세요.',
-  //       status: 'error',
-  //       duration: 1000,
-  //       isClosable: true,
-  //     });
-  //   }
-  // };
   
   // 임시 더미 함수 (기존 코드 호환성을 위해)
   const handleUnassignStudent = async (studentId: number) => {
@@ -276,42 +150,6 @@ function StudentPlacementPageContent() {
       isClosable: true,
     });
   };
-
-  // 보충 시스템 개편으로 주석처리 - 더 이상 개별 배치 개념 없음
-  // // 다중 학생 미배치 처리 함수
-  // const handleUnassignMultipleStudents = async (students: Student[]) => {
-  //   try {
-  //     // 모든 학생에 대해 API 호출
-  //     await Promise.all(students.map(student => unassignStudent(student.id)));
-  //     
-  //     // 상태 업데이트
-  //     const studentIds = students.map(s => s.id);
-  //     
-  //     // 모든 선생님에게서 해당 학생들 제거
-  //     const newAssignedStudents = { ...assignedStudents };
-  //     Object.keys(newAssignedStudents).forEach(key => {
-  //       const teacherId = Number(key);
-  //       newAssignedStudents[teacherId] = newAssignedStudents[teacherId].filter(s => !studentIds.includes(s.id));
-  //     });
-  //     
-  //     // 미배치 학생 목록에 추가 (이름순으로 정렬)
-  //     const newUnassignedList = [...unassignedStudents, ...students];
-  //     newUnassignedList.sort((a, b) => a.student_name.localeCompare(b.student_name, 'ko'));
-  //     
-  //     setUnassignedStudents(newUnassignedList);
-  //     setAssignedStudents(newAssignedStudents);
-  //     
-  //   } catch (error) {
-  //     console.error('다중 학생 미배치 처리 오류:', error);
-  //     toast({
-  //       title: '학생 미배치 처리 실패',
-  //       description: '서버 오류가 발생했습니다. 다시 시도해주세요.',
-  //       status: 'error',
-  //       duration: 1000,
-  //       isClosable: true,
-  //     });
-  //   }
-  // };
   
   // 임시 더미 함수 (기존 코드 호환성을 위해)
   const handleUnassignMultipleStudents = async (students: Student[]) => {
@@ -330,12 +168,8 @@ function StudentPlacementPageContent() {
     const targetClinic = clinics.find(clinic => clinic.clinic_day === day);
     if (!targetClinic) return false;
     
-    // 해당 요일 클리닉의 모든 학생 목록에서 확인 (해설, 질문, 미배치 포함)
-    const allStudentsInClinic = [
-      ...(targetClinic.clinic_prime_students || []),
-      ...(targetClinic.clinic_sub_students || []),
-      ...(targetClinic.clinic_unassigned_students || [])
-    ];
+    // 해당 요일 클리닉의 모든 학생 목록에서 확인 (통합된 보충수업)
+    const allStudentsInClinic = targetClinic.clinic_students?.map(user => user.id) || [];
     
     return allStudentsInClinic.includes(studentId);
   };
@@ -420,7 +254,7 @@ function StudentPlacementPageContent() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <Container maxW="100%" p={4} pt="75px" h="100vh" display="flex" flexDirection="column">
+      <Container maxW="100%" p={4} h="100vh" display="flex" flexDirection="column">
         <Flex h="calc(100vh)" gap={6}>
           {/* 학생 목록 (왼쪽) */}
           <Box 
@@ -472,7 +306,8 @@ function StudentPlacementPageContent() {
         <ClinicManagementModal
           isOpen={isOpen}
           onClose={onClose}
-          clinic={selectedClinic}
+          day={selectedClinic?.clinic_day || null}
+          clinics={clinics}
           onUpdate={handleClinicUpdate}
         />
       </Container>

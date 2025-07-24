@@ -24,6 +24,7 @@ import {
   MenuList,
   MenuItem,
   MenuDivider,
+  useToast,
 } from '@chakra-ui/react';
 import { HamburgerIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { useAuth } from '@/lib/authContext';
@@ -40,9 +41,21 @@ export default function Navigation() {
   const router = useRouter(); // 라우터 훅 추가
   const { isOpen, onOpen, onClose } = useDisclosure();
   const isMobile = useBreakpointValue({ base: true, md: false });
+  const toast = useToast();
   
   // 인증 상태 사용
   const { user, isAuthenticated, logout } = useAuth();
+
+  // 마이페이지 클릭 핸들러 (학생용 - 아직 미구현)
+  const handleStudentMyPage = () => {
+    toast({
+      title: 'mypage',
+      description: '마이페이지 기능이 아직 구현되지 않았습니다.',
+      status: 'info',
+      duration: 3000,
+      isClosable: true,
+    });
+  };
 
   return (
     <Box 
@@ -50,10 +63,8 @@ export default function Navigation() {
       bg="hsla(0, 0.00%, 0.00%, 0.85)" 
       px={4} 
       boxShadow="md"
-      position="fixed"
+      position="static"
       width="100%"
-      top={0}
-      zIndex={1000}
       height="60px"
       display="flex"
       alignItems="center"
@@ -72,11 +83,61 @@ export default function Navigation() {
         {/* 데스크톱 뷰 */}
         {!isMobile ? (
           <HStack spacing={8} alignItems="center">
+            {/* 왼쪽 네비게이션 버튼들 - 사용자 역할별 */}
             <HStack
               as="nav"
               spacing={4}
               display={{ base: 'none', md: 'flex' }}
             >
+              {isAuthenticated && user?.is_student && (
+                <>
+                  <Button
+                    color="white"
+                    bg="transparent"
+                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    onClick={() => router.push('/clinic/reserve')}
+                  >
+                    클리닉 예약
+                  </Button>
+                  <Button
+                    color="white"
+                    bg="transparent"
+                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    onClick={handleStudentMyPage}
+                  >
+                    마이페이지
+                  </Button>
+                </>
+              )}
+              
+              {isAuthenticated && user?.is_staff && (
+                <>
+                  <Button
+                    color="white"
+                    bg="transparent"
+                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    onClick={() => router.push('/student-placement')}
+                  >
+                    학생 관리
+                  </Button>
+                  <Button
+                    color="white"
+                    bg="transparent"
+                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    onClick={() => router.push('/clinic/reserve')}
+                  >
+                    클리닉 예약
+                  </Button>
+                  <Button
+                    color="white"
+                    bg="transparent"
+                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    onClick={() => router.push(`/mypage/${user?.id}`)}
+                  >
+                    마이페이지
+                  </Button>
+                </>
+              )}
             </HStack>
             
             {isAuthenticated ? (
@@ -93,7 +154,8 @@ export default function Navigation() {
                   }}
                   rightIcon={<ChevronDownIcon />}
                 >
-                  {user?.user_name || user?.username}
+                  {/* {user?.user_name || user?.username} */}
+                  {user?.name}
                 </MenuButton>
                 <MenuList>
                   {/* 관리자/슈퍼유저만 학생 배치 페이지 접근 가능 */}
@@ -101,7 +163,7 @@ export default function Navigation() {
                     <MenuItem 
                       onClick={() => router.push('/student-placement')}
                     >
-                      학생 배치
+                      학생 관리
                     </MenuItem>
                   )}
                   
@@ -149,36 +211,76 @@ export default function Navigation() {
           <DrawerHeader borderBottomWidth="1px">메뉴</DrawerHeader>
           <DrawerBody>
             <VStack spacing={0} align="stretch" marginBottom={0}>
-              {/* 관리자/슈퍼유저만 학생 배치 페이지 접근 가능 */}
-              {isAuthenticated && (user?.is_superuser || user?.is_staff) && (
-                <Box py={4} borderBottomWidth="1px">
-                  <Button
-                    w="full"
-                    variant="ghost"
-                    onClick={() => {
-                      router.push('/student-placement');
-                      onClose();
-                    }}
-                  >
-                    학생 배치
-                  </Button>
-                </Box>
+              {/* 학생용 메뉴 */}
+              {isAuthenticated && user?.is_student && (
+                <>
+                  <Box py={4} borderBottomWidth="1px">
+                    <Button
+                      w="full"
+                      variant="ghost"
+                      onClick={() => {
+                        router.push('/clinic/reserve');
+                        onClose();
+                      }}
+                    >
+                      클리닉 예약
+                    </Button>
+                  </Box>
+                  <Box py={4} borderBottomWidth="1px">
+                    <Button
+                      w="full"
+                      variant="ghost"
+                      onClick={() => {
+                        handleStudentMyPage();
+                        onClose();
+                      }}
+                    >
+                      마이페이지
+                    </Button>
+                  </Box>
+                </>
               )}
               
-              {/* 마이페이지 버튼 */}
-              {isAuthenticated && (
-                <Box py={4} borderBottomWidth="1px">
-                  <Button
-                    w="full"
-                    variant="ghost"
-                    onClick={() => {
-                      router.push(`/mypage/${user?.id}`);
-                      onClose();
-                    }}
-                  >
-                    마이페이지
-                  </Button>
-                </Box>
+              {/* 관리자용 메뉴 */}
+              {isAuthenticated && user?.is_staff && (
+                <>
+                  <Box py={4} borderBottomWidth="1px">
+                    <Button
+                      w="full"
+                      variant="ghost"
+                      onClick={() => {
+                        router.push('/student-placement');
+                        onClose();
+                      }}
+                    >
+                      학생 관리
+                    </Button>
+                  </Box>
+                  <Box py={4} borderBottomWidth="1px">
+                    <Button
+                      w="full"
+                      variant="ghost"
+                      onClick={() => {
+                        router.push('/clinic/reserve');
+                        onClose();
+                      }}
+                    >
+                      클리닉 예약
+                    </Button>
+                  </Box>
+                  <Box py={4} borderBottomWidth="1px">
+                    <Button
+                      w="full"
+                      variant="ghost"
+                      onClick={() => {
+                        router.push(`/mypage/${user?.id}`);
+                        onClose();
+                      }}
+                    >
+                      마이페이지
+                    </Button>
+                  </Box>
+                </>
               )}
               
               {/* 로그아웃 버튼 */}

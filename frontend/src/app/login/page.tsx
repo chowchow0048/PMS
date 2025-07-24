@@ -40,8 +40,8 @@ export default function LoginPage() {
   // 이미 로그인된 사용자 리다이렉트 처리
   useEffect(() => {
     if (isAuthenticated) {
-      // 이미 로그인된 경우 학생배치 페이지로 이동
-      router.push('/student-placement');
+      // 이미 로그인된 경우 메인 페이지로 이동 (권한별 라우팅은 메인 페이지에서 처리)
+      router.push('/');
     }
   }, [isAuthenticated, router]);
 
@@ -91,20 +91,28 @@ export default function LoginPage() {
         console.log('백엔드 리다이렉트 경로:', data.redirect);
         router.push(data.redirect);
       } else {
-        // 백엔드와 동일한 권한 로직 적용
+        // 백엔드와 동일한 권한 로직 적용 (is_student 우선순위)
         console.log('클라이언트 사이드 권한 체크');
-        if (data.user.is_superuser || data.user.is_staff) {
-          // 슈퍼유저나 관리자는 학생 배치 페이지로
+        if (data.user.is_superuser) {
+          // 슈퍼유저는 메인 페이지로
+          console.log('슈퍼유저 권한 - 메인 페이지로 이동');
+          router.push('/');
+        } else if (data.user.is_student) {
+          // 학생은 클리닉 예약 페이지로 (우선순위 높음)
+          console.log('학생 권한 - 클리닉 예약 페이지로 이동');
+          router.push('/clinic/reserve');
+        } else if (data.user.is_staff && !data.user.is_superuser && !data.user.is_student) {
+          // 관리자는 학생 배치 페이지로 (학생이 아닌 경우만)
           console.log('관리자 권한 - 학생 배치 페이지로 이동');
           router.push('/student-placement');
-        } else if (data.user.is_teacher && !data.user.is_staff && !data.user.is_superuser) {
-          // 일반 강사(관리자가 아닌)는 마이페이지로
+        } else if (data.user.is_teacher) {
+          // 강사는 마이페이지로
           console.log('강사 권한 - 마이페이지로 이동:', `/mypage/${data.user.id}`);
           router.push(`/mypage/${data.user.id}`);
         } else {
           // 기본 리다이렉션
-          console.log('기본 리다이렉션 - 학생 배치 페이지로 이동');
-          router.push('/student-placement');
+          console.log('기본 리다이렉션 - 메인 페이지로 이동');
+          router.push('/');
         }
       }
     } catch (error) {

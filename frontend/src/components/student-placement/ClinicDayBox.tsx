@@ -1,17 +1,20 @@
 import React from 'react';
 import { Box, VStack, Text, Badge, Button, Flex, Tooltip, Center } from '@chakra-ui/react';
 import { useDrop } from 'react-dnd';
-import { Clinic } from '@/lib/types';
-import { Student, ItemTypes } from './StudentItem';
+import { Clinic, Student } from '@/lib/types'; // types.ts에서 Student와 Clinic import
+import { ItemTypes } from './StudentItem'; // ItemTypes만 StudentItem에서 import
 
 interface ClinicDayBoxProps {
   day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
   dayLabel: string;
   clinics: Clinic[];
-  onClinicClick: (clinic: Clinic) => void;
+  onClinicClick: (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun') => void; // 요일을 전달하도록 변경
   onStudentDrop?: (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun', students: Student[]) => void;
   isStudentAlreadyAssigned?: (studentId: number, day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun') => boolean;
 }
+
+// 시간대 선택지 정의
+const TIME_SLOTS = ['18:00', '19:00', '20:00', '21:00'];
 
 const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
   day,
@@ -21,8 +24,13 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
   onStudentDrop,
   isStudentAlreadyAssigned,
 }) => {
-  // 해당 요일의 클리닉 찾기 (요일당 1개만 존재)
-  const dayClinic = clinics.find(clinic => clinic.clinic_day === day);
+  // 해당 요일의 시간대별 클리닉 찾기
+  const dayClinics = TIME_SLOTS.map(timeSlot => 
+    clinics.find(clinic => clinic.clinic_day === day && clinic.clinic_time === timeSlot)
+  );
+
+  // 해당 요일에 클리닉이 하나라도 있는지 확인
+  const hasAnyClinics = dayClinics.some(clinic => clinic !== undefined);
 
   // 드롭 기능 구현
   const [{ isOver, canDrop }, dropRef] = useDrop({
@@ -34,7 +42,7 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
       isMultiple?: boolean; 
     }) => {
       // 클리닉이 없으면 드롭 불가
-      if (!dayClinic) return false;
+      if (!hasAnyClinics) return false;
       
       // 이미 배치된 학생이 있는지 확인
       if (isStudentAlreadyAssigned) {
@@ -75,9 +83,7 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
   });
 
   const handleBoxClick = () => {
-    if (dayClinic) {
-      onClinicClick(dayClinic);
-    }
+    onClinicClick(day); // 요일을 전달
   };
 
   return (
@@ -98,8 +104,8 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
         isOver ? 'red.50' : 
         'white'
       }
-      cursor={dayClinic ? "pointer" : "default"}
-      _hover={dayClinic ? { 
+      cursor={hasAnyClinics ? "pointer" : "default"}
+      _hover={hasAnyClinics ? { 
         borderColor: 'blue.400', 
         shadow: 'md'
       } : {}}
@@ -135,100 +141,113 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
       )}
       
       {/* 요일 헤더 */}
-      <Flex justify="space-between" align="center" mb={4}>
-        <Text fontSize="lg" fontWeight="bold" color="gray.700">
+      <Flex justify="center" align="center" mb={6}>
+        <Text fontSize="xl" fontWeight="bold" color="gray.700">
           {dayLabel}
         </Text>
-        {/* 클리닉 개수 배지 제거 (요일당 1개 고정) */}
       </Flex>
 
       {/* 클리닉 정보 */}
-      {!dayClinic ? (
+      {!hasAnyClinics ? (
         <Center py={8} flexDirection="column">
+          <Text color="gray.500" fontSize="2xl" mb={3}>
+            🕐
+          </Text>
           <Text color="gray.500" fontSize="md" mb={2}>
-            📅
+            등록된 클리닉이 없습니다
           </Text>
-          <Text color="gray.500" fontSize="sm">
-            등록된 클리닉이 없습니다.
-          </Text>
-          <Text color="gray.400" fontSize="xs" mt={1}>
-            클릭하여 클리닉을 생성하세요.
+          <Text color="gray.400" fontSize="sm">
+            클릭하여 클리닉을 생성하세요
           </Text>
         </Center>
       ) : (
-        <VStack align="start" spacing={4}>
-          {/* 담당 선생님 정보 */}
-          <Box
-            w="full"
-            p={3}
-            bg="blue.50"
-            border="1px solid"
-            borderColor="blue.200"
-            borderRadius="md"
-          >
-            <VStack align="start" spacing={2}>
-              <Flex justify="space-between" w="full">
-                <Text fontSize="md" fontWeight="semibold" color="blue.800">
-                  👨‍🏫 {dayClinic.teacher_name}
-                </Text>
-              </Flex>
-            </VStack>
-          </Box>
-
-          {/* 시간대별 학생 수 정보 */}
-          <VStack align="start" spacing={3} w="full">
-            <Text fontSize="sm" fontWeight="semibold" color="gray.600">
-              📊 학생 현황
+        <VStack align="stretch" spacing={4}>
+          {/* 시간대별 학생 수 표시 */}
+          <VStack align="stretch" spacing={3}>
+            <Text fontSize="sm" fontWeight="semibold" color="gray.600" textAlign="center">
+              시간대별 현황
             </Text>
             
-            <VStack align="start" spacing={2} w="full">
-              {/* Prime Clinic */}
-              <Flex justify="space-between" w="full" align="center">
-                <Flex align="center" gap={2}>
-                  <Text fontSize="sm" color="green.600">📚</Text>
-                  <Text fontSize="sm" color="green.700">숙제 해설 (18:00-19:00)</Text>
-                </Flex>
-                <Badge colorScheme="green" size="sm">
-                  {dayClinic.clinic_prime_students.length}명
-                </Badge>
-              </Flex>
-              
-              {/* Sub Clinic */}
-              <Flex justify="space-between" w="full" align="center">
-                <Flex align="center" gap={2}>
-                  <Text fontSize="sm" color="orange.600">❓</Text>
-                  <Text fontSize="sm" color="orange.700">자유 질문 (19:00-22:00)</Text>
-                </Flex>
-                <Badge colorScheme="orange" size="sm">
-                  {dayClinic.clinic_sub_students.length}명
-                </Badge>
-              </Flex>
-              
-              {/* 미배치 학생 */}
-              <Flex justify="space-between" w="full" align="center">
-                <Flex align="center" gap={2}>
-                  <Text fontSize="sm" color="gray.600">👥</Text>
-                  <Text fontSize="sm" color="gray.700">미배치</Text>
-                </Flex>
-                <Badge colorScheme="gray" size="sm">
-                  {dayClinic.clinic_unassigned_students.length}명
-                </Badge>
-              </Flex>
+            <VStack spacing={2}>
+              {TIME_SLOTS.map((timeSlot) => {
+                const clinic = dayClinics.find(c => c?.clinic_time === timeSlot);
+                const studentCount = clinic?.clinic_students?.length || 0;
+                const capacity = clinic?.clinic_capacity || 0;
+                const isActive = clinic !== undefined;
+                
+                return (
+                  <Flex 
+                    key={timeSlot}
+                    justify="space-between" 
+                    align="center"
+                    w="full"
+                    p={2}
+                    bg={isActive ? 'white.50' : 'gray.50'}
+                    borderRadius="md"
+                    border="1px solid"
+                    borderColor={isActive ? 'gray.300' : 'gray.300'}
+                  >
+                    <Flex align="center" gap={2}>
+                      {/* <Text fontSize="sm" color={isActive ? "blue.600" : "gray.500"}>
+                        🕐
+                      </Text> */}
+                      <Text 
+                        fontSize="sm" 
+                        fontWeight="medium"
+                        color={isActive ? "blue.700" : "gray.500"}
+                      >
+                        {timeSlot}
+                      </Text>
+                    </Flex>
+                    
+                    <Badge 
+                      colorScheme={
+                        !isActive ? "gray" :
+                        studentCount >= capacity ? "red" : 
+                        studentCount > 0 ? "green" : "gray"
+                      } 
+                      size="sm"
+                      px={2}
+                    >
+                      {isActive ? `${studentCount}/${capacity}명` : '없음'}
+                    </Badge>
+                  </Flex>
+                );
+              })}
             </VStack>
           </VStack>
 
-          {/* 클릭 안내 */}
-          <Box
+          {/* 총 학생 수 */}
+          {/* <Box
             w="full"
-            mt="auto"
-            pt={3}
+            p={3}
+            bg="green.50"
+            border="1px solid"
+            borderColor="green.200"
+            borderRadius="md"
+            textAlign="center"
+          >
+            <Text fontSize="sm" color="green.600" fontWeight="semibold">
+              📚 총 신청 학생 수
+            </Text>
+            <Text fontSize="lg" fontWeight="bold" color="green.700">
+              {dayClinics.reduce((total, clinic) => 
+                total + (clinic?.clinic_students?.length || 0), 0
+              )}명
+            </Text>
+          </Box> */}
+
+          {/* 클릭 안내 */}
+          {/* <Box
+            w="full"
+            pt={2}
             borderTop="1px solid"
             borderColor="gray.200"
           >
             <Text fontSize="xs" color="gray.500" textAlign="center">
-              클릭하여 학생 배치 관리
+              클릭하여 시간대별 학생 관리
             </Text>
-          </Box>
+          </Box> */}
         </VStack>
       )}
     </Box>

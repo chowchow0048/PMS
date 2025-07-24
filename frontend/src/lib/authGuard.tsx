@@ -34,13 +34,18 @@ export function AuthGuard({
   const getUserRole = (): UserRole | null => {
     if (!user) return null;
     
+    // 학생인 경우 우선순위 최고 (다른 권한이 있어도 학생으로 분류)
+    if (user.is_student) {
+      return 'student';
+    }
+    
     // 관리자 또는 슈퍼유저인 경우
     if (user.is_superuser || user.is_staff) {
       return 'admin';
     }
     
     // 일반 강사인 경우
-    if (user.is_teacher && !user.is_staff && !user.is_superuser) {
+    if (user.is_teacher) {
       return 'teacher';
     }
     
@@ -101,14 +106,11 @@ export function AuthGuard({
     // 특정 역할이 필요한 경우 권한 체크
     if (allowedRoles.length > 0 && user) {
       const userRole = getUserRole();
-      console.log('AuthGuard: 사용자 역할 체크:', { userRole, allowedRoles });
-      
       if (!userRole || !allowedRoles.includes(userRole)) {
         // 권한이 없는 경우
-        const defaultRedirect = userRole === 'teacher' ? `/mypage/${user.id}` : '/student-placement';
+        const defaultRedirect = userRole === 'student' ? `/clinic/reserve` : '/student-placement';
         const targetRedirect = redirectTo || defaultRedirect;
         
-        console.log('AuthGuard: 권한 없음 - 리다이렉트:', targetRedirect);
         toast({
           title: '접근 권한 없음',
           description: '이 페이지에 접근할 권한이 없습니다.',

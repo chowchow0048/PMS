@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Student } from '@/components/student-placement/StudentItem';
+import { Student, User } from '@/lib/types'; // types.ts에서 Student와 User import
 // import { Teacher } from '@/components/student-placement/TeacherBox';  // 보충 시스템 개편으로 주석처리
 
 // 보충 시스템 개편으로 임시 Teacher 타입 정의 (기존 코드 유지를 위해)
@@ -112,16 +112,18 @@ export const register = async (userData: any) => {
   }
 };
 
-// 모든 학생 가져오기
-export const getStudents = async () => {
+// 모든 학생 가져오기 (is_student=true인 User들)
+export const getStudents = async (): Promise<Student[]> => {
   try {
+    console.log('🔍 [api.ts] getStudents 함수 시작 - User 기반 (is_student=true)');
+    
     let allStudents: any[] = []; // 모든 학생 데이터를 담을 배열
-    let nextUrl: string | null = '/students/?page_size=100'; // 첫 번째 페이지 URL
+    let nextUrl: string | null = '/users/?is_student=true&page_size=100'; // User 엔드포인트로 변경
     
     // 모든 페이지를 순회하여 데이터 수집
     while (nextUrl) {
       const response: any = await api.get(nextUrl);
-      console.log('response', response);
+      console.log('🔍 [api.ts] User(is_student=true) 응답:', response);
       
       // 현재 페이지의 학생 데이터 추가
       if (Array.isArray(response.data)) {
@@ -146,18 +148,29 @@ export const getStudents = async () => {
       }
     }
     
-    console.log(`전체 학생 수: ${allStudents.length}명`);
-    return allStudents;
+    // User 데이터를 Student 인터페이스에 맞게 변환
+    const students: Student[] = allStudents.map((user: any) => ({
+      ...user,
+      student_name: user.name, // name을 student_name으로 매핑 (기존 코드 호환성)
+      is_student: true,
+      student_phone_num: user.student_phone_num || '',
+      student_parent_phone_num: user.student_parent_phone_num || '',
+      school: user.school || '',
+      grade: user.grade || '',
+    }));
+    
+    console.log(`🔍 [api.ts] 전체 학생 수: ${students.length}명`);
+    return students;
   } catch (error) {
-    console.error('학생 데이터 가져오기 오류:', error);
+    console.error('❌ [api.ts] 학생 데이터 가져오기 오류:', error);
     throw error;
   }
 };
 
-// 모든 선생님 가져오기
+// 모든 선생님 가져오기 (is_teacher=true인 User들)
 export const getTeachers = async () => {
   try {
-    console.log('🔍 [api.ts] getTeachers 함수 시작');
+    console.log('🔍 [api.ts] getTeachers 함수 시작 - User 기반 (is_teacher=true)');
     console.log('🔍 [api.ts] API_URL:', API_URL);
     console.log('🔍 [api.ts] 요청 URL:', `${API_URL}/users/?is_active=true&is_teacher=true&is_superuser=false`);
     
@@ -171,13 +184,21 @@ export const getTeachers = async () => {
     console.log('🔍 [api.ts] 응답 데이터 타입:', typeof response.data);
     console.log('🔍 [api.ts] 응답 데이터:', response.data);
 
-    const teachers = Array.isArray(response.data) ? response.data : 
-    (response.data.results ? response.data.results : []);
+    const users = Array.isArray(response.data) ? response.data : 
+                  (response.data.results ? response.data.results : []);
+    
+    // User 데이터를 Teacher 인터페이스에 맞게 변환
+    const teachers = users.map((user: any) => ({
+      ...user,
+      user_name: user.name, // name을 user_name으로 매핑 (기존 코드 호환성)
+      user_subject: user.subject, // subject를 user_subject로 매핑
+      max_student_num: 20, // 기본값 설정 (향후 User 모델에 추가 필요시 수정)
+    }));
+    
     console.log('🔍 [api.ts] 처리된 선생님 데이터:', teachers);
     console.log('🔍 [api.ts] 선생님 수:', teachers.length);
     
-    return teachers
-    // results 필드가 있으면 해당 배열을 반환하고, 없으면 응답 자체를 배열로 변환합니다
+    return teachers;
   } catch (error) {
     console.error('❌ [api.ts] getTeachers 함수에서 오류 발생:');
     console.error('❌ [api.ts] 오류 타입:', error?.constructor?.name);
@@ -231,7 +252,7 @@ export const unassignStudent = async (studentId: number) => {
   return { deprecated: true };
 };
 
-// 엑셀 파일로 학생 명단 업로드 API
+// 엑셀 파일로 학생 명단 업로드 API (User 기반으로 수정)
 export const uploadStudentExcel = async (file: File) => {
   try {
     console.log('🔍 [api.ts] 학생 명단 엑셀 파일 업로드 시도:', file.name);
@@ -248,7 +269,8 @@ export const uploadStudentExcel = async (file: File) => {
     console.log('🔍 [api.ts] 토큰 확인:', token ? '있음' : '없음');
     
     console.log('🔍 [api.ts] API 요청 시작...');
-    const response = await axios.post(`${API_URL}/students/upload-excel/`, formData, {
+    // User 엔드포인트로 변경
+    const response = await axios.post(`${API_URL}/users/upload-student-excel/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         'Authorization': `Token ${token}`,
@@ -260,44 +282,6 @@ export const uploadStudentExcel = async (file: File) => {
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 학생 명단 엑셀 업로드 오류:', error);
-    if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as any;
-      console.error('❌ [api.ts] 응답 상태:', axiosError.response?.status);
-      console.error('❌ [api.ts] 응답 데이터:', axiosError.response?.data);
-    }
-    throw error;
-  }
-};
-
-// 보충 신청 엑셀 파일 업로드 API
-export const uploadClinicEnrollmentExcel = async (file: File) => {
-  try {
-    console.log('🔍 [api.ts] 보충 신청 엑셀 파일 업로드 시도:', file.name);
-    console.log('🔍 [api.ts] 파일 크기:', file.size, 'bytes');
-    console.log('🔍 [api.ts] 파일 타입:', file.type);
-    
-    // FormData 생성
-    const formData = new FormData();
-    formData.append('file', file);
-    console.log('🔍 [api.ts] FormData 생성 완료');
-    
-    // multipart/form-data로 전송하기 위해 별도 axios 인스턴스 사용
-    const token = localStorage.getItem('token');
-    console.log('🔍 [api.ts] 토큰 확인:', token ? '있음' : '없음');
-    
-    console.log('🔍 [api.ts] API 요청 시작...');
-    const response = await axios.post(`${API_URL}/clinics/upload-enrollment/`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': `Token ${token}`,
-      },
-    });
-    
-    console.log('🔍 [api.ts] API 응답 수신:', response.status);
-    console.log('🔍 [api.ts] 보충 신청 엑셀 업로드 응답:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('❌ [api.ts] 보충 신청 엑셀 업로드 오류:', error);
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as any;
       console.error('❌ [api.ts] 응답 상태:', axiosError.response?.status);
@@ -374,7 +358,7 @@ export const createClinic = async (clinicData: any) => {
   }
 };
 
-// 클리닉에 학생 배치 API (미배치 상태에서 특정 클리닉의 미배치 영역으로 배치)
+// 클리닉에 학생 배치 API (Student 배치를 clinic_students에 직접 추가)
 export const assignStudentToClinic = async (clinicId: number, studentIds: number[]) => {
   try {
     console.log('🔍 [api.ts] assignStudentToClinic 함수 시작:', clinicId, studentIds);
@@ -383,13 +367,20 @@ export const assignStudentToClinic = async (clinicId: number, studentIds: number
     const clinicResponse = await api.get(`/clinics/${clinicId}/`);
     const clinic = clinicResponse.data;
     
-    // 기존 미배치 학생 ID 목록에 새 학생 ID들 추가
-    const updatedUnassignedStudents = [...clinic.clinic_unassigned_students, ...studentIds];
+    console.log('🔍 [api.ts] 현재 클리닉 정보:', clinic);
     
-    // 클리닉 업데이트
+    // 기존 학생 ID 목록 추출 (clinic_students는 User 객체 배열)
+    const existingStudentIds = clinic.clinic_students?.map((user: any) => user.id) || [];
+    console.log('🔍 [api.ts] 기존 학생 ID들:', existingStudentIds);
+    
+    // 새 학생 ID들과 기존 학생 ID들을 합치되, 중복 제거
+    const updatedStudentIds = Array.from(new Set([...existingStudentIds, ...studentIds]));
+    console.log('🔍 [api.ts] 업데이트될 학생 ID들:', updatedStudentIds);
+    
+    // 클리닉 업데이트 (clinic_students에 학생 ID 배열 전송)
     const response = await api.put(`/clinics/${clinicId}/`, {
       ...clinic,
-      clinic_unassigned_students: updatedUnassignedStudents
+      clinic_students: updatedStudentIds // User ID 배열로 전송
     });
     
     console.log('🔍 [api.ts] 학생 클리닉 배치 완료:', response.data);
@@ -413,5 +404,6 @@ export const getTodayClinic = async () => {
     throw error;
   }
 };
+
 
 export default api; 

@@ -52,19 +52,27 @@ export default function HomePage() {
         return;
       }
 
-      // 로그인된 상태: 사용자 권한에 따라 리다이렉트
-      if (user.is_superuser || user.is_staff) {
-        // 슈퍼유저나 관리자는 학생 배치 페이지로
+      // 로그인된 상태: 사용자 권한에 따라 리다이렉트 (백엔드와 동일한 우선순위)
+      if (user.is_superuser) {
+        // 슈퍼유저는 기본 관리 페이지로
+        console.log('슈퍼유저 권한 - 학생 배치 페이지로 이동');
+        router.push('/student-placement');
+      } else if (user.is_student) {
+        // 학생은 클리닉 예약 페이지로 (우선순위 높음)
+        console.log('학생 권한 - 클리닉 예약 페이지로 이동');
+        router.push('/clinic/reserve');
+      } else if (user.is_staff && !user.is_superuser && !user.is_student) {
+        // 관리자는 학생 배치 페이지로 (학생이 아닌 경우만)
         console.log('관리자 권한 - 학생 배치 페이지로 이동');
         router.push('/student-placement');
       } else if (user.is_teacher) {
-        // 강사는 마이페이지로 (관리자 여부와 상관없이)
+        // 강사는 마이페이지로
         console.log('강사 권한 - 마이페이지로 이동:', `/mypage/${user.id}`);
         router.push(`/mypage/${user.id}`);
       } else {
-        // 기본값: 학생 배치 페이지로 (예상치 못한 사용자 타입)
-        console.log('기본 리다이렉션 - 학생 배치 페이지로 이동');
-        router.push('/student-placement');
+        // 기본값: 클리닉 예약 페이지로
+        console.log('기본 리다이렉션 - 클리닉 예약 페이지로 이동');
+        router.push('/clinic/reserve');
       }
     } else {
       // 로그인되지 않은 상태: 로그인 페이지로 리다이렉트

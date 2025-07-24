@@ -1,10 +1,37 @@
-// 사용자 타입
+// 사용자 타입 (Backend User 모델 기반으로 확장)
 export interface User {
   id: number;
   username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  name: string; // 사용자 이름
+  phone_num?: string; // 전화번호
+  subject?: number; // 담당 과목 ID 또는 수강 과목 ID
+  is_teacher: boolean; // 강사 여부
+  is_student: boolean; // 학생 여부
+  is_staff: boolean; // 관리자 여부
+  is_superuser: boolean; // 슈퍼유저 여부
+  is_active: boolean; // 활성 상태
+  
+  // 학생 전용 필드들
+  student_phone_num?: string; // 학생 전화번호
+  student_parent_phone_num?: string; // 학부모 전화번호
+  school?: string; // 학교
+  grade?: string; // 학년
+  
+  // 추가 정보
+  subject_name?: string; // 과목명 (조인된 정보)
+}
+
+// Student 타입을 User 기반으로 정의 (is_student=true인 User)
+export interface Student extends User {
+  is_student: true;
+  student_name: string; // name과 동일하지만 기존 코드 호환성을 위해
+  student_phone_num: string;
+  student_parent_phone_num: string;
+  school: string;
+  grade: string;
 }
 
 // 프로젝트 멤버십 타입
@@ -90,15 +117,16 @@ export interface RegisterRequest {
   last_name?: string;
 }
 
-// 클리닉 타입 정의
+// 클리닉 타입 정의 (보충 시스템 개편 반영)
 export interface Clinic {
   id: number;
   clinic_teacher: number;
-  clinic_day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+  clinic_day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+  clinic_time: string; // 클리닉 시간 (예: "18:00", "19:00", "20:00", "21:00")
+  clinic_room: string; // 강의실 (예: "1강의실", "2강의실")
+  clinic_capacity: number; // 정원
   clinic_subject: number;
-  clinic_prime_students: number[];
-  clinic_sub_students: number[];
-  clinic_unassigned_students: number[];
+  clinic_students: User[]; // 예약한 학생들 (통합됨)
   teacher_name: string;
   subject_name: string;
   day_display: string;
@@ -121,8 +149,8 @@ export const DAY_CHOICES: DayChoice[] = [
   { value: 'sun', label: '일요일' },
 ];
 
-// 클리닉 섹션 타입
-export type ClinicSection = 'unassigned' | 'prime' | 'sub';
+// 보충 시스템 개편으로 주석처리 - 더 이상 섹션 구분이 없음
+// export type ClinicSection = 'unassigned' | 'prime' | 'sub';
 
 // 클리닉 모달 프롭스 타입
 export interface ClinicModalProps {

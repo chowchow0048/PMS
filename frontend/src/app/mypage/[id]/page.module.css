@@ -1066,4 +1066,27 @@
   .unassignedStudentItem {
     padding: 12px;
   }
+}
+
+/* 비활성화 메시지 스타일 */
+.deprecatedMessage {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  margin: 2rem 0;
+  color: #6c757d;
+}
+
+.deprecatedMessage h3 {
+  color: #6c757d;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.deprecatedMessage p {
+  color: #6c757d;
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
 } 

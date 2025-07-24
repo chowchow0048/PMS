@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import styles from './ClinicCell.module.css';
 import pageStyles from './page.module.css';
 import { useClinic } from './ClinicContext';
-import StudentItem from './StudentItem';
+// import StudentItem from './StudentItem';
 import { bg } from 'date-fns/locale';
 
 // 시간 정보 타입 정의 (실제 API 응답 구조에 맞게 수정)
