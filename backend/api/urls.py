@@ -53,6 +53,11 @@ urlpatterns = [
     path("auth/login/", views.LoginView.as_view(), name="login"),
     path("auth/logout/", views.LogoutView.as_view(), name="logout"),
     path("auth/register/", views.UserRegistrationView.as_view(), name="register"),
+    path(
+        "auth/change_password/",
+        views.ChangePasswordView.as_view(),
+        name="change_password",
+    ),
     # 마이페이지 관련 API
     path("mypage/<int:user_id>/", views.UserMyPageView.as_view(), name="user_mypage"),
     # 오늘의 클리닉 API

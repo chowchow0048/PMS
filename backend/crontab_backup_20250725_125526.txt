@@ -1,0 +1,1 @@
+*/1 * * * * /Users/chow/Desktop/GitHub/2024/appleWeb/.venv/bin/python /Users/chow/Desktop/GitHub/2024/appleWeb/appleWeb/manage.py crontab run 73b3ff97a5a06acd06746f23a4e7e75c # django-cronjobs for config

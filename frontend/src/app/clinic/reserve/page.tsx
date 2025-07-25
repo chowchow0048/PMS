@@ -91,6 +91,35 @@ const ClinicReservePage: React.FC = () => {
     sat: '토요일',
   };
 
+  // 요일 순서 매핑 (월요일부터 토요일까지)
+  const dayOrder: { [key: string]: number } = {
+    mon: 0,
+    tue: 1,
+    wed: 2,
+    thu: 3,
+    fri: 4,
+    sat: 5,
+  };
+
+  // 현재 요일 확인 함수
+  const getCurrentDayOrder = () => {
+    const today = new Date();
+    const weekday = today.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
+    
+    // 일요일(0)을 토요일 다음(6)으로 처리
+    if (weekday === 0) return 6; // 일요일은 모든 요일 예약 가능
+    return weekday - 1; // 월요일(1) -> 0, 화요일(2) -> 1, ...
+  };
+
+  // 특정 요일이 예약 가능한지 확인하는 함수
+  const isDayReservable = (day: string) => {
+    const currentDayOrder = getCurrentDayOrder();
+    const targetDayOrder = dayOrder[day];
+    
+    // 현재 요일보다 이전 요일은 예약 불가
+    return targetDayOrder >= currentDayOrder;
+  };
+
   // 초기 데이터 로드 (인증 완료 후)
   useEffect(() => {
     if (!isLoading && token) {
@@ -150,6 +179,18 @@ const ClinicReservePage: React.FC = () => {
         title: '로그인 필요',
         description: '로그인 후 이용해주세요.',
         status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    // 이전 요일 예약 불가 체크
+    if (!isDayReservable(day)) {
+      toast({
+        title: '예약 불가',
+        description: `${dayNames[day]}은 이미 지나간 요일로 예약할 수 없습니다.`,
+        status: 'warning',
         duration: 3000,
         isClosable: true,
       });
@@ -345,6 +386,7 @@ const ClinicReservePage: React.FC = () => {
 
     const isReserved = user && clinic.students.some(student => student.id === user.id);
     const hasClinic = clinic.clinic_id !== null;
+    const isPastDay = !isDayReservable(day); // 이전 요일인지 확인
 
     return (
       <GridItem key={`${day}-${time}`}>
@@ -359,6 +401,8 @@ const ClinicReservePage: React.FC = () => {
           bg={
             !hasClinic
               ? "gray.50"
+              : isPastDay
+              ? "gray.100"
               : isReserved
               ? "blue.50"
               : clinic.is_full
@@ -366,12 +410,12 @@ const ClinicReservePage: React.FC = () => {
               : "white"
           }
           _hover={{
-            shadow: hasClinic && !clinic.is_full ? "md" : "none",
-            cursor: hasClinic && !clinic.is_full ? "pointer" : "default",
+            shadow: hasClinic && !clinic.is_full && !isPastDay ? "md" : "none",
+            cursor: hasClinic && !clinic.is_full && !isPastDay ? "pointer" : "default",
           }}
           transition="all 0.2s"
           onClick={() => {
-            if (hasClinic) {
+            if (hasClinic && !isPastDay) {
               if (isReserved) {
                 // 예약 취소 확인 모달 표시
                 setSelectedSlot({ day, time, clinic, action: 'cancel' });
@@ -422,27 +466,38 @@ const ClinicReservePage: React.FC = () => {
                   </Badge>
                 )}
                 
-                {/* 정가운데 인원수 표시 */}
+                {/* 정가운데 인원수 표시 또는 마감 표시 */}
                 <Box
                   position="absolute"
                   top="50%"
                   left="50%"
                   transform="translate(-50%, -50%)"
                 >
-                  <Text
-                    fontSize="lg"
-                    fontWeight="bold"
-                    textAlign="center"
-                    color={
-                      clinic.is_full ? "red.500" : clinic.remaining_spots <= 3 ? "orange.500" : "green.600"
-                    }
-                  >
-                    {clinic.current_count}/{clinic.capacity}
-                  </Text>
+                  {isPastDay ? (
+                    <Text
+                      fontSize="sm"
+                      fontWeight="bold"
+                      textAlign="center"
+                      color="gray.500"
+                    >
+                      {dayNames[day]} 마감
+                    </Text>
+                  ) : (
+                    <Text
+                      fontSize="lg"
+                      fontWeight="bold"
+                      textAlign="center"
+                      color={
+                        clinic.is_full ? "red.500" : clinic.remaining_spots <= 3 ? "orange.500" : "green.600"
+                      }
+                    >
+                      {clinic.current_count}/{clinic.capacity}
+                    </Text>
+                  )}
                 </Box>
                 
-                {/* 마감 표시 - 하단 중앙 */}
-                {clinic.is_full && (
+                {/* 마감 표시 - 하단 중앙 (이전 요일이 아닌 경우만) */}
+                {clinic.is_full && !isPastDay && (
                   <Text 
                     fontSize="sm" 
                     color="red.500" 

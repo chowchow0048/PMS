@@ -15,7 +15,14 @@ import {
   InputRightElement,
   Heading,
   useToast,
-  Text
+  Text,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure
 } from '@chakra-ui/react';
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 import { login } from '@/lib/api';
@@ -32,9 +39,16 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // 비밀번호 변경 모달 상태
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [pendingLoginData, setPendingLoginData] = useState<any>(null);
+
   // Next.js 라우터와 인증 상태 관리
   const router = useRouter();
   const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const { login: authLogin, isAuthenticated } = useAuth();
 
   // 이미 로그인된 사용자 리다이렉트 처리
@@ -47,6 +61,135 @@ export default function LoginPage() {
 
   // 비밀번호 표시/숨김 토글 핸들러
   const handleShowPassword = () => setShowPassword(!showPassword);
+
+  // 비밀번호 변경 처리
+  const handlePasswordChange = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast({
+        title: '입력 오류',
+        description: '새 비밀번호를 모두 입력해주세요.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: '비밀번호 불일치',
+        description: '새 비밀번호가 일치하지 않습니다.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      toast({
+        title: '비밀번호 길이 오류',
+        description: '비밀번호는 최소 4자리 이상이어야 합니다.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/auth/change_password/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Token ${pendingLoginData.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          current_password: pendingLoginData.user.username, // 현재 비밀번호는 아이디와 동일
+          new_password: newPassword,
+          confirm_password: confirmPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: '비밀번호 변경 완료',
+          description: '비밀번호가 성공적으로 변경되었습니다.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+
+        // 모달 닫기 및 상태 초기화
+        onClose();
+        setNewPassword('');
+        setConfirmPassword('');
+
+        // 로그인 완료 처리
+        authLogin(pendingLoginData.token, pendingLoginData.user, false);
+
+        // 리다이렉트 처리
+        if (pendingLoginData.redirect) {
+          router.push(pendingLoginData.redirect);
+        } else if (pendingLoginData.user.is_student) {
+          router.push('/clinic/reserve');
+        } else {
+          router.push('/');
+        }
+      } else {
+        toast({
+          title: '비밀번호 변경 실패',
+          description: data.error || '비밀번호 변경 중 오류가 발생했습니다.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('비밀번호 변경 오류:', error);
+      toast({
+        title: '네트워크 오류',
+        description: '비밀번호 변경 요청 중 오류가 발생했습니다.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  // 나중에 변경 처리
+  const handleSkipPasswordChange = () => {
+    // 모달 닫기 및 상태 초기화
+    onClose();
+    setNewPassword('');
+    setConfirmPassword('');
+
+    // 비밀번호 변경 없이 로그인 완료 처리 (다음 로그인 시에도 팝업 표시됨)
+    authLogin(pendingLoginData.token, pendingLoginData.user, true); // needsPasswordChange를 true로 유지
+
+    toast({
+      title: '로그인 완료',
+      description: '다음 로그인 시에도 비밀번호 변경을 권장합니다.',
+      status: 'info',
+      duration: 3000,
+      isClosable: true,
+    });
+
+    // 리다이렉트 처리
+    if (pendingLoginData.redirect) {
+      router.push(pendingLoginData.redirect);
+    } else if (pendingLoginData.user.is_student) {
+      router.push('/clinic/reserve');
+    } else {
+      router.push('/');
+    }
+  };
 
   // 로그인 폼 제출 처리
   const handleLogin = async (e: React.FormEvent) => {
@@ -74,8 +217,16 @@ export default function LoginPage() {
       console.log('로그인 응답 데이터:', data);
       console.log('사용자 정보:', data.user);
       
+      // 초기 비밀번호 변경이 필요한 경우 모달 표시
+      if (data.needs_password_change) {
+        console.log('초기 비밀번호 변경 필요 - 모달 표시');
+        setPendingLoginData(data);
+        onOpen();
+        return;
+      }
+
       // 인증 컨텍스트에 로그인 정보 저장
-      authLogin(data.token, data.user);
+      authLogin(data.token, data.user, data.needs_password_change);
       
       toast({
         title: '로그인 성공',
@@ -207,6 +358,57 @@ export default function LoginPage() {
           </VStack>
         </Box>
       </Flex>
+
+      {/* 초기 비밀번호 변경 모달 */}
+      <Modal isOpen={isOpen} onClose={() => {}} isCentered closeOnOverlayClick={false}>
+        <ModalOverlay bg="blackAlpha.300" />
+        <ModalContent>
+          <ModalHeader textAlign="center">
+            초기 비밀번호를 변경해주세요!
+          </ModalHeader>
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl>
+                <FormLabel>새 비밀번호</FormLabel>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="새 비밀번호를 입력하세요"
+                  border="1px solid rgb(198, 203, 210)"
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>새 비밀번호 확인</FormLabel>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="새 비밀번호를 다시 입력하세요"
+                  border="1px solid rgb(198, 203, 210)"
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              mr={3}
+              onClick={handleSkipPasswordChange}
+            >
+              나중에 변경
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={handlePasswordChange}
+              isLoading={changingPassword}
+              loadingText="변경 중..."
+            >
+              확인
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Container>
   );
 } 

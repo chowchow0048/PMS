@@ -10,8 +10,10 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: User) => void;
+  needsPasswordChange: boolean;
+  login: (token: string, user: User, needsPasswordChange?: boolean) => void;
   logout: () => void;
+  clearPasswordChangeFlag: () => void;
 }
 
 // 기본값으로 컨텍스트 생성
@@ -20,8 +22,10 @@ const AuthContext = createContext<AuthContextType>({
   token: null,
   isAuthenticated: false,
   isLoading: true,
+  needsPasswordChange: false,
   login: () => {},
   logout: () => {},
+  clearPasswordChangeFlag: () => {},
 });
 
 // 인증 제공자 프롭스 타입 정의
@@ -34,6 +38,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const router = useRouter();
 
   // 로컬 스토리지에서 사용자 정보 불러오기
@@ -81,11 +86,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []); // 빈 의존성 배열로 한 번만 실행
 
   // 로그인 함수
-  const login = (token: string, user: User) => {
+  const login = (token: string, user: User, needsPasswordChange?: boolean) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     setToken(token);
     setUser(user);
+    setNeedsPasswordChange(needsPasswordChange || false);
   };
 
   // 로그아웃 함수
@@ -94,7 +100,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+    setNeedsPasswordChange(false);
     router.push('/');
+  };
+
+  // 비밀번호 변경 플래그 초기화 함수
+  const clearPasswordChangeFlag = () => {
+    setNeedsPasswordChange(false);
   };
 
   return (
@@ -104,8 +116,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         token,
         isAuthenticated: !!token && !!user,
         isLoading,
+        needsPasswordChange,
         login,
         logout,
+        clearPasswordChangeFlag,
       }}
     >
       {children}

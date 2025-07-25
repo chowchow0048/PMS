@@ -818,6 +818,14 @@ class LoginView(APIView):
                     # Django 세션 로그인 (시그널이 발동됨)
                     login(request, user)
 
+                    # 초기 비밀번호 변경 필요 여부 확인 (학생 계정만)
+                    needs_password_change = False
+                    if user.is_student and user.check_password(user.username):
+                        needs_password_change = True
+                        logger.info(
+                            f"[api/views.py] 초기 비밀번호 변경 필요: {user.username}"
+                        )
+
                     # 사용자 권한에 따라 리다이렉트 경로 결정
                     redirect_path = None
                     if user.is_superuser:
@@ -847,6 +855,7 @@ class LoginView(APIView):
                             "token": token.key,
                             "user": UserSerializer(user).data,
                             "redirect": redirect_path,
+                            "needs_password_change": needs_password_change,  # 초기 비밀번호 변경 필요 여부 추가
                         }
                     )
                 else:
@@ -876,6 +885,75 @@ class LogoutView(APIView):
     def post(self, request):
         logout(request)
         return Response({"message": "로그아웃 되었습니다."}, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    """비밀번호 변경 API"""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """사용자 비밀번호 변경"""
+        try:
+            current_password = request.data.get("current_password")
+            new_password = request.data.get("new_password")
+            confirm_password = request.data.get("confirm_password")
+
+            # 필수 데이터 검증
+            if not all([current_password, new_password, confirm_password]):
+                return Response(
+                    {"error": "모든 필드를 입력해주세요."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 새 비밀번호 확인
+            if new_password != confirm_password:
+                return Response(
+                    {"error": "새 비밀번호가 일치하지 않습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 현재 비밀번호 확인
+            if not request.user.check_password(current_password):
+                return Response(
+                    {"error": "현재 비밀번호가 올바르지 않습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 새 비밀번호가 현재 비밀번호와 같은지 확인
+            if current_password == new_password:
+                return Response(
+                    {"error": "새 비밀번호는 현재 비밀번호와 달라야 합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 비밀번호 길이 검증 (최소 4자리)
+            if len(new_password) < 4:
+                return Response(
+                    {"error": "비밀번호는 최소 4자리 이상이어야 합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 비밀번호 변경
+            request.user.set_password(new_password)
+            request.user.save()
+
+            logger.info(f"[api/views.py] 비밀번호 변경 성공: {request.user.username}")
+
+            return Response(
+                {"message": "비밀번호가 성공적으로 변경되었습니다."},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[api/views.py] 비밀번호 변경 오류: {error_msg}")
+            logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
+
+            return Response(
+                {"error": f"비밀번호 변경 중 오류가 발생했습니다: {error_msg}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class UserMyPageView(APIView):
