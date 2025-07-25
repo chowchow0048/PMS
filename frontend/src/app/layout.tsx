@@ -4,8 +4,8 @@ import Navigation from '@/components/Navigation';
 import { AuthProvider } from '@/lib/authContext';
 
 export const metadata: Metadata = {
-  title: '프로젝트 관리 시스템',
-  description: 'Django, Next.js, PostgreSQL 기반 프로젝트 관리 시스템',
+  title: '물리단',
+  description: '우리는 물리단!',
 };
 
 export default function RootLayout({

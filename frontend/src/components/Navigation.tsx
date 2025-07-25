@@ -76,7 +76,7 @@ export default function Navigation() {
       >
         <Link href="/" passHref>
           <Text fontSize="xl" fontWeight="bold" color="white" cursor="pointer">
-            PMS
+            물리단
           </Text>
         </Link>
 

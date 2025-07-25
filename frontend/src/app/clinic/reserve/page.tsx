@@ -491,7 +491,7 @@ const ClinicReservePage: React.FC = () => {
     <Container maxW="container.xl" py={4}>
       <VStack spacing={1} align="stretch">
         <Heading as="h1" size="md" pb={2} textAlign="center" fontWeight="normal">
-          보충 예약
+          {/* 보충 예약 */}
         </Heading>
       
         {/* 동적 n*m 그리드 (시간 x 요일) */}

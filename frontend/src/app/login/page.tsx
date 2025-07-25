@@ -136,7 +136,11 @@ export default function LoginPage() {
         w="100%" 
         justifyContent="center" 
         alignItems="center"
+        flexDirection="column"
       >
+        <Heading size="xl" mb={10} mt={-150} textAlign="center" fontWeight="normal">
+          물리단
+        </Heading>
         <Box 
           p={8} 
           width="100%" 
@@ -146,7 +150,7 @@ export default function LoginPage() {
           bg="white"
         >
           <VStack spacing={6}>
-            <Heading size="xl" mb={2} textAlign="center">
+            <Heading size="xl" mb={2} textAlign="center" fontWeight="normal">
               로그인
             </Heading>
             

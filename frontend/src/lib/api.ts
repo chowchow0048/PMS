@@ -45,14 +45,48 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API 에러:', error);
+    
+    // 401 Unauthorized 응답 처리
     if (error.response?.status === 401) {
-      // 토큰이 만료되었거나 유효하지 않은 경우
+      const errorData = error.response?.data;
+      
+      // 클라이언트 사이드에서만 처리
       if (typeof window !== 'undefined') {
+        // 중복 로그인 감지 시 특별 처리
+        if (errorData?.error === 'session_expired' || errorData?.reason === 'duplicate_login') {
+          console.warn('🚨 중복 로그인 감지:', errorData);
+          
+          // localStorage 정리
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          
+          // 사용자에게 알림 표시 (토스트 또는 알림창)
+          const message = errorData?.message || '다른 곳에서 로그인하여 자동으로 로그아웃되었습니다.';
+          
+          // 브라우저 알림 표시
+          if (window.confirm(`${message}\n\n로그인 페이지로 이동하시겠습니까?`)) {
+            window.location.href = '/login';
+          } else {
+            // 사용자가 취소를 눌러도 로그인 페이지로 이동
+            setTimeout(() => {
+              window.location.href = '/login';
+            }, 2000);
+          }
+          
+          return Promise.reject(new Error('duplicate_login_detected'));
+        }
+        
+        // 일반적인 인증 오류 (토큰 만료 등)
+        console.warn('🔐 인증 오류 - 로그인 필요');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        
+        // 조용히 로그인 페이지로 리다이렉트
         window.location.href = '/login';
       }
     }
+    
+    // 기타 오류는 그대로 전파
     return Promise.reject(error);
   }
 );

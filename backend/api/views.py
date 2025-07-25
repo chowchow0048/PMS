@@ -301,8 +301,8 @@ class UserViewSet(viewsets.ModelViewSet):
                         )
                         continue
 
-                    # 8자리 학생 ID 생성
-                    def generate_student_username(school, grade, user_id):
+                    # 9자리 학생 ID 생성 (연도2자리 + 학교구분2자리 + 학년1자리 + 부모님번호중간4자리)
+                    def generate_student_username(school, grade, parent_phone):
                         # 현재 연도의 마지막 2자리
                         current_year = "25"  # 2025년
 
@@ -324,13 +324,32 @@ class UserViewSet(viewsets.ModelViewSet):
                         school_code = school_code_map.get(school, "99")
                         grade_code = grade_code_map.get(grade, "9")
 
-                        # 사용자 ID를 3자리로 변환 (예: 1 -> 001)
-                        user_id_padded = str(user_id).zfill(3)
+                        # 부모님 전화번호에서 중간 4자리 추출
+                        # 예: 010-1234-5678 또는 01012345678에서 1234 추출
+                        phone_digits = parent_phone.replace("-", "").replace(" ", "")
 
-                        # 8자리 ID 생성
-                        return (
-                            f"{current_year}{school_code}{grade_code}{user_id_padded}"
-                        )
+                        # # 전화번호가 11자리인 경우 (010-1234-5678)
+                        # if len(phone_digits) == 11:
+                        #     middle_4_digits = phone_digits[3:7]  # 010 다음 4자리
+                        # # 전화번호가 10자리인 경우 (예: 01012345678에서 0이 빠진 경우)
+                        # elif len(phone_digits) == 10:
+                        #     middle_4_digits = phone_digits[2:6]  # 앞 2자리 다음 4자리
+                        # else:
+                        #     # 전화번호 형식이 예상과 다른 경우 기본값 사용
+                        #     middle_4_digits = "0000"
+
+                        # 전화번호가 11자리인 경우 (010-1234-5678)
+                        if len(phone_digits) == 11:
+                            last_4_digits = phone_digits[7:11]  # 마지막 4자리
+                        # 전화번호가 10자리인 경우 (예: 01012345678에서 0이 빠진 경우)
+                        elif len(phone_digits) == 10:
+                            last_4_digits = phone_digits[6:10]  # 마지막 4자리
+                        else:
+                            # 전화번호 형식이 예상과 다른 경우 기본값 사용
+                            last_4_digits = "0000"
+
+                        # 9자리 ID 생성
+                        return f"{current_year}{school_code}{grade_code}{last_4_digits}"
 
                     # 기본 과목을 physics1으로 설정
                     default_subject = None
@@ -360,9 +379,9 @@ class UserViewSet(viewsets.ModelViewSet):
                         password=f"temp_{name}_{index}",  # 임시 비밀번호 (나중에 변경)
                     )
 
-                    # 실제 8자리 학생 ID 생성 및 업데이트
+                    # 실제 9자리 학생 ID 생성 및 업데이트
                     student_username = generate_student_username(
-                        school, grade, new_user.id
+                        school, grade, parent_phone
                     )
                     new_user.username = student_username
                     new_user.set_password(
@@ -765,7 +784,11 @@ class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        logger.info(f"[api/views.py] 로그인 시도: {request.data.get('username')}")
+        # 로그인 시도 기록을 위해 시그널 함수 import
+        from core.signals import record_failed_login
+
+        username = request.data.get("username", "")
+        logger.info(f"[api/views.py] 로그인 시도: {username}")
 
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
@@ -781,11 +804,19 @@ class LoginView(APIView):
                 )
 
                 if user.is_active:
-                    login(request, user)  # 세션 로그인도 추가
-                    token, created = Token.objects.get_or_create(user=user)
+                    # 기존 토큰이 있다면 삭제하고 새로 생성 (중복 로그인 방지)
+                    Token.objects.filter(user=user).delete()
+                    token = Token.objects.create(user=user)
+
+                    # 시그널에서 사용할 수 있도록 토큰 키를 request에 저장
+                    request._token_key = token.key
+
                     logger.info(
-                        f"[api/views.py] 토큰 생성/조회: {token.key[:5]}...{token.key[-5:]}"
+                        f"[api/views.py] 새 토큰 생성: {token.key[:5]}...{token.key[-5:]}"
                     )
+
+                    # Django 세션 로그인 (시그널이 발동됨)
+                    login(request, user)
 
                     # 사용자 권한에 따라 리다이렉트 경로 결정
                     redirect_path = None
@@ -820,18 +851,24 @@ class LoginView(APIView):
                     )
                 else:
                     logger.warning(f"[api/views.py] 비활성화된 계정: {username}")
+                    # 비활성화된 계정 로그인 시도 기록
+                    record_failed_login(request, username, "account_inactive")
                     return Response(
                         {"error": "계정이 비활성화되어 있습니다."},
                         status=status.HTTP_401_UNAUTHORIZED,
                     )
             else:
                 logger.warning(f"[api/views.py] 인증 실패: {username}")
+                # 인증 실패 기록
+                record_failed_login(request, username, "invalid_credentials")
                 return Response(
                     {"error": "로그인 정보가 올바르지 않습니다."},
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
         else:
             logger.warning(f"[api/views.py] 유효성 검사 실패: {serializer.errors}")
+            # 유효성 검사 실패 기록
+            record_failed_login(request, username, "validation_error")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

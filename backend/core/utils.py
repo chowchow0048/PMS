@@ -340,3 +340,225 @@ class DatabaseOptimizer:
             _ = clinic.clinic_subject  # lazy loading으로 조회
 
         return clinic
+
+
+# 클라이언트 정보 추출 유틸리티 (로그인 추적용)
+class ClientInfoExtractor:
+    """클라이언트 정보 추출 및 분석 유틸리티"""
+
+    @staticmethod
+    def get_client_ip(request):
+        """실제 클라이언트 IP 주소 추출 (프록시/로드밸런서 고려)"""
+        # X-Forwarded-For 헤더 확인 (프록시 환경)
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            # 첫 번째 IP가 실제 클라이언트 IP
+            ip_address = x_forwarded_for.split(",")[0].strip()
+        else:
+            # 직접 연결의 경우
+            ip_address = request.META.get("REMOTE_ADDR", "unknown")
+
+        # Railway/Vercel 등 클라우드 환경에서 추가 헤더 확인
+        if ip_address in ["127.0.0.1", "localhost", "::1"]:
+            # Real-IP 헤더 확인 (Nginx 등)
+            real_ip = request.META.get("HTTP_X_REAL_IP")
+            if real_ip:
+                ip_address = real_ip
+            else:
+                # Cloudflare 등의 CF-Connecting-IP 헤더
+                cf_ip = request.META.get("HTTP_CF_CONNECTING_IP")
+                if cf_ip:
+                    ip_address = cf_ip
+
+        return ip_address
+
+    @staticmethod
+    def get_forwarded_ip(request):
+        """프록시/로드밸런서 IP 주소 추출"""
+        return request.META.get("REMOTE_ADDR", "unknown")
+
+    @staticmethod
+    def parse_user_agent(user_agent_string):
+        """User-Agent 문자열 파싱 (기본 구현)"""
+        if not user_agent_string:
+            return {
+                "browser_name": "Unknown",
+                "os_name": "Unknown",
+                "device_type": "unknown",
+            }
+
+        user_agent_lower = user_agent_string.lower()
+
+        # 브라우저 감지
+        browser_name = "Unknown"
+        if "chrome" in user_agent_lower and "edg" not in user_agent_lower:
+            browser_name = "Chrome"
+        elif "firefox" in user_agent_lower:
+            browser_name = "Firefox"
+        elif "safari" in user_agent_lower and "chrome" not in user_agent_lower:
+            browser_name = "Safari"
+        elif "edg" in user_agent_lower or "edge" in user_agent_lower:
+            browser_name = "Edge"
+        elif "opera" in user_agent_lower or "opr" in user_agent_lower:
+            browser_name = "Opera"
+
+        # 운영체제 감지
+        os_name = "Unknown"
+        if "windows" in user_agent_lower:
+            if "windows nt 10" in user_agent_lower:
+                os_name = "Windows 10/11"
+            elif "windows nt 6" in user_agent_lower:
+                os_name = "Windows 7/8"
+            else:
+                os_name = "Windows"
+        elif "macintosh" in user_agent_lower or "mac os" in user_agent_lower:
+            os_name = "macOS"
+        elif "linux" in user_agent_lower:
+            os_name = "Linux"
+        elif "android" in user_agent_lower:
+            os_name = "Android"
+        elif "iphone" in user_agent_lower or "ipad" in user_agent_lower:
+            os_name = "iOS"
+
+        # 기기 유형 감지
+        device_type = "desktop"
+        if any(
+            mobile in user_agent_lower for mobile in ["mobile", "android", "iphone"]
+        ):
+            device_type = "mobile"
+        elif "ipad" in user_agent_lower or "tablet" in user_agent_lower:
+            device_type = "tablet"
+
+        return {
+            "browser_name": browser_name,
+            "os_name": os_name,
+            "device_type": device_type,
+        }
+
+    @staticmethod
+    def get_location_info(ip_address):
+        """IP 주소 기반 위치 정보 조회 (간단한 구현)"""
+        # 실제 서비스에서는 GeoIP 데이터베이스나 외부 API 사용 권장
+        # 현재는 기본값만 반환
+        location_info = {"country": None, "city": None, "isp": None}
+
+        # 로컬 IP 주소 체크
+        if ip_address in ["127.0.0.1", "localhost", "::1"]:
+            location_info.update({"country": "Local", "city": "Local", "isp": "Local"})
+        elif (
+            ip_address.startswith("192.168.")
+            or ip_address.startswith("10.")
+            or ip_address.startswith("172.")
+        ):
+            location_info.update(
+                {
+                    "country": "Private Network",
+                    "city": "Private Network",
+                    "isp": "Private Network",
+                }
+            )
+
+        return location_info
+
+    @classmethod
+    def extract_client_info(cls, request):
+        """요청에서 종합적인 클라이언트 정보 추출"""
+        # IP 주소 정보
+        ip_address = cls.get_client_ip(request)
+        forwarded_ip = cls.get_forwarded_ip(request)
+
+        # User-Agent 정보
+        user_agent_string = request.META.get("HTTP_USER_AGENT", "")
+        user_agent_info = cls.parse_user_agent(user_agent_string)
+
+        # 위치 정보 (선택적)
+        location_info = cls.get_location_info(ip_address)
+
+        # 기타 네트워크 정보
+        referer = request.META.get("HTTP_REFERER", "")
+        accept_language = request.META.get("HTTP_ACCEPT_LANGUAGE", "")
+
+        return {
+            # 네트워크 정보
+            "ip_address": ip_address,
+            "forwarded_ip": forwarded_ip if forwarded_ip != ip_address else None,
+            # 브라우저/기기 정보
+            "user_agent": user_agent_string,
+            "browser_name": user_agent_info["browser_name"],
+            "os_name": user_agent_info["os_name"],
+            "device_type": user_agent_info["device_type"],
+            # 위치 정보
+            "country": location_info["country"],
+            "city": location_info["city"],
+            "isp": location_info["isp"],
+            # 기타 정보
+            "referer": referer,
+            "accept_language": accept_language,
+        }
+
+    @staticmethod
+    def log_client_info(client_info, user=None, action="unknown"):
+        """클라이언트 정보를 로그로 기록"""
+        user_info = f" | 사용자: {user.username}" if user else ""
+        logger.info(
+            f"🔍 클라이언트 정보 [{action}]: "
+            f"IP: {client_info['ip_address']} | "
+            f"기기: {client_info['device_type']} | "
+            f"브라우저: {client_info['browser_name']} | "
+            f"OS: {client_info['os_name']}"
+            f"{user_info}"
+        )
+
+
+# 로그인 보안 관련 유틸리티
+class LoginSecurityUtils:
+    """로그인 보안 유틸리티"""
+
+    SUSPICIOUS_LOGIN_KEY_PREFIX = "suspicious_login"
+    MAX_FAILED_ATTEMPTS = 5
+    LOCKOUT_DURATION = 900  # 15분
+
+    @classmethod
+    def is_suspicious_activity(cls, user, client_info):
+        """의심스러운 로그인 활동 감지"""
+        # 여기서는 기본적인 체크만 구현
+        # 실제로는 더 정교한 분석이 필요
+
+        suspicious_indicators = []
+
+        # 1. 짧은 시간 내 여러 IP에서 로그인 시도
+        recent_logins = (
+            user.login_history.filter(
+                login_at__gte=timezone.now() - timedelta(minutes=10)
+            )
+            .values_list("ip_address", flat=True)
+            .distinct()
+        )
+
+        if len(recent_logins) > 3:
+            suspicious_indicators.append(
+                f"10분 내 {len(recent_logins)}개 IP에서 로그인"
+            )
+
+        # 2. 알려지지 않은 기기/브라우저
+        known_devices = user.login_history.filter(
+            login_success=True,
+            device_type=client_info["device_type"],
+            browser_name=client_info["browser_name"],
+        ).exists()
+
+        if not known_devices:
+            suspicious_indicators.append("새로운 기기/브라우저")
+
+        return suspicious_indicators
+
+    @classmethod
+    def log_security_event(cls, user, event_type, client_info, details=""):
+        """보안 이벤트 로그 기록"""
+        logger.warning(
+            f"🚨 보안 이벤트 [{event_type}]: "
+            f"사용자: {user.username} | "
+            f"IP: {client_info['ip_address']} | "
+            f"기기: {client_info.get('device_type', 'unknown')} | "
+            f"상세: {details}"
+        )

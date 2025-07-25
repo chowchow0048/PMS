@@ -374,3 +374,149 @@ class StudentPlacement(models.Model):
 
     def __str__(self):
         return f"{self.student.name} - {self.teacher.name} ({self.subject})"
+
+
+class LoginHistory(models.Model):
+    """로그인 이력 추적 모델"""
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="login_history",
+        verbose_name="사용자",
+    )
+
+    # 네트워크 정보
+    ip_address = models.GenericIPAddressField(verbose_name="IP 주소")
+    forwarded_ip = models.GenericIPAddressField(
+        null=True, blank=True, verbose_name="프록시 IP"
+    )
+
+    # 기기/브라우저 정보
+    user_agent = models.TextField(verbose_name="User Agent")
+    device_type = models.CharField(
+        max_length=20, default="unknown", verbose_name="기기 유형"
+    )  # desktop, mobile, tablet, unknown
+    os_name = models.CharField(
+        max_length=50, default="unknown", verbose_name="운영체제"
+    )
+    browser_name = models.CharField(
+        max_length=50, default="unknown", verbose_name="브라우저"
+    )
+
+    # 위치 정보 (선택적)
+    country = models.CharField(
+        max_length=100, null=True, blank=True, verbose_name="국가"
+    )
+    city = models.CharField(max_length=100, null=True, blank=True, verbose_name="도시")
+    isp = models.CharField(max_length=100, null=True, blank=True, verbose_name="ISP")
+
+    # 세션 정보
+    session_key = models.CharField(
+        max_length=40, null=True, blank=True, verbose_name="세션 키"
+    )
+    token_key = models.CharField(
+        max_length=40, null=True, blank=True, verbose_name="토큰 키"
+    )
+
+    # 로그인 결과
+    login_success = models.BooleanField(default=True, verbose_name="로그인 성공 여부")
+    failure_reason = models.CharField(
+        max_length=100, null=True, blank=True, verbose_name="실패 사유"
+    )
+    logout_reason = models.CharField(
+        max_length=50, null=True, blank=True, verbose_name="로그아웃 사유"
+    )
+
+    # 타임스탬프
+    login_at = models.DateTimeField(auto_now_add=True, verbose_name="로그인 시간")
+    logout_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="로그아웃 시간"
+    )
+
+    # 기존 세션 정보
+    previous_session_terminated = models.BooleanField(
+        default=False, verbose_name="기존 세션 종료됨"
+    )
+    previous_login_ip = models.GenericIPAddressField(
+        null=True, blank=True, verbose_name="이전 로그인 IP"
+    )
+
+    class Meta:
+        ordering = ["-login_at"]
+        verbose_name = "로그인 이력"
+        verbose_name_plural = "로그인 이력"
+        indexes = [
+            models.Index(fields=["user", "-login_at"]),
+            models.Index(fields=["ip_address"]),
+            models.Index(fields=["login_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.ip_address} ({self.login_at})"
+
+    @property
+    def session_duration(self):
+        """세션 지속 시간 계산"""
+        if self.logout_at:
+            return self.logout_at - self.login_at
+        return None
+
+    def get_device_info(self):
+        """기기 정보 요약"""
+        return f"{self.device_type} - {self.browser_name} on {self.os_name}"
+
+
+class UserSession(models.Model):
+    """사용자 세션 관리 모델 - 중복 로그인 방지용"""
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="current_session",
+        verbose_name="사용자",
+    )
+    session_key = models.CharField(
+        max_length=40, null=True, blank=True, verbose_name="세션 키"
+    )
+    token_key = models.CharField(
+        max_length=40, null=True, blank=True, verbose_name="토큰 키"
+    )
+
+    # 현재 세션의 기기 정보
+    current_ip = models.GenericIPAddressField(
+        null=True, blank=True, verbose_name="현재 IP"
+    )
+    current_user_agent = models.TextField(
+        null=True, blank=True, verbose_name="현재 User Agent"
+    )
+    current_device_type = models.CharField(
+        max_length=20, null=True, blank=True, verbose_name="현재 기기 유형"
+    )
+
+    # 타임스탬프
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성 시간")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="업데이트 시간")
+    last_activity = models.DateTimeField(auto_now=True, verbose_name="마지막 활동")
+
+    class Meta:
+        verbose_name = "사용자 세션"
+        verbose_name_plural = "사용자 세션"
+        indexes = [
+            models.Index(fields=["session_key"]),
+            models.Index(fields=["token_key"]),
+            models.Index(fields=["last_activity"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.current_ip or 'No IP'}"
+
+    def is_active(self):
+        """세션이 활성 상태인지 확인"""
+        return bool(self.session_key or self.token_key)
+
+    def invalidate(self):
+        """세션 무효화"""
+        self.session_key = None
+        self.token_key = None
+        self.save()
