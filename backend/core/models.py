@@ -23,27 +23,6 @@ class Subject(models.Model):
         return self.subject
 
 
-# Time 모델 주석처리 - 보충 시스템 개편으로 고정 시간 사용
-# class Time(models.Model):
-#     """시간 모델"""
-#
-#     DAY_CHOICES = (
-#         ("mon", "월요일"),
-#         ("tue", "화요일"),
-#         ("wed", "수요일"),
-#         ("thu", "목요일"),
-#         ("fri", "금요일"),
-#         ("sat", "토요일"),
-#         ("sun", "일요일"),
-#     )
-#
-#     time_day = models.CharField(max_length=3, choices=DAY_CHOICES)  # 요일
-#     time_slot = models.TimeField()  # 시간
-#
-#     def __str__(self):
-#         return f"{self.get_time_day_display()} {self.time_slot.strftime('%H:%M')}"
-
-
 class User(AbstractUser):
     """사용자 모델 - 학생과 강사 정보를 모두 포함"""
 

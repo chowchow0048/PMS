@@ -36,12 +36,18 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # 현재 시간 및 요일 확인
-        now = timezone.now()
-        weekday = now.weekday()  # 0=Monday, 1=Tuesday, ..., 6=Sunday
+        # 현재 시간 및 요일 확인 (한국 시간 기준)
+        import pytz
 
-        self.stdout.write(f"현재 시간: {now}")
-        self.stdout.write(f"현재 요일: {weekday} (0=Monday, 6=Sunday)")
+        # UTC 시간을 한국 시간으로 변환
+        utc_now = timezone.now()
+        kst_tz = pytz.timezone("Asia/Seoul")
+        kst_now = utc_now.astimezone(kst_tz)
+        weekday = kst_now.weekday()  # 0=Monday, 1=Tuesday, ..., 6=Sunday
+
+        self.stdout.write(f"UTC 시간: {utc_now}")
+        self.stdout.write(f"한국 시간: {kst_now}")
+        self.stdout.write(f"한국 기준 요일: {weekday} (0=Monday, 6=Sunday)")
 
         # 월요일(0)이 아니고 --force 옵션이 없으면 종료
         if weekday != 0 and not options["force"]:

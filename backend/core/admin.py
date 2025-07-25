@@ -433,7 +433,12 @@ class WeeklyReservationPeriodAdmin(admin.ModelAdmin):
     get_status.short_description = "상태"
 
     def get_reservation_period(self, obj):
-        return f"{obj.reservation_start.strftime('%m/%d %H:%M')} ~ {obj.reservation_end.strftime('%m/%d %H:%M')}"
+        from django.utils import timezone
+
+        # 한국 시간으로 변환하여 표시
+        start_kst = timezone.localtime(obj.reservation_start)
+        end_kst = timezone.localtime(obj.reservation_end)
+        return f"{start_kst.strftime('%m/%d %H:%M')} ~ {end_kst.strftime('%m/%d %H:%M')} KST"
 
     get_reservation_period.short_description = "예약 기간"
 
@@ -547,7 +552,11 @@ class LoginHistoryAdmin(admin.ModelAdmin):
     get_login_success.boolean = True
 
     def get_login_time(self, obj):
-        return obj.login_at.strftime("%m/%d %H:%M:%S")
+        from django.utils import timezone
+
+        # 한국 시간으로 변환하여 표시
+        kst_time = timezone.localtime(obj.login_at)
+        return kst_time.strftime("%m/%d %H:%M:%S KST")
 
     get_login_time.short_description = "로그인 시간"
 
@@ -586,6 +595,12 @@ class LoginHistoryAdmin(admin.ModelAdmin):
         )
 
         for obj in queryset:
+            from django.utils import timezone
+
+            # 한국 시간으로 변환
+            login_kst = timezone.localtime(obj.login_at)
+            logout_kst = timezone.localtime(obj.logout_at) if obj.logout_at else None
+
             writer.writerow(
                 [
                     obj.user.username if obj.user else "Unknown",
@@ -593,10 +608,10 @@ class LoginHistoryAdmin(admin.ModelAdmin):
                     obj.device_type,
                     obj.browser_name,
                     obj.os_name,
-                    obj.login_at.strftime("%Y-%m-%d %H:%M:%S"),
+                    login_kst.strftime("%Y-%m-%d %H:%M:%S KST"),
                     (
-                        obj.logout_at.strftime("%Y-%m-%d %H:%M:%S")
-                        if obj.logout_at
+                        logout_kst.strftime("%Y-%m-%d %H:%M:%S KST")
+                        if logout_kst
                         else ""
                     ),
                     "Success" if obj.login_success else "Failed",
@@ -670,12 +685,20 @@ class UserSessionAdmin(admin.ModelAdmin):
     get_session_status.boolean = True
 
     def get_last_activity(self, obj):
-        return obj.last_activity.strftime("%m/%d %H:%M:%S")
+        from django.utils import timezone
+
+        # 한국 시간으로 변환하여 표시
+        kst_time = timezone.localtime(obj.last_activity)
+        return kst_time.strftime("%m/%d %H:%M:%S KST")
 
     get_last_activity.short_description = "마지막 활동"
 
     def get_created_time(self, obj):
-        return obj.created_at.strftime("%m/%d %H:%M:%S")
+        from django.utils import timezone
+
+        # 한국 시간으로 변환하여 표시
+        kst_time = timezone.localtime(obj.created_at)
+        return kst_time.strftime("%m/%d %H:%M:%S KST")
 
     get_created_time.short_description = "생성 시간"
 

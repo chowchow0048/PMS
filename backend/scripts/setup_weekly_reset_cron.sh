@@ -38,8 +38,9 @@ else
     echo -e "${YELLOW}경고: 가상환경을 찾을 수 없습니다. 시스템 Python을 사용합니다.${NC}"
 fi
 
-# Cron job 명령어 생성
-CRON_COMMAND="0 0 * * 1 cd ${CURRENT_DIR} && ${PYTHON_PATH} manage.py reset_weekly_clinics >> ${CURRENT_DIR}/logs/weekly_reset.log 2>&1"
+# Cron job 명령어 생성 (한국 시간 기준)
+# 한국 시간 월요일 00:00 = UTC 일요일 15:00 (KST는 UTC+9)
+CRON_COMMAND="0 15 * * 0 cd ${CURRENT_DIR} && ${PYTHON_PATH} manage.py reset_weekly_clinics >> ${CURRENT_DIR}/logs/weekly_reset.log 2>&1"
 
 echo ""
 echo -e "${YELLOW}설정할 Cron Job:${NC}"
@@ -83,7 +84,8 @@ if crontab -l | grep -q "reset_weekly_clinics"; then
     crontab -l | grep -n "reset_weekly_clinics"
     echo ""
     echo -e "${YELLOW}참고사항:${NC}"
-    echo -e "- 매주 월요일 00:00에 클리닉 예약이 자동으로 초기화됩니다"
+    echo -e "- 매주 한국시간 월요일 00:00에 클리닉 예약이 자동으로 초기화됩니다"
+    echo -e "- 서버시간이 UTC인 경우 일요일 15:00에 실행됩니다 (UTC+9=KST)"
     echo -e "- 로그는 ${CURRENT_DIR}/logs/weekly_reset.log 에서 확인할 수 있습니다"
     echo -e "- 수동 실행: ${PYTHON_PATH} manage.py reset_weekly_clinics --force"
     echo -e "- 시뮬레이션: ${PYTHON_PATH} manage.py reset_weekly_clinics --dry-run --force"
