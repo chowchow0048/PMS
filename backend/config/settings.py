@@ -253,7 +253,7 @@ REST_FRAMEWORK = {
 }
 
 # 세션 설정
-SESSION_COOKIE_AGE = 7200  # 2시간 (초 단위)
+SESSION_COOKIE_AGE = 720000  # 100시간 (초 단위)
 SESSION_SAVE_EVERY_REQUEST = True  # 매 요청마다 세션 갱신
 
 # 프로덕션 보안 설정

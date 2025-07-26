@@ -162,34 +162,6 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
 
     return (
       <VStack align="stretch" spacing={4}>
-        {/* 시간대별 클리닉 기본 정보 */}
-        {/* <Box p={4} bg="blue.50" borderRadius="md" border="1px solid" borderColor="blue.200">
-          <VStack align="stretch" spacing={2}>
-            <Flex justify="space-between" align="center">
-              <Text fontSize="lg" fontWeight="bold" color="blue.800">
-                {timeSlot}
-              </Text>
-              <Badge 
-                colorScheme={isFullCapacity ? 'red' : 'green'} 
-                fontSize="sm"
-                px={3}
-                py={1}
-              >
-                {currentStudentCount}/{clinic.clinic_capacity}명
-              </Badge>
-            </Flex>
-            
-            <HStack spacing={1}>
-              <Text fontSize="sm" color="gray.600">
-                담당 선생: {clinic.teacher_name}
-              </Text>
-              <Text fontSize="sm" color="gray.600">
-                강의실: {clinic.clinic_room}
-              </Text>
-            </HStack>
-          </VStack>
-        </Box> */}
-
         {/* 신청한 학생 목록 */}
         <Box>
           <Text fontSize="md" fontWeight="semibold" mb={3}>

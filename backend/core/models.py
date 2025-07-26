@@ -34,7 +34,7 @@ class User(AbstractUser):
     subject = models.ForeignKey(
         Subject,
         on_delete=models.SET_NULL,
-        default="physics1",
+        default=1,  # physics1의 ID(1)를 기본값으로 설정
         null=True,
         blank=True,
         related_name="teachers",
@@ -278,8 +278,10 @@ class Clinic(models.Model):
         Subject,
         on_delete=models.CASCADE,
         related_name="related_clinics",
-        default="physics1",
+        default=1,  # physics1의 ID(1)를 기본값으로 설정
         verbose_name="과목",
+        null=True,  # null=True 추가
+        blank=True,  # blank=True 추가
     )  # 클리닉 과목
 
     # 클리닉 활성화 상태 (새로 추가)
