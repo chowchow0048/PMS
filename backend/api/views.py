@@ -59,6 +59,9 @@ from core.utils import (
 # 로거 설정
 logger = logging.getLogger("api.auth")
 mypage_logger = logging.getLogger("mypage")
+excel_upload_logger = logging.getLogger(
+    "api.excel_upload"
+)  # 엑셀 업로드 전용 로거 추가
 
 # Create your views here.
 
@@ -115,18 +118,29 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def upload_student_excel(self, request):
         """학생 명단 엑셀 파일로 학생 사용자(is_student=True) 추가"""
-        logger.info("[api/views.py] 학생 명단 엑셀 파일 업로드 시작")
+        excel_upload_logger.info("=== 학생 명단 엑셀 파일 업로드 시작 ===")
+        excel_upload_logger.info(
+            f"요청자: {request.user.username} (ID: {request.user.id})"
+        )
+        excel_upload_logger.info(f"요청 시간: {datetime.now()}")
 
         if "file" not in request.FILES:
+            excel_upload_logger.error("업로드 실패: 파일이 제공되지 않음")
             return Response(
                 {"error": "파일이 업로드되지 않았습니다."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         excel_file = request.FILES["file"]
+        excel_upload_logger.info(
+            f"업로드된 파일: {excel_file.name} (크기: {excel_file.size} bytes)"
+        )
 
         # 파일 확장자 검증
         if not excel_file.name.endswith((".xlsx", ".xls")):
+            excel_upload_logger.error(
+                f"업로드 실패: 지원하지 않는 파일 형식 - {excel_file.name}"
+            )
             return Response(
                 {"error": "엑셀 파일(.xlsx, .xls)만 업로드 가능합니다."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -134,17 +148,27 @@ class UserViewSet(viewsets.ModelViewSet):
 
         try:
             # 임시 파일 저장
+            excel_upload_logger.info("엑셀 파일을 임시 저장소에 저장 중...")
             file_name = default_storage.save(
                 f"temp/{excel_file.name}", ContentFile(excel_file.read())
             )
             file_path = default_storage.path(file_name)
+            excel_upload_logger.info(f"임시 파일 저장 완료: {file_name}")
 
             # 엑셀 파일 읽기
+            excel_upload_logger.info("엑셀 파일 데이터 읽기 시작...")
             df = pd.read_excel(file_path)
-            logger.info(f"[api/views.py] 학생 명단 엑셀 파일 읽기 완료: {len(df)}행")
+            excel_upload_logger.info(
+                f"엑셀 파일 읽기 완료: {len(df)}행, {len(df.columns)}컬럼"
+            )
+            excel_upload_logger.info(f"컬럼 헤더: {list(df.columns)}")
 
             # 최소 필요 컬럼 수 확인 (학교, 학년, 이름, 학부모전화번호 = 4개 필수)
             if len(df.columns) < 4:
+                excel_upload_logger.error(
+                    f"업로드 실패: 컬럼 수 부족 - 현재 {len(df.columns)}개, 필요 4개 이상"
+                )
+                excel_upload_logger.error(f"제공된 컬럼: {list(df.columns)}")
                 default_storage.delete(file_name)
                 return Response(
                     {
@@ -161,9 +185,17 @@ class UserViewSet(viewsets.ModelViewSet):
                 "error_students": [],
             }
 
+            excel_upload_logger.info(f"=== 데이터 처리 시작: 총 {len(df)}행 ===")
+
             # 각 행 처리
             for index, row in df.iterrows():
                 try:
+                    # 현재 처리 중인 행 로그 (매 10행마다)
+                    if index % 10 == 0:
+                        excel_upload_logger.info(
+                            f"처리 진행률: {index + 1}/{len(df)} 행"
+                        )
+
                     # 프론트엔드 양식에 맞는 컬럼 순서로 데이터 추출
                     # 0: 학교, 1: 학년, 2: 이름, 3: 학생전화번호(선택), 4: 학부모전화번호(필수)
                     school = str(row.iloc[0]).strip() if len(row) > 0 else ""
@@ -171,21 +203,8 @@ class UserViewSet(viewsets.ModelViewSet):
                     name = str(row.iloc[2]).strip() if len(row) > 2 else ""
 
                     # 전화번호 처리 - 앞의 0이 잘리는 문제 해결
-                    # 학생 전화번호 (선택사항)
-                    student_phone_raw = row.iloc[3] if len(row) > 3 else ""
-                    if pd.isna(student_phone_raw):
-                        student_phone = ""
-                    else:
-                        if isinstance(student_phone_raw, (int, float)):
-                            student_phone = str(int(student_phone_raw)).zfill(11)
-                        else:
-                            student_phone = str(student_phone_raw).strip()
-
-                        if len(student_phone) == 10 and student_phone.startswith("1"):
-                            student_phone = "0" + student_phone
-
                     # 학부모 전화번호 (필수)
-                    parent_phone_raw = row.iloc[4] if len(row) > 4 else ""
+                    parent_phone_raw = row.iloc[3] if len(row) > 3 else ""
                     if pd.isna(parent_phone_raw):
                         parent_phone = ""
                     else:
@@ -197,24 +216,46 @@ class UserViewSet(viewsets.ModelViewSet):
                         if len(parent_phone) == 10 and parent_phone.startswith("1"):
                             parent_phone = "0" + parent_phone
 
+                    # 학생 전화번호 (선택사항)
+                    student_phone_raw = row.iloc[4] if len(row) > 4 else ""
+                    if pd.isna(student_phone_raw):
+                        student_phone = ""
+                    else:
+                        if isinstance(student_phone_raw, (int, float)):
+                            student_phone = str(int(student_phone_raw)).zfill(11)
+                        else:
+                            student_phone = str(student_phone_raw).strip()
+
+                        if len(student_phone) == 10 and student_phone.startswith("1"):
+                            student_phone = "0" + student_phone
+
                     # 빈 값 검증 (학생 전화번호는 선택사항)
                     if not all([school, grade, name, parent_phone]):
+                        error_msg = "학교, 학년, 이름, 학부모 전화번호는 필수입니다."
+                        excel_upload_logger.warning(
+                            f"행 {index + 2} 검증 실패 (필수값 누락): "
+                            f"학교='{school}', 학년='{grade}', 이름='{name}', 학부모번호='{parent_phone}'"
+                        )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
                                 "name": name,
-                                "error": "학교, 학년, 이름, 학부모 전화번호는 필수입니다.",
+                                "error": error_msg,
                             }
                         )
                         continue
 
                     # 이름 유효성 검사 (숫자 포함 여부)
                     if any(char.isdigit() for char in name):
+                        error_msg = f"이름에 숫자가 포함될 수 없습니다: {name}"
+                        excel_upload_logger.warning(
+                            f"행 {index + 2} 검증 실패 (이름 형식 오류): '{name}'"
+                        )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
                                 "name": name,
-                                "error": f"이름에 숫자가 포함될 수 없습니다: {name}",
+                                "error": error_msg,
                             }
                         )
                         continue
@@ -227,26 +268,39 @@ class UserViewSet(viewsets.ModelViewSet):
                         return phone_digits.isdigit() and len(phone_digits) in [10, 11]
 
                     if not is_valid_phone(student_phone):
+                        error_msg = (
+                            f"학생 전화번호 형식이 올바르지 않습니다: {student_phone}"
+                        )
+                        excel_upload_logger.warning(
+                            f"행 {index + 2} 검증 실패 (학생 전화번호): '{student_phone}' - {name}"
+                        )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
                                 "name": name,
-                                "error": f"학생 전화번호 형식이 올바르지 않습니다: {student_phone}",
+                                "error": error_msg,
                             }
                         )
                         continue
 
                     if not is_valid_phone(parent_phone):
+                        error_msg = (
+                            f"학부모 전화번호 형식이 올바르지 않습니다: {parent_phone}"
+                        )
+                        excel_upload_logger.warning(
+                            f"행 {index + 2} 검증 실패 (학부모 전화번호): '{parent_phone}' - {name}"
+                        )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
                                 "name": name,
-                                "error": f"학부모 전화번호 형식이 올바르지 않습니다: {parent_phone}",
+                                "error": error_msg,
                             }
                         )
                         continue
 
                     # 학교명 정규화
+                    original_school = school
                     if school in ["세화고등학교", "세화고"]:
                         school = "세화고"
                     elif school in ["세화여자고등학교", "세화여고"]:
@@ -254,16 +308,21 @@ class UserViewSet(viewsets.ModelViewSet):
                     elif school in ["연합반"]:
                         school = "연합반"
                     else:
+                        error_msg = f"지원하지 않는 학교입니다: {school}"
+                        excel_upload_logger.warning(
+                            f"행 {index + 2} 검증 실패 (학교명 오류): '{original_school}' -> 지원되지 않음 - {name}"
+                        )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
                                 "name": name,
-                                "error": f"지원하지 않는 학교입니다: {school}",
+                                "error": error_msg,
                             }
                         )
                         continue
 
                     # 학년 정규화
+                    original_grade = grade
                     if grade in ["1", "1학년"]:
                         grade = "1학년"
                     elif grade in ["2", "2학년"]:
@@ -271,11 +330,15 @@ class UserViewSet(viewsets.ModelViewSet):
                     elif grade in ["3", "3학년"]:
                         grade = "3학년"
                     else:
+                        error_msg = f"지원하지 않는 학년입니다: {grade}"
+                        excel_upload_logger.warning(
+                            f"행 {index + 2} 검증 실패 (학년 오류): '{original_grade}' -> 지원되지 않음 - {name}"
+                        )
                         results["error_students"].append(
                             {
                                 "row": index + 2,
                                 "name": name,
-                                "error": f"지원하지 않는 학년입니다: {grade}",
+                                "error": error_msg,
                             }
                         )
                         continue
@@ -290,6 +353,10 @@ class UserViewSet(viewsets.ModelViewSet):
                     ).first()
 
                     if existing_user:
+                        excel_upload_logger.warning(
+                            f"행 {index + 2} 중복 사용자 발견: {name} ({school} {grade}) - "
+                            f"기존 ID: {existing_user.id}, 전화번호: {parent_phone}"
+                        )
                         results["duplicate_students"].append(
                             {
                                 "row": index + 2,
@@ -399,43 +466,104 @@ class UserViewSet(viewsets.ModelViewSet):
                         }
                     )
 
-                    logger.info(
-                        f"[api/views.py] 새 학생 사용자 추가: {name} ({school} {grade}) - ID: {student_username}"
+                    excel_upload_logger.info(
+                        f"행 {index + 2} 학생 추가 성공: {name} ({school} {grade}) - "
+                        f"ID: {student_username}, 학생번호: {student_phone}, 학부모번호: {parent_phone}"
                     )
 
                 except Exception as e:
                     error_msg = str(e)
-                    logger.error(
-                        f"[api/views.py] 행 {index + 2} 처리 오류: {error_msg}"
+                    error_type = type(e).__name__
+
+                    # 로컬 변수들 추출 (오류 발생 시점의 데이터 확인)
+                    debug_info = {
+                        "school": school if "school" in locals() else "미정의",
+                        "grade": grade if "grade" in locals() else "미정의",
+                        "name": name if "name" in locals() else "미정의",
+                        "student_phone": (
+                            student_phone if "student_phone" in locals() else "미정의"
+                        ),
+                        "parent_phone": (
+                            parent_phone if "parent_phone" in locals() else "미정의"
+                        ),
+                    }
+
+                    excel_upload_logger.error(
+                        f"행 {index + 2} 처리 중 예외 발생 ({error_type}): {error_msg}"
                     )
+                    excel_upload_logger.error(f"행 {index + 2} 데이터: {debug_info}")
+                    excel_upload_logger.error(
+                        f"행 {index + 2} 원본 데이터: {row.to_dict()}"
+                    )
+                    excel_upload_logger.error(
+                        f"행 {index + 2} 스택 트레이스:\n{traceback.format_exc()}"
+                    )
+
                     results["error_students"].append(
                         {
                             "row": index + 2,
                             "name": name if "name" in locals() else "알 수 없음",
-                            "error": error_msg,
+                            "error": f"{error_type}: {error_msg}",
                         }
                     )
 
             # 임시 파일 삭제
             default_storage.delete(file_name)
+            excel_upload_logger.info("임시 파일 삭제 완료")
 
-            logger.info(
-                f"[api/views.py] 엑셀 업로드 완료: 추가 {len(results['added_students'])}명, 중복 {len(results['duplicate_students'])}명, 오류 {len(results['error_students'])}명"
+            # 최종 결과 로그
+            excel_upload_logger.info("=== 엑셀 업로드 처리 완료 ===")
+            excel_upload_logger.info(f"총 처리 행 수: {results['total_rows']}")
+            excel_upload_logger.info(
+                f"성공적으로 추가된 학생: {len(results['added_students'])}명"
             )
+            excel_upload_logger.info(
+                f"중복으로 제외된 학생: {len(results['duplicate_students'])}명"
+            )
+            excel_upload_logger.info(
+                f"오류로 실패한 학생: {len(results['error_students'])}명"
+            )
+
+            # 성공률 계산
+            success_rate = (
+                (len(results["added_students"]) / results["total_rows"] * 100)
+                if results["total_rows"] > 0
+                else 0
+            )
+            excel_upload_logger.info(f"처리 성공률: {success_rate:.1f}%")
+
+            # 오류가 있을 경우 오류 요약 로그
+            if results["error_students"]:
+                excel_upload_logger.warning(f"=== 오류 발생 행 요약 ===")
+                for error_student in results["error_students"]:
+                    excel_upload_logger.warning(
+                        f"행 {error_student['row']}: {error_student['name']} - {error_student['error']}"
+                    )
 
             return Response(results, status=status.HTTP_200_OK)
 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"[api/views.py] 엑셀 파일 처리 오류: {error_msg}")
-            logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
+            error_type = type(e).__name__
+
+            excel_upload_logger.error("=== 엑셀 업로드 전체 처리 실패 ===")
+            excel_upload_logger.error(f"오류 유형: {error_type}")
+            excel_upload_logger.error(f"오류 메시지: {error_msg}")
+            excel_upload_logger.error(
+                f"요청자: {request.user.username} (ID: {request.user.id})"
+            )
+            excel_upload_logger.error(
+                f"파일명: {excel_file.name if 'excel_file' in locals() else '알 수 없음'}"
+            )
+            excel_upload_logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
 
             # 임시 파일 삭제 (오류 발생 시에도)
             try:
                 if "file_name" in locals():
                     default_storage.delete(file_name)
-            except:
-                pass
+                    excel_upload_logger.info("오류 발생으로 인한 임시 파일 삭제 완료")
+            except Exception as cleanup_error:
+                excel_upload_logger.error(f"임시 파일 삭제 실패: {cleanup_error}")
 
             return Response(
                 {"error": f"파일 처리 중 오류가 발생했습니다: {error_msg}"},

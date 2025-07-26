@@ -359,44 +359,63 @@ LOGGING = {
     },
 }
 
-# 개발 환경에서만 파일 로깅 사용
-if DEBUG:
-    LOGGING["handlers"].update(
-        {
-            "file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": os.path.join(LOG_DIR, "django.log"),
-                "formatter": "verbose",
-                "maxBytes": 10485760,  # 10MB
-                "backupCount": 5,
-            },
-            "auth_file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": os.path.join(LOG_DIR, "auth.log"),
-                "formatter": "verbose",
-                "maxBytes": 10485760,  # 10MB
-                "backupCount": 5,
-            },
-            "api_file": {
-                "class": "logging.handlers.RotatingFileHandler",
-                "filename": os.path.join(LOG_DIR, "api.log"),
-                "formatter": "verbose",
-                "maxBytes": 10485760,  # 10MB
-                "backupCount": 5,
-            },
-        }
-    )
-    # 개발 환경에서는 파일 핸들러도 추가
-    LOGGING["loggers"]["django"]["handlers"].append("file")
-    LOGGING["loggers"]["django.request"]["handlers"].append("file")
-    LOGGING["loggers"]["api"]["handlers"].append("api_file")
-    LOGGING["loggers"]["api.auth"]["handlers"].append("auth_file")
-    LOGGING["loggers"]["auth"]["handlers"].append("auth_file")
+# 파일 로깅을 개발/프로덕션 환경 모두에서 사용 (Railway 환경 고려)
+LOGGING["handlers"].update(
+    {
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "django.log"),
+            "formatter": "verbose",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+        },
+        "auth_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "auth.log"),
+            "formatter": "verbose",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+        },
+        "api_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "api.log"),
+            "formatter": "verbose",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+        },
+        "excel_upload_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "excel_upload.log"),
+            "formatter": "verbose",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+        },
+    }
+)
+
+# 파일 핸들러를 모든 환경에서 추가
+LOGGING["loggers"]["django"]["handlers"].append("file")
+LOGGING["loggers"]["django.request"]["handlers"].append("file")
+LOGGING["loggers"]["api"]["handlers"].append("api_file")
+LOGGING["loggers"]["api.auth"]["handlers"].append("auth_file")
+LOGGING["loggers"]["auth"]["handlers"].append("auth_file")
+
+# 엑셀 업로드 전용 로거 추가
+LOGGING["loggers"]["api.excel_upload"] = {
+    "handlers": ["console", "excel_upload_file"],
+    "level": "DEBUG" if DEBUG else "INFO",
+    "propagate": False,
+}
 
 # 프로덕션 환경에서 로그 레벨 강화 (LOGGING 정의 이후 적용)
 if not DEBUG:
+    # 일반 로그들은 WARNING 레벨로 조정 (엑셀 업로드 제외)
     for logger_name in ["django", "django.request", "api", "api.auth", "auth"]:
         if logger_name in LOGGING["loggers"]:
             LOGGING["loggers"][logger_name][
                 "level"
             ] = "WARNING"  # 프로덕션에서는 WARNING 레벨 이상만 로그
+
+    # 엑셀 업로드 로거는 INFO 레벨 유지 (중요한 업로드 정보 보존)
+    if "api.excel_upload" in LOGGING["loggers"]:
+        LOGGING["loggers"]["api.excel_upload"]["level"] = "INFO"

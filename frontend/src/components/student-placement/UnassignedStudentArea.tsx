@@ -136,7 +136,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
 
   // 엑셀 양식 다운로드 핸들러
   const handleDownloadTemplate = () => {
-    const headers = ['학교', '학년', '이름', '학생 전화번호', '학부모 전화번호'];
+    const headers = ['학교', '학년', '이름', '학부모 전화번호', '학생 전화번호'];
     const worksheet = XLSX.utils.aoa_to_sheet([headers]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, '학생 명단');
