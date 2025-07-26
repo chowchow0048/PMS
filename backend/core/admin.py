@@ -96,7 +96,7 @@ class CustomUserAdmin(UserAdmin):
     )
     search_fields = ("username", "name")  # user_name → name
     ordering = ("username",)
-    actions = ["regenerate_student_credentials"]
+    actions = ["regenerate_student_credentials", "reset_student_password_to_username"]
 
     def regenerate_student_credentials(self, request, queryset):
         """
@@ -214,6 +214,56 @@ class CustomUserAdmin(UserAdmin):
             )
 
     regenerate_student_credentials.short_description = "학생유저 아이디/비밀번호 재구성"
+
+    def reset_student_password_to_username(self, request, queryset):
+        """
+        선택된 학생 사용자들의 비밀번호를 아이디(username)와 같게 초기화
+        """
+        from django.contrib.auth.hashers import make_password
+
+        # is_student=True인 사용자만 필터링
+        student_users = queryset.filter(is_student=True)
+
+        if not student_users.exists():
+            self.message_user(
+                request, "선택된 사용자 중 학생이 없습니다.", level="WARNING"
+            )
+            return
+
+        # 결과 추적
+        success_count = 0
+        error_count = 0
+        error_messages = []
+
+        for user in student_users:
+            try:
+                # 비밀번호를 아이디와 같게 설정 (Django 비밀번호 검증 우회)
+                user.password = make_password(user.username)
+                user.save()
+                success_count += 1
+
+            except Exception as e:
+                error_messages.append(f"{user.name} ({user.username}): {str(e)}")
+                error_count += 1
+
+        # 결과 메시지
+        if success_count > 0:
+            self.message_user(
+                request,
+                f"{success_count}명의 학생 비밀번호가 아이디와 같게 초기화되었습니다.",
+            )
+
+        if error_count > 0:
+            self.message_user(
+                request,
+                f"{error_count}명의 학생 처리 중 오류 발생:\n"
+                + "\n".join(error_messages),
+                level="ERROR",
+            )
+
+    reset_student_password_to_username.short_description = (
+        "학생 비밀번호를 아이디와 같게 초기화"
+    )
 
 
 # StudentAdmin 삭제 - User 모델로 통합됨
