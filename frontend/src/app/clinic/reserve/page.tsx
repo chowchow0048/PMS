@@ -75,6 +75,7 @@ const ClinicReservePage: React.FC = () => {
     clinic: ClinicSlot;
     action: 'reserve' | 'cancel';  // 예약 또는 취소 구분
   } | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>(''); // 타이머 상태
   
   // 모달 및 유틸리티
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -83,12 +84,22 @@ const ClinicReservePage: React.FC = () => {
 
   // 요일 매핑
   const dayNames: { [key: string]: string } = {
-    mon: '월요일',
-    tue: '화요일',
-    wed: '수요일',
-    thu: '목요일',
-    fri: '금요일',
-    sat: '토요일',
+    mon: '월',
+    tue: '화',
+    wed: '수',
+    thu: '목',
+    fri: '금',
+    sat: '토',
+  };
+
+  // 요일 축약형 매핑 (md 이상에서 사용)
+  const dayNamesShort: { [key: string]: string } = {
+    mon: '월',
+    tue: '화',
+    wed: '수',
+    thu: '목',
+    fri: '금',
+    sat: '토',
   };
 
   // 요일 순서 매핑 (월요일부터 토요일까지)
@@ -120,12 +131,49 @@ const ClinicReservePage: React.FC = () => {
     return targetDayOrder >= currentDayOrder;
   };
 
+  // 다음주 월요일 00:00까지의 시간 계산 함수 (24시간계)
+  const getTimeUntilNextMonday = () => {
+    const now = new Date();
+    const nextMonday = new Date();
+    
+    // 다음주 월요일 계산
+    const daysUntilMonday = (8 - now.getDay()) % 7 || 7; // 일요일=0, 월요일=1
+    nextMonday.setDate(now.getDate() + daysUntilMonday);
+    nextMonday.setHours(0, 0, 0, 0); // 00:00:00으로 설정
+    
+    const timeDiff = nextMonday.getTime() - now.getTime();
+    
+    if (timeDiff <= 0) return '00:00:00';
+    
+    // 전체 시간을 시:분:초로 계산 (일수를 시간으로 변환)
+    const totalHours = Math.floor(timeDiff / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    
+    return `${totalHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   // 초기 데이터 로드 (인증 완료 후)
   useEffect(() => {
     if (!isLoading && token) {
       loadWeeklySchedule();
     }
   }, [token, isLoading]);
+
+  // 타이머 업데이트 (1초마다)
+  useEffect(() => {
+    const updateTimer = () => {
+      setTimeLeft(getTimeUntilNextMonday());
+    };
+    
+    // 초기 설정
+    updateTimer();
+    
+    // 1초마다 업데이트
+    const interval = setInterval(updateTimer, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // 주간 스케줄 로드
   const loadWeeklySchedule = async () => {
@@ -379,7 +427,7 @@ const ClinicReservePage: React.FC = () => {
     }
   };
 
-  // 슬롯 렌더링
+  // 슬롯 렌더링 - 모바일 최적화
   const renderSlot = (day: string, time: string) => {
     const clinic = schedule[day]?.[time];
     if (!clinic) return null;
@@ -391,10 +439,11 @@ const ClinicReservePage: React.FC = () => {
     return (
       <GridItem key={`${day}-${time}`}>
         <Box
-          p={1}
-          width="95%"
-          mx="0"
-          aspectRatio={1}  // 정사방형 (width와 height 같게)
+          // 모바일에서 더 큰 패딩 설정
+          p={{ base: 0.5, md: 1 }}
+          width="100%"
+          // 정사각형으로 고정
+          aspectRatio={1}
           border="1px solid"
           borderColor={hasClinic ? "gray.200" : "gray.100"}
           borderRadius="md"
@@ -425,104 +474,107 @@ const ClinicReservePage: React.FC = () => {
               }
             }
           }}
+          // 터치 영역 확대를 위한 스타일
+          position="relative"
+          role="button"
+          tabIndex={hasClinic && !clinic.is_full && !isPastDay ? 0 : -1}
         >
-          <Box position="relative" height="100%">
+          <Box position="relative" height="100%" display="flex" flexDirection="column">
             {hasClinic ? (
               <>
-                {/* 시작 시간 - 최상단 좌측 */}
-                <Text 
-                  fontSize="xs" 
-                  color="gray.600" 
-                  position="absolute"
-                  top={1}
-                  left={1}
-                  fontWeight="bold"
-                >
-                  {time} {dayNames[day]}
-                </Text>
-
-                {/* <Text 
-                  fontSize="xs" 
-                  color="gray.600" 
-                  position="absolute"
-                  top={1}
-                  left="47.5%"
-                  transform="translateX(-50%)"
-                  fontWeight="bold"
-                >
-                  {dayNames[day]}    {clinic.room}
-                </Text> */}
-                
-                {/* 예약됨 뱃지 - 최상단 우측 */}
-                {isReserved && (
-                  <Badge 
-                    colorScheme="blue" 
-                    position="absolute"
-                    top={1}
-                    right={1}
-                    fontSize="xs"
+                {/* 시간과 요일 표시 - 최상단 */}
+                <HStack justify="space-between" align="flex-start" mb={1}>
+                  <Text 
+                    // sm 이하에서 더 작은 텍스트
+                    fontSize={{ base: "0.6rem", sm: "xs", md: "sm" }}
+                    color="gray.600" 
+                    fontWeight="bold"
+                    lineHeight="1.2"
                   >
-                    예약됨
-                  </Badge>
-                )}
+                    {time}
+                  </Text>
+                  <Text 
+                    fontSize={{ base: "0.6rem", sm: "xs", md: "xs" }}
+                    color="gray.600" 
+                    fontWeight="bold"
+                    lineHeight="1.2"
+                  >
+                    {/* md 이상에서는 축약형, 그 이하에서는 전체 */}
+                    <Box display={{ base: "block", md: "none" }}>{dayNames[day]}</Box>
+                    <Box display={{ base: "none", md: "block" }}>{dayNamesShort[day]}</Box>
+                  </Text>
+                </HStack>
+                
+                                 {/* 예약됨 뱃지 - 상단 우측에서 중앙 상단으로 이동 */}
+                 {isReserved && (
+                   <Center mb={0.5}>
+                     <Badge 
+                       colorScheme="blue" 
+                       fontSize={{ base: "0.6rem", sm: "0.8rem", md: "0.8rem" }}
+                       px={0.8}
+                       py={0.2}
+                     >
+                       예약됨
+                     </Badge>
+                   </Center>
+                 )}
                 
                 {/* 정가운데 인원수 표시 또는 마감 표시 */}
                 <Box
-                  position="absolute"
-                  top="50%"
-                  left="50%"
-                  transform="translate(-50%, -50%)"
+                  flex="1"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
                 >
-                  {isPastDay ? (
-                    <Text
-                      fontSize="sm"
-                      fontWeight="bold"
-                      textAlign="center"
-                      color="gray.500"
-                    >
-                      {dayNames[day]} 마감
-                    </Text>
-                  ) : (
-                    <Text
-                      fontSize="lg"
-                      fontWeight="bold"
-                      textAlign="center"
-                      color={
-                        clinic.is_full ? "red.500" : clinic.remaining_spots <= 3 ? "orange.500" : "green.600"
-                      }
-                    >
-                      {clinic.current_count}/{clinic.capacity}
-                    </Text>
-                  )}
+                                     {isPastDay ? (
+                     <Text
+                       // sm 이하에서 더 작은 텍스트
+                       fontSize={{ base: "0.6rem", sm: "sm", md: "sm" }}
+                       fontWeight="bold"
+                       textAlign="center"
+                       color="gray.500"
+                     >
+                       마감
+                     </Text>
+                   ) : (
+                     <Text
+                       // sm 이하에서 더 작은 텍스트 (인원수는 가장 중요한 정보)
+                       fontSize={{ base: "0.7rem", sm: "0.8rem", md: "0.8rem" }}
+                       fontWeight="bold"
+                       textAlign="center"
+                       color={
+                         clinic.is_full ? "red.500" : clinic.remaining_spots <= 3 ? "orange.500" : "blue.600"
+                       }
+                     >
+                       {clinic.current_count}/{clinic.capacity}
+                     </Text>
+                   )}
                 </Box>
                 
-                {/* 마감 표시 - 하단 중앙 (이전 요일이 아닌 경우만) */}
-                {clinic.is_full && !isPastDay && (
-                  <Text 
-                    fontSize="sm" 
-                    color="red.500" 
-                    fontWeight="bold"
-                    position="absolute"
-                    bottom={1}
-                    left="50%"
-                    transform="translateX(-50%)"
-                  >
-                    마감
-                  </Text>
-                )}
+                                 {/* 마감 표시 - 하단 중앙 */}
+                 {clinic.is_full && !isPastDay && (
+                   <Center>
+                     <Text 
+                       fontSize={{ base: "0.6rem", sm: "xs", md: "xs" }}
+                       color="red.500" 
+                       fontWeight="bold"
+                     >
+                       마감
+                     </Text>
+                   </Center>
+                 )}
               </>
             ) : (
-              <Text 
-                fontSize="sm" 
-                color="gray.400" 
-                position="absolute"
-                top="50%"
-                left="50%"
-                transform="translate(-50%, -50%)"
-              >
-                                 클리닉 없음
-               </Text>
-             )}
+                             <Center height="100%">
+                 <Text 
+                   fontSize={{ base: "xs", sm: "xs", md: "xs" }}
+                   color="gray.400"
+                   textAlign="center"
+                 >
+                   클리닉 없음
+                 </Text>
+               </Center>
+            )}
           </Box>
         </Box>
       </GridItem>
@@ -543,57 +595,114 @@ const ClinicReservePage: React.FC = () => {
   }
 
   return (
-    <Container maxW="container.xl" py={4}>
-      <VStack spacing={1} align="stretch">
-        <Heading as="h1" size="md" pb={2} textAlign="center" fontWeight="normal">
-          {/* 보충 예약 */}
-        </Heading>
+    <Container maxW="container.xl" py={{ base: 2, md: 4 }} px={{ base: 2, md: 4 }}>
+      <VStack spacing={4} align="stretch">
+        <VStack spacing={2} textAlign="center">
+          <Heading 
+            as="h1" 
+            size={{ base: "lg", md: "md" }}
+            fontWeight="bold"
+            color="gray.600"
+          >
+            보충 예약
+          </Heading>
+          <Text 
+            fontSize={{ base: "md", md: "lg" }}
+            color="blue.500"
+            fontWeight="bold"
+            maxW="md"
+            mx="auto"
+            lineHeight="1.6"
+          >
+            초기화 까지 남은시간 {timeLeft}
+          </Text>
+        </VStack>
       
-        {/* 동적 n*m 그리드 (시간 x 요일) */}
+        {/* 동적 n*m 그리드 (시간 x 요일) - 모바일 최적화 */}
         <Box 
           overflowX="auto"
           display="flex"
           justifyContent="center"
           alignItems="center"
+          // 모바일에서 여백 조정
+          px={{ base: 0.5, md: 0 }}
         >
           <Grid
-            // 요일별로 동일한 크기의 컬럼들만 사용
-            templateColumns={`repeat(${days.length}, 1fr)`}
-            columnGap="0rem"
-            rowGap="0.5rem"
-            // 컨테이너 크기를 비율 기반으로 설정 (더 컴팩트하게)
+            // 반응형 그리드: base~md에서는 시간별 컬럼, md 이상에서는 요일별 컬럼
+            templateColumns={{ 
+              base: `repeat(${times.length}, 1fr)`,  // 모바일: 시간별 컬럼
+              md: `repeat(${days.length}, 1fr)`      // 데스크톱: 요일별 컬럼
+            }}
+            // 셀 사이 간격 1rem으로 고정
+            columnGap="1rem"
+            rowGap="1rem"
+            // 컨테이너 크기를 디바이스별로 조정
             w="100%"
-            maxW="800px"
+            maxW={{ base: "100%", md: "800px" }}
+            // 모바일에서 최소 너비 보장
+            minW={{ base: "200px", md: "auto" }}
           >
-            {/* 각 시간대별 행 */}
-            {times.map(time => (
-              <React.Fragment key={time}>
-                {/* 해당 시간의 요일별 슬롯 */}
-                {days.map(day => renderSlot(day, time))}
-              </React.Fragment>
-            ))}
+            {/* 반응형 그리드 렌더링 */}
+            <Box display={{ base: "contents", md: "none" }}>
+              {/* 모바일: 요일별로 행 구성 (월, 화, 수, 목, 금, 토) */}
+              {days.map(day => (
+                <React.Fragment key={day}>
+                  {times.map(time => renderSlot(day, time))}
+                </React.Fragment>
+              ))}
+            </Box>
+            
+            <Box display={{ base: "none", md: "contents" }}>
+              {/* 데스크톱: 시간별로 행 구성 (기존 방식) */}
+              {times.map(time => (
+                <React.Fragment key={time}>
+                  {days.map(day => renderSlot(day, time))}
+                </React.Fragment>
+              ))}
+            </Box>
           </Grid>
         </Box>
-
-
       </VStack>
 
-      {/* 예약 확인 모달 */}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+      {/* 예약 확인 모달 - 모바일 최적화 */}
+      <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        isCentered
+        // 모바일에서 더 작은 크기와 여백
+        size={{ base: "sm", md: "md" }}
+        motionPreset="slideInBottom"
+      >
         <ModalOverlay bg="blackAlpha.300" />
-        <ModalContent>
+        <ModalContent 
+          // 모바일에서 화면 가장자리 여백
+          mx={{ base: 4, md: 0 }}
+          my={{ base: 4, md: 0 }}
+        >
           {selectedSlot && (
             <>
-              <ModalBody pt={6}>
-                <Text textAlign="center" fontSize="lg" mb={4}>
+              <ModalBody pt={6} px={{ base: 4, md: 6 }}>
+                <Text 
+                  textAlign="center" 
+                  // 모바일에서 더 큰 텍스트
+                  fontSize={{ base: "lg", md: "md" }}
+                  mb={4}
+                  lineHeight="1.5"
+                >
                   {selectedSlot.action === 'reserve' 
                     ? `${dayNames[selectedSlot.day]} ${selectedSlot.time} ${selectedSlot.clinic.room} 예약 하시겠습니까?`
                     : `${dayNames[selectedSlot.day]} ${selectedSlot.time} ${selectedSlot.clinic.room} 예약을 취소하시겠습니까?`
                   }
                 </Text>
               </ModalBody>
-              <ModalFooter>
-                <Button variant="ghost" mr={3} onClick={onClose}>
+              <ModalFooter px={{ base: 4, md: 6 }}>
+                <Button 
+                  variant="ghost" 
+                  mr={3} 
+                  onClick={onClose}
+                  // 모바일에서 더 큰 버튼
+                  size={{ base: "md", md: "sm" }}
+                >
                   닫기
                 </Button>
                 <Button
@@ -601,6 +710,7 @@ const ClinicReservePage: React.FC = () => {
                   onClick={confirmReservation}
                   isLoading={reserving}
                   loadingText={selectedSlot.action === 'cancel' ? "취소 중..." : "예약 중..."}
+                  size={{ base: "md", md: "sm" }}
                 >
                   {selectedSlot.action === 'cancel' ? "예약 취소" : "예약 확정"}
                 </Button>
