@@ -80,6 +80,13 @@ class User(AbstractUser):
         verbose_name="학년",
     )  # 학년 (학생인 경우만)
 
+    # 노쇼 관리 필드
+    no_show = models.IntegerField(
+        default=0,
+        verbose_name="무단결석 횟수",
+        help_text="2회 이상 무단결석 시 보충 예약이 제한됩니다.",
+    )  # 무단결석 횟수
+
     def __str__(self):
         return self.name
 
@@ -331,6 +338,114 @@ class Clinic(models.Model):
             return False
 
         return True
+
+
+class ClinicAttendance(models.Model):
+    """클리닉 출석 관리 모델"""
+
+    ATTENDANCE_CHOICES = (
+        ("attended", "출석"),
+        ("absent", "결석"),
+        ("sick", "병결"),
+        ("late", "지각"),
+    )
+
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.CASCADE,
+        related_name="attendances",
+        verbose_name="클리닉",
+    )  # 클리닉
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="clinic_attendances",
+        limit_choices_to={"is_student": True},
+        verbose_name="학생",
+    )  # 학생 (User 모델에서 is_student=True인 사용자)
+    date = models.DateField(
+        verbose_name="출석 날짜", help_text="출석을 체크한 날짜 (년-월-일)"
+    )  # 출석 날짜 (년-월-일까지만)
+    attendance_type = models.CharField(
+        max_length=10,
+        choices=ATTENDANCE_CHOICES,
+        verbose_name="출석 상태",
+    )  # 출석 상태 (출석/결석/지각/병결)
+
+    # 메타데이터
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성 시간")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="수정 시간")
+
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        verbose_name = "클리닉 출석"
+        verbose_name_plural = "클리닉 출석"
+        # 같은 학생이 같은 클리닉에 같은 날짜에 중복 출석 체크 방지
+        unique_together = ("clinic", "student", "date")
+        indexes = [
+            models.Index(fields=["student", "-date"]),
+            models.Index(fields=["clinic", "-date"]),
+            models.Index(fields=["attendance_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.student.name} - {self.clinic} ({self.date}: {self.get_attendance_type_display()})"
+
+    def save(self, *args, **kwargs):
+        """
+        출석 데이터 저장 시 no_show 카운트 업데이트
+        """
+        # 기존 데이터인지 확인 (수정인지 새로 생성인지)
+        is_update = self.pk is not None
+        old_attendance_type = None
+
+        if is_update:
+            try:
+                old_instance = ClinicAttendance.objects.get(pk=self.pk)
+                old_attendance_type = old_instance.attendance_type
+            except ClinicAttendance.DoesNotExist:
+                is_update = False
+
+        super().save(*args, **kwargs)
+
+        # no_show 카운트 업데이트
+        self._update_no_show_count(old_attendance_type)
+
+    def delete(self, *args, **kwargs):
+        """
+        출석 데이터 삭제 시 no_show 카운트 업데이트
+        """
+        old_attendance_type = self.attendance_type
+        super().delete(*args, **kwargs)
+
+        # no_show 카운트 업데이트 (삭제되는 데이터의 반대 작업)
+        self._update_no_show_count_on_delete(old_attendance_type)
+
+    def _update_no_show_count(self, old_attendance_type=None):
+        """
+        학생의 no_show 카운트를 업데이트하는 헬퍼 메서드
+        """
+        student = self.student
+
+        # 현재 출석 타입이 무단결석(absent)인 경우 no_show 증가
+        if self.attendance_type == "absent":
+            if old_attendance_type != "absent":  # 새로 무단결석이 된 경우
+                student.no_show += 1
+
+        # 이전에 무단결석이었는데 다른 상태로 변경된 경우 no_show 감소
+        elif old_attendance_type == "absent":
+            student.no_show = max(0, student.no_show - 1)  # 0 이하로 내려가지 않도록
+
+        student.save(update_fields=["no_show"])
+
+    def _update_no_show_count_on_delete(self, old_attendance_type):
+        """
+        출석 데이터 삭제 시 no_show 카운트를 업데이트하는 헬퍼 메서드
+        """
+        if old_attendance_type == "absent":
+            student = self.student
+            student.no_show = max(0, student.no_show - 1)  # 0 이하로 내려가지 않도록
+            student.save(update_fields=["no_show"])
 
 
 class StudentPlacement(models.Model):

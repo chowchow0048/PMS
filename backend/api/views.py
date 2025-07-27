@@ -685,6 +685,22 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
+                # no_show 체크 (2회 이상 무단결석한 학생은 예약 불가)
+                if user.no_show >= 2:
+                    logger.warning(
+                        f"[api/views.py] 노쇼 학생 예약 차단: user_id={user_id}, "
+                        f"user_name={user.name}, no_show_count={user.no_show}"
+                    )
+                    return Response(
+                        {
+                            "error": "no_show_blocked",
+                            "message": f"{user.name} 학생은 {user.no_show}회 무단결석하여 금주 보충 예약이 불가능합니다.",
+                            "no_show_count": user.no_show,
+                            "user_name": user.name,
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
                 # 정원 확인
                 if clinic.is_full():
                     logger.warning(
