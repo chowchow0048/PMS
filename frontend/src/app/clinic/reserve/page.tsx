@@ -118,7 +118,7 @@ const ClinicReservePage: React.FC = () => {
     const weekday = today.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
     
     // 테스팅용: 월요일로 가정
-    return 0; // 월요일로 고정
+    // return 0; // 월요일로 고정
     
     // 일요일(0)을 토요일 다음(6)으로 처리
     if (weekday === 0) return 6; // 일요일은 모든 요일 예약 가능
@@ -341,6 +341,16 @@ const ClinicReservePage: React.FC = () => {
               });
               onClose();
               await loadWeeklySchedule(); // 최신 상태로 업데이트
+            } else if (response.status === 403 && data.error === 'no_show_blocked') {
+              // 노쇼로 인한 예약 차단
+              toast({
+                title: '예약 제한',
+                description: data.message || `${data.user_name || '학생'}은 ${data.no_show_count || 2}회 이상 무단결석하여 금주 보충 예약이 불가능합니다.`,
+                status: 'error',
+                duration: 8000, // 길게 표시
+                isClosable: true,
+              });
+              onClose();
             } else if (response.status === 400 && data.error === 'reservation_closed') {
               // 예약 기간이 아닌 경우
               toast({
