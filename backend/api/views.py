@@ -833,8 +833,8 @@ class ClinicViewSet(viewsets.ModelViewSet):
         #     return Response(cached_data, status=status.HTTP_200_OK)
 
         try:
-            # 최적화된 클리닉 데이터 조회
-            clinics = DatabaseOptimizer.optimize_clinic_query()
+            # 최적화된 클리닉 데이터 조회 (활성화된 클리닉만)
+            clinics = DatabaseOptimizer.optimize_clinic_query().filter(is_active=True)
 
             # DB에 실제로 존재하는 요일들만 동적으로 조회 (올바른 순서로 정렬)
             day_order = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
