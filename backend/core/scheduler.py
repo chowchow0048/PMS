@@ -61,18 +61,25 @@ def start_scheduler():
 
     # 이미 실행 중인 스케줄러가 있으면 중복 실행 방지
     if scheduler is not None and scheduler.running:
+        print("[Scheduler] 스케줄러가 이미 실행 중입니다")
         logger.info("[Scheduler] 스케줄러가 이미 실행 중입니다")
         return scheduler
 
     try:
+        print("[Scheduler] 스케줄러 초기화 시작...")
+        logger.info("[Scheduler] 스케줄러 초기화 시작...")
+
         # 스케줄러 초기화
         scheduler = BackgroundScheduler(timezone="Asia/Seoul")
+        print("[Scheduler] BackgroundScheduler 생성 완료")
 
         # Django 데이터베이스를 job store로 사용
         scheduler.add_jobstore(DjangoJobStore(), "default")
+        print("[Scheduler] Django JobStore 추가 완료")
 
         # 주간 클리닉 예약 초기화 작업 추가
         # 매주 월요일 00:00 (한국시간)에 실행
+        print("[Scheduler] 주간 클리닉 예약 초기화 작업 추가 중...")
         scheduler.add_job(
             reset_weekly_clinics_job,
             trigger=CronTrigger(
@@ -87,6 +94,7 @@ def start_scheduler():
             replace_existing=True,  # 기존 작업이 있으면 대체
             name="주간 클리닉 예약 초기화",
         )
+        print("[Scheduler] 주간 클리닉 예약 초기화 작업 추가 완료")
 
         # 작업 실행 기록 정리 작업 추가
         # 매일 02:00에 오래된 기록 삭제
@@ -103,10 +111,15 @@ def start_scheduler():
 
         # 스케줄러 시작
         scheduler.start()
+        print("[Scheduler] APScheduler가 성공적으로 시작되었습니다")
         logger.info("[Scheduler] APScheduler가 성공적으로 시작되었습니다")
+
+        print("[Scheduler] 등록된 작업:")
         logger.info("[Scheduler] 등록된 작업:")
         for job in scheduler.get_jobs():
-            logger.info(f"  - {job.name} (ID: {job.id}): {job.trigger}")
+            job_info = f"  - {job.name} (ID: {job.id}): {job.trigger}"
+            print(job_info)
+            logger.info(job_info)
 
         # 애플리케이션 종료 시 스케줄러도 함께 종료
         atexit.register(lambda: scheduler.shutdown() if scheduler else None)

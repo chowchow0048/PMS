@@ -41,7 +41,8 @@ import traceback
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
-import pandas as pd
+
+# pandas는 필요할 때만 임포트 (lazy loading)
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import os
@@ -157,6 +158,16 @@ class UserViewSet(viewsets.ModelViewSet):
 
             # 엑셀 파일 읽기
             excel_upload_logger.info("엑셀 파일 데이터 읽기 시작...")
+            try:
+                import pandas as pd
+            except ImportError as e:
+                excel_upload_logger.error(f"pandas 임포트 실패: {str(e)}")
+                return Response(
+                    {
+                        "error": "엑셀 처리를 위한 pandas 라이브러리를 불러올 수 없습니다."
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             df = pd.read_excel(file_path)
             excel_upload_logger.info(
                 f"엑셀 파일 읽기 완료: {len(df)}행, {len(df.columns)}컬럼"
@@ -205,6 +216,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     # 전화번호 처리 - 앞의 0이 잘리는 문제 해결
                     # 학부모 전화번호 (필수)
                     parent_phone_raw = row.iloc[3] if len(row) > 3 else ""
+                    # pandas가 이미 import되어 있으므로 사용 (위에서 import됨)
                     if pd.isna(parent_phone_raw):
                         parent_phone = ""
                     else:
