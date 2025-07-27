@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "rest_framework",  # Django REST Framework
     "corsheaders",  # CORS 지원
     "rest_framework.authtoken",  # 토큰 기반 인증
+    "django_apscheduler",  # Django APScheduler for background tasks
     # Local apps
     "core",  # 핵심 모델
     "api",  # API 앱
@@ -419,3 +420,21 @@ if not DEBUG:
     # 엑셀 업로드 로거는 INFO 레벨 유지 (중요한 업로드 정보 보존)
     if "api.excel_upload" in LOGGING["loggers"]:
         LOGGING["loggers"]["api.excel_upload"]["level"] = "INFO"
+
+# Django APScheduler 설정
+SCHEDULER_CONFIG = {
+    "apscheduler.executors.default": {
+        "class": "apscheduler.executors.pool:ThreadPoolExecutor",
+        "max_workers": "20",
+    },
+    "apscheduler.executors.processpool": {
+        "type": "processpool",
+        "max_workers": "5",
+    },
+    "apscheduler.job_defaults.coalesce": "false",
+    "apscheduler.job_defaults.max_instances": "3",
+    "apscheduler.timezone": "Asia/Seoul",  # 한국 시간대 설정
+}
+
+# APScheduler 데이터베이스 설정 (Django ORM 사용)
+SCHEDULER_AUTOSTART = True
