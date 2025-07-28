@@ -348,6 +348,7 @@ class ClinicAttendance(models.Model):
         ("absent", "결석"),
         ("sick", "병결"),
         ("late", "지각"),
+        ("none", "미정"),
     )
 
     clinic = models.ForeignKey(
@@ -370,6 +371,7 @@ class ClinicAttendance(models.Model):
         max_length=10,
         choices=ATTENDANCE_CHOICES,
         verbose_name="출석 상태",
+        default="none",
     )  # 출석 상태 (출석/결석/지각/병결)
 
     # 메타데이터
@@ -427,14 +429,16 @@ class ClinicAttendance(models.Model):
         """
         student = self.student
 
-        # 현재 출석 타입이 무단결석(absent)인 경우 no_show 증가
+        # 현재 출석 타입이 무단결석(absent)인 경우 no_show 증가 (+2)
         if self.attendance_type == "absent":
             if old_attendance_type != "absent":  # 새로 무단결석이 된 경우
-                student.no_show += 1
+                student.no_show += 2  # +1에서 +2로 변경
 
-        # 이전에 무단결석이었는데 다른 상태로 변경된 경우 no_show 감소
+        # 이전에 무단결석이었는데 다른 상태로 변경된 경우 no_show 감소 (-2)
         elif old_attendance_type == "absent":
-            student.no_show = max(0, student.no_show - 1)  # 0 이하로 내려가지 않도록
+            student.no_show = max(
+                0, student.no_show - 2
+            )  # -1에서 -2로 변경하되 0 이하로 내려가지 않도록
 
         student.save(update_fields=["no_show"])
 
@@ -444,7 +448,9 @@ class ClinicAttendance(models.Model):
         """
         if old_attendance_type == "absent":
             student = self.student
-            student.no_show = max(0, student.no_show - 1)  # 0 이하로 내려가지 않도록
+            student.no_show = max(
+                0, student.no_show - 2
+            )  # -1에서 -2로 변경하되 0 이하로 내려가지 않도록
             student.save(update_fields=["no_show"])
 
 

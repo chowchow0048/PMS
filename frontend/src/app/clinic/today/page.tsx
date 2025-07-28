@@ -29,11 +29,24 @@ import {
   CardBody,
   Heading,
   IconButton,
-  Button
+  Button,
+  ButtonGroup
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 import { Clinic, User, DAY_CHOICES } from '@/lib/types';
-import { getClinics, getStudents } from '@/lib/api';
+import { getClinics, getStudents, getClinicAttendances, updateAttendance, createAttendanceForClinic, getOrCreateAttendance } from '@/lib/api';
+import { AuthGuard } from '@/lib/authGuard';
+
+// 출석 상태 타입 정의
+type AttendanceType = 'attended' | 'absent' | 'sick' | 'late' | 'none';
+
+// 출석 상태 매핑
+const ATTENDANCE_OPTIONS: { value: AttendanceType; label: string; color: string }[] = [
+  { value: 'attended', label: '출석', color: 'green' },
+  { value: 'absent', label: '결석', color: 'red' },
+  { value: 'late', label: '지각', color: 'yellow' },
+  { value: 'sick', label: '병결', color: 'blue' },
+];
 
 // 시간대 선택지 정의
 const TIME_SLOTS = ['18:00', '19:00', '20:00', '21:00'];
@@ -53,16 +66,49 @@ const getTodayDay = (): 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun' =>
   return dayMapping[today.getDay()];
 };
 
+// 과목명 한글 변환 함수
+const getKoreanSubjectName = (subject: any): string => {
+  // 과목 객체에서 한글 이름을 가져오거나, 영어 이름을 한글로 변환
+  if (subject?.subject_kr) {
+    return subject.subject_kr;  
+  }
+  
+  if (subject?.subject) {
+    const subjectMap: { [key: string]: string } = {
+      'physics1': '물리학1',
+      'physics2': '물리학2', 
+      'chemistry1': '화학1',
+      'chemistry2': '화학2',
+      'biology1': '생명과학1',
+      'biology2': '생명과학2',
+      'earth1': '지구과학1',
+      'earth2': '지구과학2',
+      'math1': '수학1',
+      'math2': '수학2',
+      'mathA': '미적분',
+      'mathB': '기하',
+      'mathC': '확률과통계',
+    };
+    return subjectMap[subject.subject] || subject.subject;
+  }
+  
+  return '과목 없음';
+};
+
 /**
  * 오늘의 클리닉 페이지 컴포넌트
  * 오늘 요일에 해당하는 클리닉들의 출석 관리를 위한 페이지
  */
-const TodayClinicPage: React.FC = () => {
+const TodayClinicPageContent: React.FC = () => {
   const toast = useToast();
   const [clinics, setClinics] = useState<Clinic[]>([]); // 모든 클리닉 데이터
   const [students, setStudents] = useState<User[]>([]); // 모든 학생 데이터
   const [isLoading, setIsLoading] = useState(true); // 로딩 상태
   const [selectedTabIndex, setSelectedTabIndex] = useState(0); // 선택된 탭 인덱스
+  // 출석 상태 관리 - 각 학생별 출석 상태를 저장
+  const [attendanceStates, setAttendanceStates] = useState<{ [key: string]: AttendanceType }>({});
+  // 출석 데이터 ID 매핑 - API 업데이트를 위해 필요
+  const [attendanceIds, setAttendanceIds] = useState<{ [key: string]: number }>({});
   
   const today = getTodayDay(); // 오늘 요일
   const dayDisplay = DAY_CHOICES.find(d => d.value === today)?.label || today; // 요일 한글 표시
@@ -72,12 +118,137 @@ const TodayClinicPage: React.FC = () => {
     clinics.find(clinic => clinic.clinic_day === today && clinic.clinic_time === timeSlot)
   );
 
+  // 출석 데이터 로드 함수
+  const loadAttendanceData = async (clinic: Clinic) => {
+    try {
+      // console.log(`📋 출석 데이터 로드 시작 - 클리닉 ${clinic.id}`);
+      
+      // 해당 클리닉의 출석 데이터 조회
+      const attendances = await getClinicAttendances(clinic.id);
+      
+      // 상태 업데이트
+      const newAttendanceStates: { [key: string]: AttendanceType } = {};
+      const newAttendanceIds: { [key: string]: number } = {};
+      
+      attendances.forEach((attendance: any) => {
+        const stateKey = `${clinic.id}-${attendance.student}`;
+        newAttendanceStates[stateKey] = attendance.attendance_type;
+        newAttendanceIds[stateKey] = attendance.id;
+      });
+      
+      setAttendanceStates(prev => ({ ...prev, ...newAttendanceStates }));
+      setAttendanceIds(prev => ({ ...prev, ...newAttendanceIds }));
+      
+      // console.log(`✅ 출석 데이터 로드 완료 - 클리닉 ${clinic.id}:`, attendances.length, '건');
+      
+          } catch (error) {
+        // console.error(`❌ 출석 데이터 로드 오류 - 클리닉 ${clinic.id}:`, error);
+      }
+  };
+
+  // 출석 상태 업데이트 함수
+  const handleAttendanceChange = async (clinicId: number, studentId: number, attendanceType: AttendanceType) => {
+    try {
+      // 상태 키 생성 (클리닉ID-학생ID)
+      const stateKey = `${clinicId}-${studentId}`;
+      
+      // 로컬 상태 먼저 업데이트 (즉시 UI 반영)
+      setAttendanceStates(prev => ({
+        ...prev,
+        [stateKey]: attendanceType
+      }));
+
+      // 출석 데이터 ID 확인
+      let attendanceId = attendanceIds[stateKey];
+      
+      // 출석 데이터가 없으면 생성
+      if (!attendanceId) {
+        // console.log(`📝 출석 데이터 생성 필요 - 클리닉: ${clinicId}, 학생: ${studentId}`);
+        const attendance = await getOrCreateAttendance(clinicId, studentId);
+        attendanceId = attendance.id;
+        
+        // 새로 생성된 ID 저장
+        setAttendanceIds(prev => ({
+          ...prev,
+          [stateKey]: attendanceId
+        }));
+      }
+
+      // API 호출로 서버에 출석 상태 업데이트
+      await updateAttendance(attendanceId, attendanceType);
+      
+      // console.log(`🔄 출석 상태 업데이트 완료: 클리닉 ${clinicId}, 학생 ${studentId}, 상태 ${attendanceType}`);
+      
+      toast({
+        title: '출석 상태 업데이트',
+        description: `${ATTENDANCE_OPTIONS.find(opt => opt.value === attendanceType)?.label} 처리되었습니다.`,
+        status: 'success',
+        duration: 2000,
+        isClosable: true,
+      });
+
+    } catch (error) {
+      // console.error('❌ 출석 상태 업데이트 오류:', error);
+      
+      // 오류 시 원래 상태로 복원
+      setAttendanceStates(prev => {
+        const restored = { ...prev };
+        delete restored[`${clinicId}-${studentId}`];
+        return restored;
+      });
+      
+      toast({
+        title: '출석 상태 업데이트 실패',
+        description: '출석 상태 업데이트 중 오류가 발생했습니다.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  // 클리닉 시간에 맞춰 출석 데이터 생성하는 함수
+  const initializeAttendanceForClinic = async (clinic: Clinic) => {
+    try {
+      // console.log(`📝 클리닉 ${clinic.id}의 출석 데이터 초기화 시작`);
+      
+      // API 호출로 해당 클리닉의 출석 데이터 일괄 생성
+      await createAttendanceForClinic(clinic.id);
+      
+      // 생성 후 출석 데이터 다시 로드
+      await loadAttendanceData(clinic);
+      
+      // console.log(`✅ 클리닉 ${clinic.id}의 출석 데이터 초기화 완료`);
+      
+      toast({
+        title: '출석 체크 준비 완료',
+        description: `${clinic.clinic_time} 클리닉의 출석 체크가 준비되었습니다.`,
+        status: 'info',
+        duration: 3000,
+        isClosable: true,
+      });
+      
+    } catch (error) {
+      // console.error('❌ 출석 데이터 초기화 오류:', error);
+      
+      toast({
+        title: '출석 체크 준비 실패',
+        description: '출석 체크 준비 중 오류가 발생했습니다.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        console.log('🔍 [TodayClinicPage] 데이터 로드 시작');
+        // console.log('🚀 [TodayClinicPage] === 페이지 진입 시작 ===');
+        // console.log('🔍 [TodayClinicPage] 데이터 로드 시작');
+        // console.log('📅 [TodayClinicPage] 오늘 요일:', today, `(${dayDisplay})`);
 
         // 클리닉과 학생 데이터를 병렬로 로드
         const [clinicsData, studentsData] = await Promise.all([
@@ -88,14 +259,141 @@ const TodayClinicPage: React.FC = () => {
         setClinics(clinicsData);
         setStudents(studentsData);
 
-        console.log('✅ [TodayClinicPage] 데이터 로드 완료:', {
-          clinics: clinicsData.length,
-          students: studentsData.length,
-          today
-        });
+        // === 디버깅 로그: 해당 요일 클리닉 정보 ===
+        const todayClinicsData = clinicsData.filter((clinic: Clinic) => clinic.clinic_day === today) as Clinic[];
+        // console.log('🏥 [TodayClinicPage] === 오늘 클리닉 정보 ===');
+        // console.log(`📊 [TodayClinicPage] 전체 클리닉 수: ${clinicsData.length}개`);
+        // console.log(`🎯 [TodayClinicPage] 오늘(${dayDisplay}) 클리닉 수: ${todayClinicsData.length}개`);
+        
+        if (todayClinicsData.length === 0) {
+          // console.log('⚠️ [TodayClinicPage] 오늘 등록된 클리닉이 없습니다.');
+        } else {
+          // 시간별로 정렬하여 출력
+          const sortedClinics = todayClinicsData.sort((a: Clinic, b: Clinic) => a.clinic_time.localeCompare(b.clinic_time));
+          
+          // console.log('📋 [TodayClinicPage] === 시간별 클리닉 상세 정보 ===');
+          for (const clinic of sortedClinics) {
+            const subject_kr = getKoreanSubjectName(clinic.clinic_subject);
+            const teacher_name = (clinic.clinic_teacher as any)?.name || '강사 없음';
+            const student_count = clinic.clinic_students?.length || 0;
+            
+            // console.log(`⏰ [${clinic.clinic_time}] ${subject_kr} - ${clinic.clinic_room}`);
+            // console.log(`   👨‍🏫 강사: ${teacher_name}`);
+            // console.log(`   👥 예약 학생: ${student_count}/${clinic.clinic_capacity}명`);
+            // console.log(`   🔄 활성화: ${(clinic as any).is_active ? '활성' : '비활성'}`);
+            // console.log(`   📍 클리닉 ID: ${clinic.id}`);
+            
+            // === 디버깅 로그: 클리닉별 학생 정보 ===
+            if (student_count > 0) {
+              // console.log(`   📚 [${clinic.clinic_time}] 예약 학생 목록:`);
+              clinic.clinic_students.forEach((student: any, index: number) => {
+                // console.log(`      ${index + 1}. ${student.name} (${student.username}) - ${student.school} ${student.grade}`);
+                // console.log(`         📞 학생: ${student.student_phone_num || '없음'}, 학부모: ${student.student_parent_phone_num || '없음'}`);
+                // console.log(`         ❌ 무단결석: ${student.no_show || 0}회`);
+              });
+            } else {
+              // console.log(`   📚 [${clinic.clinic_time}] 예약 학생 없음`);
+            }
+            // console.log(''); // 빈 줄로 구분
+          }
+        }
+
+        // === 디버깅 로그: 출석 데이터 로드 및 분석 ===
+        // console.log('📋 [TodayClinicPage] === 출석 데이터 로드 시작 ===');
+        let totalAttendanceRecords = 0;
+        let clinicsWithAttendance = 0;
+        let clinicsNeedingAttendance = 0;
+        
+        for (const clinic of todayClinicsData) {
+          if (clinic.clinic_students && clinic.clinic_students.length > 0) {
+            // console.log(`🔍 [출석데이터] ${clinic.clinic_time} 클리닉 (ID: ${clinic.id}) 출석 데이터 로드 중...`);
+            
+            try {
+              // 기존 출석 데이터 확인
+              const existingAttendances = await getClinicAttendances(clinic.id);
+              const attendanceCount = existingAttendances.length;
+              
+              if (attendanceCount === 0) {
+                // 출석 데이터가 없으면 자동 생성
+                // console.log(`📝 [자동생성] ${clinic.clinic_time} 클리닉: 출석 데이터가 없어서 자동 생성 시작...`);
+                clinicsNeedingAttendance++;
+                
+                try {
+                  const createResult = await createAttendanceForClinic(clinic.id);
+                  // console.log(`✅ [자동생성] ${clinic.clinic_time} 클리닉: ${createResult.created?.length || 0}개 출석 데이터 생성 완료`);
+                  
+                  // 생성 후 다시 로드
+                  await loadAttendanceData(clinic);
+                  
+                  // 생성된 데이터 다시 조회하여 카운트 업데이트
+                  const newAttendances = await getClinicAttendances(clinic.id);
+                  totalAttendanceRecords += newAttendances.length;
+                  
+                  if (newAttendances.length > 0) {
+                    clinicsWithAttendance++;
+                    // console.log(`🎯 [자동생성] ${clinic.clinic_time} 클리닉: 최종 ${newAttendances.length}개 출석 기록 확인`);
+                    
+                    // 출석 상태별 통계 (생성 후에는 모두 'none'이어야 함)
+                    const attendanceStats = newAttendances.reduce((stats: any, att: any) => {
+                      stats[att.attendance_type] = (stats[att.attendance_type] || 0) + 1;
+                      return stats;
+                    }, {});
+                    
+                    // console.log(`   📊 [출석통계] none: ${attendanceStats.none || 0}, attended: ${attendanceStats.attended || 0}, absent: ${attendanceStats.absent || 0}, late: ${attendanceStats.late || 0}, sick: ${attendanceStats.sick || 0}`);
+                  }
+                  
+                } catch (createError) {
+                  // console.error(`❌ [자동생성] ${clinic.clinic_time} 클리닉 출석 데이터 생성 실패:`, createError);
+                  // 생성 실패해도 기존 로직 계속 진행
+                  await loadAttendanceData(clinic);
+                }
+                
+              } else {
+                // 기존 출석 데이터가 있는 경우
+                await loadAttendanceData(clinic);
+                totalAttendanceRecords += attendanceCount;
+                clinicsWithAttendance++;
+                
+                // console.log(`✅ [출석데이터] ${clinic.clinic_time} 클리닉: ${attendanceCount}개 출석 기록 발견 (기존 데이터)`);
+                
+                // 출석 상태별 통계
+                const attendanceStats = existingAttendances.reduce((stats: any, att: any) => {
+                  stats[att.attendance_type] = (stats[att.attendance_type] || 0) + 1;
+                  return stats;
+                }, {});
+                
+                // console.log(`   📊 [출석통계] none: ${attendanceStats.none || 0}, attended: ${attendanceStats.attended || 0}, absent: ${attendanceStats.absent || 0}, late: ${attendanceStats.late || 0}, sick: ${attendanceStats.sick || 0}`);
+              }
+              
+            } catch (error) {
+              // console.error(`❌ [출석데이터] ${clinic.clinic_time} 클리닉 출석 데이터 처리 실패:`, error);
+            }
+          } else {
+            // console.log(`⏭️ [출석데이터] ${clinic.clinic_time} 클리닉: 예약 학생 없음, 출석 데이터 처리 건너뜀`);
+          }
+        }
+
+        // === 디버깅 로그: 전체 요약 ===
+        // console.log('📈 [TodayClinicPage] === 전체 데이터 로드 요약 ===');
+        // console.log(`🏥 총 클리닉: ${clinicsData.length}개 (오늘: ${todayClinicsData.length}개)`);
+        // console.log(`👥 총 학생: ${studentsData.length}명`);
+        // console.log(`📋 총 출석 기록: ${totalAttendanceRecords}개`);
+        // console.log(`✅ 출석 데이터가 있는 클리닉: ${clinicsWithAttendance}/${todayClinicsData.length}개`);
+        // console.log(`🔧 자동 생성이 필요했던 클리닉: ${clinicsNeedingAttendance}개`);
+        
+        // console.log('✅ [TodayClinicPage] 데이터 로드 완료:', {
+          // clinics: clinicsData.length,
+          // students: studentsData.length,
+          // todayClinics: todayClinicsData.length,
+          // attendanceRecords: totalAttendanceRecords,
+          // autoCreatedClinics: clinicsNeedingAttendance,
+          // today
+        // });
+
+        // console.log('🏁 [TodayClinicPage] === 페이지 진입 완료 ===');
 
       } catch (error) {
-        console.error('❌ [TodayClinicPage] 데이터 로드 오류:', error);
+        // console.error('❌ [TodayClinicPage] 데이터 로드 오류:', error);
         
         toast({
           title: '데이터 로드 실패',
@@ -131,29 +429,35 @@ const TodayClinicPage: React.FC = () => {
 
     return (
       <VStack align="stretch" spacing={4}>
-        {/* 클리닉 기본 정보 */}
+        {/* 클리닉 기본 정보 카드 */}
         <Card>
           <CardHeader pb={2}>
-            <Heading size="sm">클리닉 정보</Heading>
+            <Flex justify="space-between" align="center">
+              <Heading size="sm">클리닉 정보</Heading>
+              {/* 자동 생성 상태 표시 */}
+              <Text fontSize="xs" color="gray.500">
+                출석 데이터 자동 생성됨
+              </Text>
+            </Flex>
           </CardHeader>
           <CardBody pt={0}>
-                         <HStack spacing={4} flexWrap="wrap">
-               <Badge colorScheme="blue" size="md">
-                 {(clinic.clinic_subject as any)?.subject || clinic.subject_name || '과목 없음'}
-               </Badge>
-               <Badge colorScheme="green" size="md">
-                 {(clinic.clinic_teacher as any)?.name || clinic.teacher_name || '강사 없음'}
-               </Badge>
-               <Badge colorScheme="purple" size="md">
-                 {clinic.clinic_room}
-               </Badge>
-               <Badge 
-                 colorScheme={remainingCapacity <= 0 ? 'red' : 'gray'} 
-                 size="md"
-               >
-                 {currentStudentCount}/{clinic.clinic_capacity}명
-               </Badge>
-             </HStack>
+            <HStack spacing={4} flexWrap="wrap">
+              <Badge colorScheme="blue" size="md">
+                {getKoreanSubjectName(clinic.clinic_subject)}
+              </Badge>
+              <Badge colorScheme="green" size="md">
+                {(clinic.clinic_teacher as any)?.name || clinic.teacher_name || '강사 없음'}
+              </Badge>
+              <Badge colorScheme="purple" size="md">
+                {clinic.clinic_room}
+              </Badge>
+              <Badge 
+                colorScheme={remainingCapacity <= 0 ? 'red' : 'gray'} 
+                size="md"
+              >
+                {currentStudentCount}/{clinic.clinic_capacity}명
+              </Badge>
+            </HStack>
           </CardBody>
         </Card>
 
@@ -182,52 +486,64 @@ const TodayClinicPage: React.FC = () => {
                       <Th>학교/학년</Th>
                       <Th>학부모님 전화번호</Th>
                       <Th>학생 전화번호</Th>
-                      <Th width="200px">출석 상태</Th>
-                      <Th width="100px">관리</Th>
+                      <Th width="320px">출석 상태</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {clinic.clinic_students.map((student, index) => (
-                      <Tr key={`student-${student.id}-${index}-${timeSlot}`}>
-                        <Td>{index + 1}</Td>
-                        <Td fontWeight="semibold">
-                          {student.name || student.username || '이름 없음'}
-                        </Td>
-                        <Td>
-                          <Text fontSize="sm">
-                            {student.school} {student.grade}
-                          </Text>
-                        </Td>
-                        <Td>{student.student_parent_phone_num || '-'}</Td>
-                        <Td>{student.student_phone_num || '-'}</Td>
-                        <Td>
-                          {/* 출석 체크 버튼들 - 추후 구현 */}
-                          <HStack spacing={1}>
-                            <Button size="xs" colorScheme="green" variant="outline">
-                              출석
-                            </Button>
-                            <Button size="xs" colorScheme="red" variant="outline">
-                              결석
-                            </Button>
-                            <Button size="xs" colorScheme="yellow" variant="outline">
-                              지각
-                            </Button>
-                            <Button size="xs" colorScheme="blue" variant="outline">
-                              병결
-                            </Button>
-                          </HStack>
-                        </Td>
-                        <Td>
-                          <IconButton
-                            aria-label="학생 정보"
-                            icon={<InfoIcon />}
-                            size="sm"
-                            colorScheme="blue"
-                            variant="ghost"
-                          />
-                        </Td>
-                      </Tr>
-                    ))}
+                    {clinic.clinic_students.map((student, index) => {
+                      const stateKey = `${clinic.id}-${student.id}`;
+                      const currentAttendance = attendanceStates[stateKey] || 'none';
+                      
+                      return (
+                        <Tr key={`student-${student.id}-${index}-${timeSlot}`}>
+                          <Td>{index + 1}</Td>
+                          <Td fontWeight="semibold">
+                            {student.name || student.username || '이름 없음'}
+                          </Td>
+                          <Td>
+                            <Text fontSize="sm">
+                              {student.school} {student.grade}
+                            </Text>
+                          </Td>
+                          <Td>{student.student_parent_phone_num || '-'}</Td>
+                          <Td>{student.student_phone_num || '-'}</Td>
+                          <Td>
+                            {/* 토글 형식의 출석 체크 버튼들 - space-between으로 균등 분포 */}
+                            <Flex justify="space-between" align="center" width="100%">
+                              {ATTENDANCE_OPTIONS.map((option) => (
+                                <Button
+                                  key={option.value}
+                                  size="sm"
+                                  colorScheme={option.color}
+                                  variant={currentAttendance === option.value ? 'solid' : 'outline'}
+                                  onClick={() => handleAttendanceChange(clinic.id, student.id, option.value)}
+                                  flex="1"
+                                  mx={1}
+                                  fontSize="xs"
+                                  minW="50px"
+                                  h="28px"
+                                  border="1px solid"
+                                  borderColor={
+                                    currentAttendance === option.value 
+                                      ? `${option.color}.500` 
+                                      : `${option.color}.500`
+                                  }
+                                  _hover={{
+                                    transform: 'none', // hover 시 변형 방지
+                                    borderColor: `${option.color}.600`
+                                  }}
+                                  _active={{
+                                    transform: 'none' // active 시 변형 방지
+                                  }}
+                                >
+                                  {option.label}
+                                </Button>
+                              ))}
+                            </Flex>
+                          </Td>
+                        </Tr>
+                      );
+                    })}
                   </Tbody>
                 </Table>
               </TableContainer>
@@ -251,7 +567,7 @@ const TodayClinicPage: React.FC = () => {
   }
 
   return (
-    <Box maxW="7xl" mx="auto" px={6} py={8}>
+    <Box maxW="7xl" mx="auto" px={6} py={4}>
       <VStack align="stretch" spacing={6}>
         {/* 페이지 헤더 */}
         <Card>
@@ -268,10 +584,7 @@ const TodayClinicPage: React.FC = () => {
               </Flex>
               
               {/* 전체 통계 정보 */}
-              <HStack spacing={4} flexWrap="wrap">
-                {/* <Text fontSize="sm" color="gray.600">
-                  
-                </Text> */}
+              <HStack spacing={2} flexWrap="wrap">
                 {TIME_SLOTS.map(timeSlot => {
                   const clinic = todayClinics.find(c => c?.clinic_time === timeSlot);
                   const count = clinic?.clinic_students?.length || 0;
@@ -346,6 +659,15 @@ const TodayClinicPage: React.FC = () => {
         </Card>
       </VStack>
     </Box>
+  );
+};
+
+// AuthGuard로 감싸서 관리자와 강사만 접근 가능
+const TodayClinicPage: React.FC = () => {
+  return (
+    <AuthGuard allowedRoles={['admin', 'teacher']} requireAuth={true}>
+      <TodayClinicPageContent />
+    </AuthGuard>
   );
 };
 

@@ -40,6 +40,7 @@ import {
   TabPanel
 } from '@chakra-ui/react';
 import { DeleteIcon, InfoIcon } from '@chakra-ui/icons';
+import { useRouter } from 'next/navigation';
 import { Clinic, User, DAY_CHOICES } from '@/lib/types';
 import { updateClinic } from '@/lib/api';
 
@@ -66,6 +67,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
   onUpdate,
 }) => {
   const toast = useToast();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false); // 로딩 상태 관리
   const [studentToRemove, setStudentToRemove] = useState<User | null>(null); // 제거할 학생
   const [selectedTabIndex, setSelectedTabIndex] = useState(0); // 선택된 탭 인덱스
@@ -84,6 +86,12 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
 
   // 요일 표시명 가져오기
   const dayDisplay = DAY_CHOICES.find(d => d.value === day)?.label || day;
+
+  // 오늘의 보충 페이지로 이동하는 함수
+  const handleGoToTodayClinic = () => {
+    onClose(); // 모달 닫기
+    router.push('/clinic/today'); // 오늘의 보충 페이지로 이동
+  };
 
   // 학생을 클리닉에서 제거하는 함수
   const handleRemoveStudent = async (studentToRemove: User) => {
@@ -220,11 +228,18 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
         <ModalContent maxW="90vw" minH="90vh">
           <ModalHeader>
             <VStack align="stretch" spacing={2}>
-              {/* 요일 정보 */}
+              {/* 요일 정보와 오늘의 보충 버튼 */}
               <Flex justify="space-between" align="center">
                 <Text fontSize="xl" fontWeight="bold">
                   {dayDisplay} 보충 관리
                 </Text>
+                <Button
+                  colorScheme="blue"
+                  size="sm"
+                  onClick={handleGoToTodayClinic}
+                >
+                  오늘의 보충
+                </Button>
               </Flex>
               
               {/* 전체 통계 정보 */}
@@ -250,7 +265,6 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
               </HStack>
             </VStack>
           </ModalHeader>
-          <ModalCloseButton />
           
           <ModalBody>
             {isLoading ? (
@@ -306,7 +320,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
           
           <ModalFooter>
             <Button colorScheme="blue" onClick={onClose}>
-              확인
+              닫기
             </Button>
           </ModalFooter>
         </ModalContent>

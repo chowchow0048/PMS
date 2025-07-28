@@ -6,6 +6,7 @@ from core.models import (
     Clinic,
     StudentPlacement,
     WeeklyReservationPeriod,
+    ClinicAttendance,
 )
 
 # from core.models import Time, Comment  # 보충 시스템 개편으로 주석처리
@@ -371,3 +372,48 @@ class WeeklyReservationPeriodSerializer(serializers.ModelSerializer):
     def get_remaining_time(self, obj):
         """예약 마감까지 남은 시간"""
         return str(obj.get_remaining_time())
+
+
+class ClinicAttendanceSerializer(serializers.ModelSerializer):
+    """클리닉 출석 관리 시리얼라이저"""
+
+    # 학생 이름과 클리닉 정보를 포함하여 표시
+    student_name = serializers.CharField(source="student.name", read_only=True)
+    clinic_info = serializers.CharField(source="clinic.__str__", read_only=True)
+    attendance_type_display = serializers.CharField(
+        source="get_attendance_type_display", read_only=True
+    )
+
+    class Meta:
+        model = ClinicAttendance
+        fields = [
+            "id",
+            "clinic",
+            "student",
+            "student_name",
+            "clinic_info",
+            "date",
+            "attendance_type",
+            "attendance_type_display",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "student_name",
+            "clinic_info",
+            "attendance_type_display",
+            "created_at",
+            "updated_at",
+        ]
+
+    def create(self, validated_data):
+        """
+        ClinicAttendance 생성 시 오늘 날짜로 자동 설정
+        """
+        from django.utils import timezone
+
+        # 오늘 날짜로 설정
+        validated_data["date"] = timezone.now().date()
+
+        return super().create(validated_data)

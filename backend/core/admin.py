@@ -8,6 +8,7 @@ from .models import (
     Clinic,
     StudentPlacement,
     WeeklyReservationPeriod,
+    ClinicAttendance,  # 클리닉 출석 모델 추가
     LoginHistory,
     UserSession,
 )
@@ -30,14 +31,19 @@ class CustomUserAdmin(UserAdmin):
         "is_superuser",
         "school",
         "grade",
+        "no_show",  # 무단결석 횟수 추가
+        "is_active",
     )
     list_filter = (
         "is_teacher",
         "is_student",
         "is_staff",
         "is_superuser",
+        "is_active",
         "school",
         "grade",
+        "no_show",  # 무단결석 횟수로 필터링 추가
+        "subject",  # 과목 필터 추가
     )
     fieldsets = (
         (None, {"fields": ("username", "password")}),
@@ -59,6 +65,7 @@ class CustomUserAdmin(UserAdmin):
                     "student_parent_phone_num",
                     "school",
                     "grade",
+                    "no_show",  # 무단결석 횟수 추가
                 )
             },
         ),
@@ -71,6 +78,15 @@ class CustomUserAdmin(UserAdmin):
                     "is_staff",
                     "is_superuser",
                     "is_active",
+                )
+            },
+        ),
+        (
+            "날짜 정보",
+            {
+                "fields": (
+                    "date_joined",
+                    "last_login",
                 )
             },
         ),
@@ -94,9 +110,18 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
-    search_fields = ("username", "name")  # user_name → name
+    search_fields = (
+        "username",
+        "name",
+        "student_parent_phone_num",
+        "phone_num",
+    )  # 검색 필드 확장
     ordering = ("username",)
-    actions = ["regenerate_student_credentials", "reset_student_password_to_username"]
+    actions = [
+        "regenerate_student_credentials",
+        "reset_student_password_to_username",
+        "reset_no_show_count",
+    ]
 
     def regenerate_student_credentials(self, request, queryset):
         """
@@ -264,6 +289,27 @@ class CustomUserAdmin(UserAdmin):
     reset_student_password_to_username.short_description = (
         "학생 비밀번호를 아이디와 같게 초기화"
     )
+
+    def reset_no_show_count(self, request, queryset):
+        """
+        선택된 학생 사용자들의 무단결석 횟수를 0으로 초기화
+        """
+        # is_student=True인 사용자만 필터링
+        student_users = queryset.filter(is_student=True)
+
+        if not student_users.exists():
+            self.message_user(
+                request, "선택된 사용자 중 학생이 없습니다.", level="WARNING"
+            )
+            return
+
+        count = student_users.update(no_show=0)
+        self.message_user(
+            request,
+            f"{count}명의 학생 무단결석 횟수가 0으로 초기화되었습니다.",
+        )
+
+    reset_no_show_count.short_description = "학생 무단결석 횟수 초기화"
 
 
 # StudentAdmin 삭제 - User 모델로 통합됨
@@ -785,6 +831,218 @@ class UserSessionAdmin(admin.ModelAdmin):
     clean_inactive_sessions.short_description = "비활성 세션 정리"
 
 
+# ClinicAttendance 관리자 설정 (클리닉 출석 관리)
+class ClinicAttendanceAdmin(admin.ModelAdmin):
+    list_display = (
+        "get_student_name",
+        "get_clinic_info",
+        "date",
+        "get_attendance_display",
+        "get_created_time",
+        "id",
+    )
+    list_filter = (
+        "attendance_type",
+        "date",
+        "clinic__clinic_day",
+        "clinic__clinic_time",
+        "clinic__clinic_subject",
+        "created_at",
+    )
+    search_fields = (
+        "student__name",
+        "student__username",
+        "clinic__clinic_teacher__name",
+        "clinic__clinic_room",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    date_hierarchy = "date"
+    ordering = ("-date", "-created_at")
+
+    # 필터링 최적화를 위한 select_related와 prefetch_related
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "student", "clinic", "clinic__clinic_teacher", "clinic__clinic_subject"
+            )
+        )
+
+    def get_student_name(self, obj):
+        return f"{obj.student.name} ({obj.student.username})"
+
+    get_student_name.short_description = "학생"
+
+    def get_clinic_info(self, obj):
+        clinic = obj.clinic
+        day_display = clinic.get_clinic_day_display()
+        subject_kr = getattr(
+            clinic.clinic_subject, "subject_kr", clinic.clinic_subject.subject
+        )
+        return (
+            f"{subject_kr} - {day_display} {clinic.clinic_time} ({clinic.clinic_room})"
+        )
+
+    get_clinic_info.short_description = "클리닉 정보"
+
+    def get_attendance_display(self, obj):
+        return obj.get_attendance_type_display()
+
+    get_attendance_display.short_description = "출석 상태"
+
+    def get_created_time(self, obj):
+        from django.utils import timezone
+
+        kst_time = timezone.localtime(obj.created_at)
+        return kst_time.strftime("%m/%d %H:%M KST")
+
+    get_created_time.short_description = "등록 시간"
+
+    # 유용한 관리자 액션들
+    actions = [
+        "mark_as_attended",
+        "mark_as_absent",
+        "mark_as_late",
+        "mark_as_sick",
+        "bulk_create_for_today_clinics",
+        "export_attendance_csv",
+    ]
+
+    def mark_as_attended(self, request, queryset):
+        """선택한 출석 데이터를 출석으로 변경"""
+        count = queryset.update(attendance_type="attended")
+        self.message_user(request, f"{count}개의 출석이 '출석'으로 변경되었습니다.")
+
+    mark_as_attended.short_description = "선택한 출석을 '출석'으로 변경"
+
+    def mark_as_absent(self, request, queryset):
+        """선택한 출석 데이터를 결석으로 변경"""
+        count = queryset.update(attendance_type="absent")
+        self.message_user(request, f"{count}개의 출석이 '결석'으로 변경되었습니다.")
+
+    mark_as_absent.short_description = "선택한 출석을 '결석'으로 변경"
+
+    def mark_as_late(self, request, queryset):
+        """선택한 출석 데이터를 지각으로 변경"""
+        count = queryset.update(attendance_type="late")
+        self.message_user(request, f"{count}개의 출석이 '지각'으로 변경되었습니다.")
+
+    mark_as_late.short_description = "선택한 출석을 '지각'으로 변경"
+
+    def mark_as_sick(self, request, queryset):
+        """선택한 출석 데이터를 병결로 변경"""
+        count = queryset.update(attendance_type="sick")
+        self.message_user(request, f"{count}개의 출석이 '병결'으로 변경되었습니다.")
+
+    mark_as_sick.short_description = "선택한 출석을 '병결'으로 변경"
+
+    def bulk_create_for_today_clinics(self, request, queryset):
+        """오늘 활성화된 모든 클리닉에 대해 출석 데이터 일괄 생성"""
+        from django.utils import timezone
+
+        today = timezone.now().date()
+        today_weekday = today.weekday()  # 0=월요일
+
+        # 요일 매핑
+        day_mapping = {
+            0: "mon",
+            1: "tue",
+            2: "wed",
+            3: "thu",
+            4: "fri",
+            5: "sat",
+            6: "sun",
+        }
+        today_day = day_mapping.get(today_weekday, "mon")
+
+        # 오늘 요일의 활성화된 클리닉들 조회
+        active_clinics = Clinic.objects.filter(
+            clinic_day=today_day, is_active=True
+        ).prefetch_related("clinic_students")
+
+        created_count = 0
+        existing_count = 0
+
+        for clinic in active_clinics:
+            for student in clinic.clinic_students.all():
+                attendance, created = ClinicAttendance.objects.get_or_create(
+                    clinic=clinic,
+                    student=student,
+                    date=today,
+                    defaults={"attendance_type": "none"},
+                )
+                if created:
+                    created_count += 1
+                else:
+                    existing_count += 1
+
+        self.message_user(
+            request,
+            f"출석 데이터 생성 완료: 신규 {created_count}개, 기존 {existing_count}개",
+        )
+
+    bulk_create_for_today_clinics.short_description = (
+        "오늘 클리닉의 출석 데이터 일괄 생성"
+    )
+
+    def export_attendance_csv(self, request, queryset):
+        """선택한 출석 데이터를 CSV로 내보내기"""
+        import csv
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="clinic_attendance.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "Date",
+                "Student Name",
+                "Student ID",
+                "School",
+                "Grade",
+                "Clinic Subject",
+                "Clinic Day",
+                "Clinic Time",
+                "Room",
+                "Teacher",
+                "Attendance Type",
+                "Created At",
+            ]
+        )
+
+        for obj in queryset:
+            from django.utils import timezone
+
+            created_kst = timezone.localtime(obj.created_at)
+
+            writer.writerow(
+                [
+                    obj.date.strftime("%Y-%m-%d"),
+                    obj.student.name,
+                    obj.student.username,
+                    obj.student.school,
+                    obj.student.grade,
+                    getattr(
+                        obj.clinic.clinic_subject,
+                        "subject_kr",
+                        obj.clinic.clinic_subject.subject,
+                    ),
+                    obj.clinic.get_clinic_day_display(),
+                    obj.clinic.clinic_time,
+                    obj.clinic.clinic_room,
+                    obj.clinic.clinic_teacher.name,
+                    obj.get_attendance_type_display(),
+                    created_kst.strftime("%Y-%m-%d %H:%M:%S KST"),
+                ]
+            )
+
+        return response
+
+    export_attendance_csv.short_description = "선택한 출석 데이터를 CSV로 내보내기"
+
+
 # 관리자 사이트에 모델 등록
 admin.site.register(User, CustomUserAdmin)
 # admin.site.register(Student, StudentAdmin)  # Student 모델 삭제로 주석처리
@@ -794,6 +1052,7 @@ admin.site.register(StudentPlacement, StudentPlacementAdmin)
 admin.site.register(WeeklyReservationPeriod, WeeklyReservationPeriodAdmin)
 admin.site.register(LoginHistory, LoginHistoryAdmin)
 admin.site.register(UserSession, UserSessionAdmin)
+admin.site.register(ClinicAttendance, ClinicAttendanceAdmin)
 
 # 보충 시스템 개편으로 Time, Comment 모델 제거
 # admin.site.register(Time, TimeAdmin)
