@@ -198,7 +198,7 @@ const ClinicReservePage: React.FC = () => {
       setDays(data.days);
       setTimes(data.times);
     } catch (error) {
-      console.error('스케줄 로드 오류:', error);
+      // console.error('스케줄 로드 오류:', error);
       toast({
         title: '오류',
         description: '스케줄을 불러오는데 실패했습니다.',
@@ -362,7 +362,7 @@ const ClinicReservePage: React.FC = () => {
               });
             }
     } catch (error) {
-      console.error('예약 오류:', error);
+      // console.error('예약 오류:', error);
       toast({
         title: '네트워크 오류',
         description: '예약 요청 중 오류가 발생했습니다.',
@@ -419,7 +419,7 @@ const ClinicReservePage: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('취소 오류:', error);
+      // console.error('취소 오류:', error);
       toast({
         title: '네트워크 오류',
         description: '취소 요청 중 오류가 발생했습니다.',

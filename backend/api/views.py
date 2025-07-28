@@ -21,6 +21,7 @@ from core.models import (
     User,
     StudentPlacement,
     WeeklyReservationPeriod,  # 주간 예약 기간 관리
+    ClinicAttendance,  # 클리닉 출석 모델
 )
 from .serializers import (
     UserSerializer,
@@ -35,6 +36,7 @@ from .serializers import (
     StudentPlacementUpdateSerializer,
     StudentUserGenerationSerializer,  # 새로 추가
     WeeklyReservationPeriodSerializer,  # 주간 예약 기간 serializer 추가
+    ClinicAttendanceSerializer,  # 클리닉 출석 시리얼라이저
 )
 import logging
 import traceback
@@ -583,20 +585,9 @@ class UserViewSet(viewsets.ModelViewSet):
             )
 
 
-# StudentViewSet 완전 삭제 - Student 모델 통합으로 인해 더 이상 필요하지 않음
-# User 모델에서 is_student=True인 사용자들이 학생 역할을 수행
-# 학생 관련 기능은 UserViewSet에서 is_student 필터링으로 처리
-
-
 class SubjectViewSet(viewsets.ModelViewSet):
     queryset = Subject.objects.all()
     serializer_class = SubjectSerializer
-
-
-# 보충 시스템 개편으로 주석처리
-# class TimeViewSet(viewsets.ModelViewSet):
-#     queryset = Time.objects.all()
-#     serializer_class = TimeSerializer
 
 
 class ClinicViewSet(viewsets.ModelViewSet):
@@ -1178,7 +1169,7 @@ class UserMyPageView(APIView):
 
         # 빈 학생 목록 반환 (추후 클리닉 예약 시스템으로 대체)
         assigned_students = []
-        student_serializer = StudentSerializer(assigned_students, many=True)
+        student_serializer = UserSerializer(assigned_students, many=True)
 
         # 강사의 클리닉 정보 조회
         clinics = Clinic.objects.filter(clinic_teacher=user)
@@ -1331,22 +1322,6 @@ class StudentPlacementView(viewsets.ViewSet):
             )
 
 
-# 보충 시스템 개편으로 주석처리 - 더 이상 개별 시간표 관리 없음
-# class TeacherAvailableTimeUpdateView(APIView):
-#     """선생님의 수업 가능 시간을 업데이트하는 뷰"""
-#
-#     permission_classes = [permissions.IsAuthenticated]
-#
-#     def patch(self, request, teacher_id):
-#         """
-#         선생님의 available_time을 업데이트하고 무결성 검사를 수행합니다.
-#         """
-#         return Response(
-#             {"error": "보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다."},
-#             status=status.HTTP_410_GONE,
-#         )
-
-
 class TodayClinicView(APIView):
     """오늘의 클리닉 정보를 조회하는 뷰"""
 
@@ -1410,6 +1385,145 @@ class TodayClinicView(APIView):
         except Exception as e:
             logger.error(f"[api/views.py] 오늘의 클리닉 조회 오류: {str(e)}")
             logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ClinicAttendanceViewSet(viewsets.ModelViewSet):
+    """클리닉 출석 관리 ViewSet"""
+
+    queryset = ClinicAttendance.objects.all()
+    serializer_class = ClinicAttendanceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """필터링된 queryset 반환"""
+        queryset = super().get_queryset()
+
+        # 클리닉 ID로 필터링
+        clinic_id = self.request.query_params.get("clinic_id")
+        if clinic_id:
+            queryset = queryset.filter(clinic_id=clinic_id)
+
+        # 날짜로 필터링 (기본값: 오늘)
+        date = self.request.query_params.get("date")
+        if date:
+            try:
+                from datetime import datetime
+
+                filter_date = datetime.strptime(date, "%Y-%m-%d").date()
+                queryset = queryset.filter(date=filter_date)
+            except ValueError:
+                pass  # 잘못된 날짜 형식이면 필터링하지 않음
+        else:
+            # 기본값: 오늘 날짜
+            from django.utils import timezone
+
+            today = timezone.now().date()
+            queryset = queryset.filter(date=today)
+
+        return queryset.select_related("clinic", "student")
+
+    @action(detail=False, methods=["post"])
+    def bulk_create_today(self, request):
+        """
+        오늘 클리닉에 등록된 학생들의 출석 데이터를 일괄 생성
+        클리닉 시간이 되면 해당 클리닉의 모든 학생에 대해 출석 데이터를 생성
+        """
+        try:
+            clinic_id = request.data.get("clinic_id")
+            if not clinic_id:
+                return Response(
+                    {"error": "clinic_id가 필요합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 클리닉 존재 확인
+            try:
+                clinic = Clinic.objects.get(id=clinic_id)
+            except Clinic.DoesNotExist:
+                return Response(
+                    {"error": "존재하지 않는 클리닉입니다."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            from django.utils import timezone
+
+            today = timezone.now().date()
+
+            # 해당 클리닉에 등록된 학생들 조회
+            students = clinic.clinic_students.all()
+
+            created_attendances = []
+            already_exists = []
+
+            for student in students:
+                # 이미 출석 데이터가 있는지 확인
+                attendance, created = ClinicAttendance.objects.get_or_create(
+                    clinic=clinic,
+                    student=student,
+                    date=today,
+                    defaults={"attendance_type": "none"},
+                )
+
+                if created:
+                    created_attendances.append(attendance)
+                else:
+                    already_exists.append(attendance)
+
+            # 생성된 출석 데이터 직렬화
+            created_serializer = ClinicAttendanceSerializer(
+                created_attendances, many=True
+            )
+            existing_serializer = ClinicAttendanceSerializer(already_exists, many=True)
+
+            return Response(
+                {
+                    "message": f"{len(created_attendances)}개의 출석 데이터가 생성되었습니다.",
+                    "created": created_serializer.data,
+                    "already_exists": existing_serializer.data,
+                    "clinic": ClinicSerializer(clinic).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            logger.error(f"[api/views.py] bulk_create_today 오류: {str(e)}")
+            return Response(
+                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=["patch"])
+    def update_attendance(self, request, pk=None):
+        """
+        출석 상태 업데이트 (attended/absent/sick/late)
+        """
+        try:
+            attendance = self.get_object()
+            attendance_type = request.data.get("attendance_type")
+
+            if attendance_type not in ["attended", "absent", "sick", "late", "none"]:
+                return Response(
+                    {"error": "유효하지 않은 출석 상태입니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            attendance.attendance_type = attendance_type
+            attendance.save()
+
+            serializer = self.get_serializer(attendance)
+
+            return Response(
+                {
+                    "message": "출석 상태가 업데이트되었습니다.",
+                    "attendance": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"[api/views.py] update_attendance 오류: {str(e)}")
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

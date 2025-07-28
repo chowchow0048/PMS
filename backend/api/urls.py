@@ -14,6 +14,9 @@ router.register(r"users", views.UserViewSet)  # is_student 필터링으로 학�
 router.register(r"subjects", views.SubjectViewSet)
 # router.register(r"times", views.TimeViewSet)  # 보충 시스템 개편으로 주석처리
 router.register(r"clinics", views.ClinicViewSet)
+router.register(
+    r"clinic-attendances", views.ClinicAttendanceViewSet
+)  # 클리닉 출석 관리
 # router.register(r"comments", views.CommentViewSet)  # 보충 시스템 개편으로 주석처리
 
 urlpatterns = [

@@ -124,6 +124,14 @@ export default function Navigation() {
                     color="white"
                     bg="transparent"
                     _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    onClick={() => router.push('/clinic/today')}
+                  >
+                    오늘의 보충
+                  </Button>
+                  <Button
+                    color="white"
+                    bg="transparent"
+                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
                     onClick={() => router.push('/clinic/reserve')}
                   >
                     클리닉 예약
@@ -253,6 +261,18 @@ export default function Navigation() {
                       }}
                     >
                       학생 관리
+                    </Button>
+                  </Box>
+                  <Box py={4} borderBottomWidth="1px">
+                    <Button
+                      w="full"
+                      variant="ghost"
+                      onClick={() => {
+                        router.push('/clinic/today');
+                        onClose();
+                      }}
+                    >
+                      오늘의 보충
                     </Button>
                   </Box>
                   <Box py={4} borderBottomWidth="1px">

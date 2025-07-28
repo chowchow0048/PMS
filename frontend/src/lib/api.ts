@@ -244,37 +244,6 @@ export const getTeachers = async () => {
   }
 };
 
-// 보충 시스템 개편으로 주석처리 - 더 이상 개별 배치 개념 없음
-// // 학생 배치 API
-// export const assignStudent = async (studentId: number, teacherId: number) => {
-//   try {
-//     console.log(`학생 배치 시도: 학생 ID ${studentId}, 선생님 ID ${teacherId}`);
-//     const response = await api.put(`/students/${studentId}/`, {
-//       assigned_teacher: teacherId
-//     });
-//     console.log('학생 배치 응답:', response.data);
-//     return response.data;
-//   } catch (error) {
-//     console.error('학생 배치 오류:', error);
-//     throw error;
-//   }
-// };
-
-// // 학생 미배치 API
-// export const unassignStudent = async (studentId: number) => {
-//   try {
-//     console.log(`학생 미배치 시도: 학생 ID ${studentId}`);
-//     const response = await api.put(`/students/${studentId}/`, {
-//       assigned_teacher: null
-//     });
-//     console.log('학생 미배치 응답:', response.data);
-//     return response.data;
-//   } catch (error) {
-//     console.error('학생 미배치 오류:', error);
-//     throw error;
-//   }
-// };
-
 // 임시 더미 함수들 (기존 코드 호환성을 위해)
 export const assignStudent = async (studentId: number, teacherId: number) => {
   console.warn('assignStudent: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
@@ -435,6 +404,116 @@ export const getTodayClinic = async () => {
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 오늘의 클리닉 정보 가져오기 오류:', error);
+    throw error;
+  }
+};
+
+// ============= 클리닉 출석 관련 API 함수들 =============
+
+// 출석 상태 타입 정의
+type AttendanceType = 'attended' | 'absent' | 'sick' | 'late' | 'none';
+
+// 클리닉 출석 데이터 일괄 생성 (클리닉 시간에 맞춰 자동 생성)
+export const createAttendanceForClinic = async (clinicId: number) => {
+  try {
+    console.log(`🔍 [api.ts] createAttendanceForClinic 시작 - 클리닉 ID: ${clinicId}`);
+    
+    const response = await api.post('/clinic-attendances/bulk_create_today/', {
+      clinic_id: clinicId
+    });
+    
+    console.log('✅ [api.ts] 출석 데이터 일괄 생성 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 출석 데이터 일괄 생성 오류:', error);
+    throw error;
+  }
+};
+
+// 특정 클리닉의 출석 데이터 조회
+export const getClinicAttendances = async (clinicId: number, date?: string) => {
+  try {
+    console.log(`🔍 [api.ts] getClinicAttendances 시작 - 클리닉 ID: ${clinicId}, 날짜: ${date || '오늘'}`);
+    
+    const params: any = { clinic_id: clinicId };
+    if (date) {
+      params.date = date;
+    }
+    
+    const response = await api.get('/clinic-attendances/', { params });
+    
+    console.log('✅ [api.ts] 출석 데이터 조회 완료:', response.data);
+    
+    // 페이지네이션된 응답에서 results 배열 반환
+    const attendances = Array.isArray(response.data) ? response.data : 
+                       (response.data.results ? response.data.results : []);
+    
+    console.log('📋 [api.ts] 처리된 출석 데이터 배열:', attendances);
+    return attendances;
+  } catch (error) {
+    console.error('❌ [api.ts] 출석 데이터 조회 오류:', error);
+    throw error;
+  }
+};
+
+// 출석 상태 업데이트
+export const updateAttendance = async (attendanceId: number, attendanceType: AttendanceType) => {
+  try {
+    console.log(`🔍 [api.ts] updateAttendance 시작 - ID: ${attendanceId}, 상태: ${attendanceType}`);
+    
+    const response = await api.patch(`/clinic-attendances/${attendanceId}/update_attendance/`, {
+      attendance_type: attendanceType
+    });
+    
+    console.log('✅ [api.ts] 출석 상태 업데이트 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 출석 상태 업데이트 오류:', error);
+    throw error;
+  }
+};
+
+// 출석 데이터 직접 생성 (개별 학생용)
+export const createAttendance = async (clinicId: number, studentId: number, attendanceType: AttendanceType = 'none') => {
+  try {
+    console.log(`🔍 [api.ts] createAttendance 시작 - 클리닉: ${clinicId}, 학생: ${studentId}, 상태: ${attendanceType}`);
+    
+    const response = await api.post('/clinic-attendances/', {
+      clinic: clinicId,
+      student: studentId,
+      attendance_type: attendanceType
+    });
+    
+    console.log('✅ [api.ts] 출석 데이터 생성 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 출석 데이터 생성 오류:', error);
+    throw error;
+  }
+};
+
+// 특정 클리닉+학생 조합의 출석 데이터 조회 또는 생성
+export const getOrCreateAttendance = async (clinicId: number, studentId: number) => {
+  try {
+    console.log(`🔍 [api.ts] getOrCreateAttendance 시작 - 클리닉: ${clinicId}, 학생: ${studentId}`);
+    
+    // 먼저 기존 출석 데이터 조회 (이제 배열을 반환함)
+    const existingAttendances = await getClinicAttendances(clinicId);
+    console.log(`📋 [api.ts] 기존 출석 데이터 조회 결과: ${existingAttendances.length}개`);
+    
+    const existingAttendance = existingAttendances.find((att: any) => att.student === studentId);
+    
+    if (existingAttendance) {
+      console.log('📋 [api.ts] 기존 출석 데이터 발견:', existingAttendance);
+      return existingAttendance;
+    }
+    
+    // 없으면 새로 생성
+    console.log('📝 [api.ts] 출석 데이터 새로 생성');
+    return await createAttendance(clinicId, studentId, 'none');
+    
+  } catch (error) {
+    console.error('❌ [api.ts] getOrCreateAttendance 오류:', error);
     throw error;
   }
 };

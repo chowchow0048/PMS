@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from core.models import Clinic
+from core.models import Clinic, User
 import logging
 
 logger = logging.getLogger(__name__)
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     """
-    매주 월요일 00:00에 모든 클리닉의 학생 예약을 초기화하는 command
+    매주 월요일 00:00에 모든 클리닉의 학생 예약을 초기화하고 학생들의 무단결석 횟수를 감소시키는 command
 
     Usage:
         python manage.py reset_weekly_clinics
@@ -18,7 +18,7 @@ class Command(BaseCommand):
         (매주 월요일 00:00에 실행)
     """
 
-    help = "매주 월요일 자정에 모든 클리닉의 학생 예약을 초기화합니다"
+    help = "매주 월요일 자정에 모든 클리닉의 학생 예약을 초기화하고 학생들의 무단결석 횟수를 감소시킵니다"
 
     def add_arguments(self, parser):
         # 강제 실행 옵션 (요일 상관없이 실행)
@@ -92,24 +92,67 @@ class Command(BaseCommand):
                     if not options["dry_run"]:
                         clinic.clinic_students.clear()
 
+            # === 학생들의 무단결석 횟수 감소 로직 ===
+            students = User.objects.filter(is_student=True)
+            total_students = students.count()
+            students_with_no_show = students.filter(no_show__gt=0).count()
+
+            self.stdout.write(f"\n학생 무단결석 횟수 감소 처리 시작...")
+            self.stdout.write(f"총 학생 수: {total_students}명")
+            self.stdout.write(f"무단결석 횟수가 있는 학생: {students_with_no_show}명")
+
+            updated_students = 0
+            if not options["dry_run"]:
+                # 모든 학생의 no_show를 -1, 단 0보다 작아지지 않도록 제한
+                for student in students:
+                    if student.no_show > 0:
+                        old_no_show = student.no_show
+                        student.no_show = max(
+                            0, student.no_show - 1
+                        )  # 0보다 작아지지 않도록
+                        student.save(update_fields=["no_show"])
+                        updated_students += 1
+
+                        # 변경된 학생만 로그 출력
+                        if old_no_show != student.no_show:
+                            self.stdout.write(
+                                f"  {student.name} ({student.username}): {old_no_show} → {student.no_show}"
+                            )
+            else:
+                # dry-run: 시뮬레이션만
+                for student in students:
+                    if student.no_show > 0:
+                        old_no_show = student.no_show
+                        new_no_show = max(0, student.no_show - 1)
+                        updated_students += 1
+
+                        self.stdout.write(
+                            f"  [시뮬레이션] {student.name} ({student.username}): {old_no_show} → {new_no_show}"
+                        )
+
             # 결과 요약
             if options["dry_run"]:
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"시뮬레이션 완료: {total_clinics}개 클리닉에서 총 {total_reset_students}명의 학생 예약이 초기화될 예정입니다."
+                        f"\n시뮬레이션 완료:"
+                        f"\n- {total_clinics}개 클리닉에서 총 {total_reset_students}명의 학생 예약이 초기화될 예정"
+                        f"\n- {updated_students}명의 학생 무단결석 횟수가 감소될 예정"
                     )
                 )
             else:
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"클리닉 예약 초기화 완료: {total_clinics}개 클리닉에서 총 {total_reset_students}명의 학생 예약이 초기화되었습니다."
+                        f"\n주간 초기화 완료:"
+                        f"\n- {total_clinics}개 클리닉에서 총 {total_reset_students}명의 학생 예약 초기화"
+                        f"\n- {updated_students}명의 학생 무단결석 횟수 감소 처리 완료"
                     )
                 )
 
                 # 로그 기록
                 logger.info(
-                    f"[reset_weekly_clinics] 주간 클리닉 예약 초기화 완료: "
-                    f"총 {total_clinics}개 클리닉, {total_reset_students}명 학생 예약 초기화"
+                    f"[reset_weekly_clinics] 주간 초기화 완료: "
+                    f"클리닉 예약 {total_reset_students}명 초기화, "
+                    f"학생 무단결석 횟수 {updated_students}명 감소"
                 )
 
         except Exception as e:
