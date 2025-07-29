@@ -125,6 +125,23 @@ const ClinicReservePage: React.FC = () => {
     return weekday - 1; // 월요일(1) -> 0, 화요일(2) -> 1, ...
   };
 
+  const getCurrentDay = () => {
+    const today = new Date();
+    const weekday = today.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
+    
+    const dayMapping = {
+      0: 'sun',  // 일요일
+      1: 'mon',  // 월요일
+      2: 'tue',  // 화요일
+      3: 'wed',  // 수요일
+      4: 'thu',  // 목요일
+      5: 'fri',  // 금요일
+      6: 'sat'   // 토요일
+    };
+    
+    return dayMapping[weekday as keyof typeof dayMapping];
+  };
+
   // 특정 요일이 예약 가능한지 확인하는 함수
   const isDayReservable = (day: string) => {
     const currentDayOrder = getCurrentDayOrder();
@@ -743,6 +760,15 @@ const ClinicReservePage: React.FC = () => {
           {selectedSlot && (
             <>
               <ModalBody pt={6} px={{ base: 4, md: 6 }}>
+                <Text
+                  textAlign="center"
+                  fontSize={{ base: "lg", md: "md" }}
+                  fontWeight="bold"
+                  mb={4}
+                  lineHeight="1.5"
+                >
+                  예약 확인
+                </Text>
                 <Text 
                   textAlign="center" 
                   // 모바일에서 더 큰 텍스트
@@ -750,10 +776,11 @@ const ClinicReservePage: React.FC = () => {
                   mb={4}
                   lineHeight="1.5"
                 >
-                  {selectedSlot.action === 'reserve' 
+                  {/* {selectedSlot.action === 'reserve' 
                     ? `${dayNames[selectedSlot.day]} ${selectedSlot.time} ${selectedSlot.clinic.room} 예약 하시겠습니까?`
                     : `${dayNames[selectedSlot.day]} ${selectedSlot.time} ${selectedSlot.clinic.room} 예약을 취소하시겠습니까?`
-                  }
+                  } */}
+                  {selectedSlot.action === 'reserve' ? (selectedSlot.day === getCurrentDay() ? "당일 보충 예약 취소는 불가능합니다. 예약 하시겠습니까?" : `${dayNames[selectedSlot.day]} ${selectedSlot.time} 예약 하시겠습니까?`) : `${dayNames[selectedSlot.day]} ${selectedSlot.time} 예약을 취소하시겠습니까?`}
                 </Text>
               </ModalBody>
               <ModalFooter px={{ base: 4, md: 6 }}>

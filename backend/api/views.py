@@ -833,12 +833,20 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 # 예약 취소
                 clinic.clinic_students.remove(user)
 
+                # 관련된 ClinicAttendance 데이터도 삭제하여 유령 데이터 방지
+                deleted_attendances = ClinicAttendance.objects.filter(
+                    clinic=clinic, student=user
+                )
+                deleted_count = deleted_attendances.count()
+                deleted_attendances.delete()
+
             # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
             # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
 
             logger.info(
                 f"[api/views.py] 클리닉 예약 취소 성공: user_id={user_id}, "
-                f"clinic_id={clinic_id}, user_name={user.name}"
+                f"clinic_id={clinic_id}, user_name={user.name}, "
+                f"삭제된 출석 데이터: {deleted_count}개"
             )
 
             return Response(
