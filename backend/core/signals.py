@@ -28,7 +28,7 @@ def user_logged_in_handler(sender, request, user, **kwargs):
 
     주요 기능:
     1. 클라이언트 정보 추출 및 로깅
-    2. 기존 세션 무효화 (중복 로그인 방지)
+    2. 기존 세션 무효화 (중복 로그인 방지) - superuser 제외
     3. 새 세션 정보 저장
     4. 로그인 이력 기록
     5. 보안 이벤트 검사
@@ -36,6 +36,47 @@ def user_logged_in_handler(sender, request, user, **kwargs):
     try:
         logger.info(f"🔐 로그인 시그널 처리 시작: 사용자 {user.username}")
 
+        # 중복 로그인 방지 우회 체크 (superuser, 테스트 사용자)
+        should_bypass_duplicate_check = user.is_superuser or (
+            hasattr(user, "username") and user.username.startswith("test_")
+        )
+
+        if should_bypass_duplicate_check:
+            bypass_reason = "SuperUser" if user.is_superuser else "TestUser"
+            logger.info(
+                f"🔓 [{bypass_reason}] 중복 로그인 방지 우회: {user.username} (시그널 레벨)"
+            )
+
+            # 1. 클라이언트 정보 추출 (로깅용)
+            client_info = ClientInfoExtractor.extract_client_info(request)
+            log_suffix = "관리자" if user.is_superuser else "테스트"
+            ClientInfoExtractor.log_client_info(
+                client_info, user, f"로그인 ({log_suffix})"
+            )
+
+            # 2. 로그인 이력만 기록 (세션 무효화 없이)
+            login_history = LoginHistory.objects.create(
+                user=user,
+                session_key=request.session.session_key,
+                token_key=getattr(request, "_token_key", None),
+                login_success=True,
+                ip_address=client_info["ip_address"],
+                forwarded_ip=client_info["forwarded_ip"],
+                user_agent=client_info["user_agent"],
+                device_type=client_info["device_type"],
+                browser_name=client_info["browser_name"],
+                os_name=client_info["os_name"],
+                country=client_info["country"],
+                city=client_info["city"],
+                isp=client_info["isp"],
+                # 우회 사용자는 기존 세션 종료 없음
+                previous_session_terminated=False,
+            )
+
+            logger.info(f"✅ {bypass_reason} 로그인 이력 기록 완료: {user.username}")
+            return  # 중복 로그인 방지 로직 건너뛰기
+
+        # 일반 사용자 로그인 처리
         # 1. 클라이언트 정보 추출
         client_info = ClientInfoExtractor.extract_client_info(request)
         ClientInfoExtractor.log_client_info(client_info, user, "로그인")
@@ -52,7 +93,7 @@ def user_logged_in_handler(sender, request, user, **kwargs):
                 f"의심 지표: {', '.join(suspicious_indicators)}",
             )
 
-        # 3. 기존 세션/토큰 정보 확인 및 무효화
+        # 3. 기존 세션/토큰 정보 확인 및 무효화 (일반 사용자만)
         previous_session_info = {}
         try:
             user_session = UserSession.objects.get(user=user)

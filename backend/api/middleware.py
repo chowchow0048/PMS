@@ -3,6 +3,7 @@ from django.urls import resolve, reverse
 from django.contrib.auth import logout
 from django.contrib import messages
 from django.utils import timezone
+from django.conf import settings
 import re
 import logging
 
@@ -27,8 +28,10 @@ class UserAccessMiddleware:
                 f"[middleware] 접근 URL: {request.path}, 사용자: {request.user.username}"
             )
 
-            # 관리자 페이지 접근 제한
-            if request.path.startswith("/admin/") and not request.user.is_superuser:
+            # 관리자 페이지 접근 제한 (동적 admin URL 지원)
+            admin_url = getattr(settings, "ADMIN_URL", "admin/")
+            admin_path = f"/{admin_url}"
+            if request.path.startswith(admin_path) and not request.user.is_superuser:
                 logger.warning(
                     f"[middleware] 관리자 권한 없는 사용자가 관리자 페이지 접근 시도: {request.user.username}"
                 )
@@ -69,27 +72,57 @@ class SingleSessionMiddleware:
         """
         각 요청마다 사용자의 세션 유효성을 체크합니다.
         중복 로그인이 감지되면 현재 세션을 무효화시킵니다.
+
+        우선순위:
+        1. superuser: 모든 경로에서 중복 로그인 체크 우회
+        2. 테스트 사용자: 중복 로그인 체크 우회
+        3. 특정 경로: 중복 로그인 체크 우회
+        4. 일반 사용자: 중복 로그인 체크 수행
         """
 
-        # 테스트 사용자는 중복 로그인 체크 제외
-        if (
+        # 1. superuser는 모든 경로에서 중복 로그인 체크 우회
+        if request.user.is_authenticated and request.user.is_superuser:
+            logger.info(
+                f"🔓 [SuperUser] 중복 로그인 체크 우회: {request.user.username} -> {request.path}"
+            )
+            # superuser는 중복 로그인 체크를 완전히 건너뜀
+            pass
+        # 2. 테스트 사용자는 중복 로그인 체크 제외
+        elif (
             request.user.is_authenticated
             and hasattr(request.user, "username")
             and request.user.username.startswith("test_")
         ):
+            logger.info(
+                f"🧪 [TestUser] 중복 로그인 체크 우회: {request.user.username} -> {request.path}"
+            )
             # 테스트 사용자는 중복 로그인 체크를 건너뜀
             pass
-        # 인증된 사용자만 체크
+        # 3. 인증된 일반 사용자 체크
         elif request.user.is_authenticated:
-            # 특정 경로는 체크에서 제외 (로그아웃, 헬스체크 등)
+            # 특정 경로는 체크에서 제외 (로그아웃, 헬스체크, Django admin 등)
+            admin_url = getattr(settings, "ADMIN_URL", "admin/")
+            admin_path = f"/{admin_url}"
             excluded_paths = [
                 "/api/auth/logout/",
                 "/api/health/",
-                "/admin/",  # Django 관리자는 별도 처리
+                admin_path,  # Django 관리자 경로 (동적 URL 지원)
             ]
 
-            if not any(request.path.startswith(path) for path in excluded_paths):
+            # 경로 기반 우회 체크
+            path_excluded = any(
+                request.path.startswith(path) for path in excluded_paths
+            )
+
+            if path_excluded:
+                logger.info(
+                    f"🛤️ [PathExcluded] 중복 로그인 체크 우회: {request.user.username} -> {request.path}"
+                )
+            else:
                 # 중복 로그인 체크 수행
+                logger.debug(
+                    f"🔍 [SessionCheck] 중복 로그인 체크 시작: {request.user.username} -> {request.path}"
+                )
                 if self._check_session_validity(request):
                     # 세션이 유효하지 않은 경우 로그아웃 처리
                     return self._handle_invalid_session(request)
