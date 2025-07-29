@@ -519,4 +519,54 @@ export const getOrCreateAttendance = async (clinicId: number, studentId: number)
 };
 
 
+// 클리닉 예약 취소 API
+export const cancelClinicReservation = async (userId: number, clinicId: number) => {
+  try {
+    console.log('🔍 [api.ts] cancelClinicReservation 함수 시작:', { userId, clinicId });
+    
+    const response = await api.post('/clinics/cancel_reservation/', {
+      user_id: userId,
+      clinic_id: clinicId,
+    });
+    
+    console.log('✅ [api.ts] 클리닉 예약 취소 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 클리닉 예약 취소 오류:', error);
+    
+    // 백엔드 에러 응답 처리
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      console.error('❌ [api.ts] 응답 상태:', axiosError.response?.status);
+      console.error('❌ [api.ts] 응답 데이터:', axiosError.response?.data);
+      
+      // 당일 취소 불가 에러인 경우 특별 처리
+      if (axiosError.response?.status === 403 && 
+          axiosError.response?.data?.error === 'same_day_cancellation_not_allowed') {
+        throw new Error('SAME_DAY_CANCELLATION_NOT_ALLOWED');
+      }
+    }
+    
+    throw error;
+  }
+};
+
+// 클리닉 예약 API
+export const reserveClinic = async (userId: number, clinicId: number) => {
+  try {
+    console.log('🔍 [api.ts] reserveClinic 함수 시작:', { userId, clinicId });
+    
+    const response = await api.post('/clinics/reserve_clinic/', {
+      user_id: userId,
+      clinic_id: clinicId,
+    });
+    
+    console.log('✅ [api.ts] 클리닉 예약 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 클리닉 예약 오류:', error);
+    throw error;
+  }
+};
+
 export default api; 

@@ -750,6 +750,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
     def cancel_reservation(self, request):
         """
         학생이 클리닉 예약을 취소하는 API
+        당일 취소는 불가능하도록 제한
         """
         logger.info("[api/views.py] 클리닉 예약 취소 요청 시작")
 
@@ -785,6 +786,41 @@ class ClinicViewSet(viewsets.ModelViewSet):
                     return Response(
                         {"error": "유효하지 않은 클리닉입니다."},
                         status=status.HTTP_404_NOT_FOUND,
+                    )
+
+                # 당일 취소 불가능 체크
+                from datetime import datetime
+
+                today = datetime.now()
+                weekday = today.weekday()  # 0=월요일, 1=화요일, ..., 6=일요일
+
+                # 요일 매핑 (weekday 0~6 -> clinic_day 문자열)
+                day_mapping = {
+                    0: "mon",  # 월요일
+                    1: "tue",  # 화요일
+                    2: "wed",  # 수요일
+                    3: "thu",  # 목요일
+                    4: "fri",  # 금요일
+                    5: "sat",  # 토요일
+                    6: "sun",  # 일요일
+                }
+
+                today_day = day_mapping.get(weekday, "mon")
+
+                # 당일 클리닉인지 확인
+                if clinic.clinic_day == today_day:
+                    logger.warning(
+                        f"[api/views.py] 당일 예약 취소 시도 차단: user_id={user_id}, "
+                        f"clinic_id={clinic_id}, clinic_day={clinic.clinic_day}, today={today_day}"
+                    )
+                    return Response(
+                        {
+                            "error": "same_day_cancellation_not_allowed",
+                            "message": "당일 예약 취소는 불가능합니다. 예약 취소는 전일까지만 가능합니다.",
+                            "clinic_day": clinic.clinic_day,
+                            "today": today_day,
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
                     )
 
                 # 예약되어 있는지 확인

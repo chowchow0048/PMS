@@ -18,6 +18,49 @@ from django import forms
 User = get_user_model()
 
 
+# 출석 기록 인라인 (User 편집 시 출석 기록도 함께 표시)
+class ClinicAttendanceInline(admin.TabularInline):
+    model = ClinicAttendance
+    fk_name = "student"  # User 모델의 어떤 필드를 참조하는지 명시
+    extra = 0  # 빈 폼 개수 (0으로 설정하여 기존 데이터만 표시)
+    fields = ("clinic", "date", "attendance_type", "get_clinic_info_short")
+    readonly_fields = ("get_clinic_info_short",)
+    ordering = ("-date",)  # 최신 날짜부터 정렬
+
+    def get_clinic_info_short(self, obj):
+        """클리닉 정보를 간단하게 표시"""
+        if obj and obj.clinic:
+            clinic = obj.clinic
+            subject_name = (
+                getattr(
+                    clinic.clinic_subject, "subject_kr", clinic.clinic_subject.subject
+                )
+                if clinic.clinic_subject
+                else "과목미정"
+            )
+            teacher_name = (
+                clinic.clinic_teacher.name if clinic.clinic_teacher else "강사미정"
+            )
+            return f"{subject_name} - {clinic.get_clinic_day_display()} {clinic.clinic_time} ({clinic.clinic_room}) - {teacher_name}"
+        return "-"
+
+    get_clinic_info_short.short_description = "클리닉 정보"
+
+    def get_queryset(self, request):
+        """최적화된 쿼리셋 (select_related 사용)"""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "clinic", "clinic__clinic_subject", "clinic__clinic_teacher"
+            )
+        )
+
+    def has_add_permission(self, request, obj=None):
+        """인라인에서 추가 권한은 제한 (별도 ClinicAttendanceAdmin에서 관리)"""
+        return False
+
+
 # User 관리자 설정 - 학생 정보도 포함하도록 확장
 class CustomUserAdmin(UserAdmin):
     model = User
@@ -32,6 +75,8 @@ class CustomUserAdmin(UserAdmin):
         "school",
         "grade",
         "no_show",  # 무단결석 횟수 추가
+        "get_clinic_attendance_count",  # 출석 기록 수
+        "get_recent_attendance_status",  # 최근 출석 상태
         "is_active",
     )
     list_filter = (
@@ -67,6 +112,16 @@ class CustomUserAdmin(UserAdmin):
                     "grade",
                     "no_show",  # 무단결석 횟수 추가
                 )
+            },
+        ),
+        (
+            "출석 정보 (학생인 경우만)",
+            {
+                "fields": (
+                    "get_total_attendance_info",
+                    "get_recent_attendances_display",
+                ),
+                "classes": ("collapse",),  # 접을 수 있는 섹션으로 설정
             },
         ),
         (
@@ -110,6 +165,10 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
+    readonly_fields = (
+        "get_total_attendance_info",
+        "get_recent_attendances_display",
+    )  # 읽기 전용 필드 추가
     search_fields = (
         "username",
         "name",
@@ -119,9 +178,16 @@ class CustomUserAdmin(UserAdmin):
     ordering = ("username",)
     actions = [
         "regenerate_student_credentials",
-        "reset_student_password_to_username",
+        "reset_user_password_to_username",  # 모든 사용자 대상 비밀번호 초기화 액션 추가
         "reset_no_show_count",
     ]
+    inlines = [ClinicAttendanceInline]  # 출석 기록 인라인 추가
+
+    def get_inlines(self, request, obj):
+        """학생인 경우에만 출석 기록 인라인 표시"""
+        if obj and obj.is_student:
+            return [ClinicAttendanceInline]
+        return []  # 강사/관리자는 출석 기록 인라인 없음
 
     def regenerate_student_credentials(self, request, queryset):
         """
@@ -240,19 +306,15 @@ class CustomUserAdmin(UserAdmin):
 
     regenerate_student_credentials.short_description = "학생유저 아이디/비밀번호 재구성"
 
-    def reset_student_password_to_username(self, request, queryset):
+    def reset_user_password_to_username(self, request, queryset):
         """
-        선택된 학생 사용자들의 비밀번호를 아이디(username)와 같게 초기화
+        선택된 모든 사용자들의 비밀번호를 아이디(username)와 같게 초기화
+        학생뿐만 아니라 모든 종류의 사용자가 대상
         """
         from django.contrib.auth.hashers import make_password
 
-        # is_student=True인 사용자만 필터링
-        student_users = queryset.filter(is_student=True)
-
-        if not student_users.exists():
-            self.message_user(
-                request, "선택된 사용자 중 학생이 없습니다.", level="WARNING"
-            )
+        if not queryset.exists():
+            self.message_user(request, "선택된 사용자가 없습니다.", level="WARNING")
             return
 
         # 결과 추적
@@ -260,7 +322,7 @@ class CustomUserAdmin(UserAdmin):
         error_count = 0
         error_messages = []
 
-        for user in student_users:
+        for user in queryset:
             try:
                 # 비밀번호를 아이디와 같게 설정 (Django 비밀번호 검증 우회)
                 user.password = make_password(user.username)
@@ -275,20 +337,18 @@ class CustomUserAdmin(UserAdmin):
         if success_count > 0:
             self.message_user(
                 request,
-                f"{success_count}명의 학생 비밀번호가 아이디와 같게 초기화되었습니다.",
+                f"{success_count}명의 사용자 비밀번호가 아이디와 같게 초기화되었습니다.",
             )
 
         if error_count > 0:
             self.message_user(
                 request,
-                f"{error_count}명의 학생 처리 중 오류 발생:\n"
+                f"{error_count}명의 사용자 처리 중 오류 발생:\n"
                 + "\n".join(error_messages),
                 level="ERROR",
             )
 
-    reset_student_password_to_username.short_description = (
-        "학생 비밀번호를 아이디와 같게 초기화"
-    )
+    reset_user_password_to_username.short_description = "비밀번호 초기화"
 
     def reset_no_show_count(self, request, queryset):
         """
@@ -310,6 +370,127 @@ class CustomUserAdmin(UserAdmin):
         )
 
     reset_no_show_count.short_description = "학생 무단결석 횟수 초기화"
+
+    # 출석 관련 표시 메서드들
+    def get_clinic_attendance_count(self, obj):
+        """학생의 총 출석 기록 수를 반환"""
+        if not obj.is_student:
+            return "-"
+        return obj.clinic_attendances.count()
+
+    get_clinic_attendance_count.short_description = "출석기록수"
+
+    def get_recent_attendance_status(self, obj):
+        """최근 출석 상태를 반환 (최근 5개)"""
+        if not obj.is_student:
+            return "-"
+
+        recent_attendances = obj.clinic_attendances.select_related("clinic").order_by(
+            "-date"
+        )[:5]
+        if not recent_attendances:
+            return "출석기록 없음"
+
+        status_icons = {
+            "attended": "✅",
+            "absent": "❌",
+            "sick": "🏥",
+            "late": "⏰",
+            "none": "❓",
+        }
+
+        statuses = []
+        for attendance in recent_attendances:
+            icon = status_icons.get(attendance.attendance_type, "❓")
+            date_str = attendance.date.strftime("%m/%d")
+            statuses.append(f"{icon}{date_str}")
+
+        return " | ".join(statuses)
+
+    get_recent_attendance_status.short_description = "최근출석(5개)"
+
+    def get_total_attendance_info(self, obj):
+        """학생의 전체 출석 통계 정보를 반환"""
+        if not obj.is_student:
+            return "강사/관리자는 출석 정보가 없습니다."
+
+        attendances = obj.clinic_attendances.all()
+        if not attendances:
+            return "출석 기록이 없습니다."
+
+        total = attendances.count()
+        attended = attendances.filter(attendance_type="attended").count()
+        absent = attendances.filter(attendance_type="absent").count()
+        sick = attendances.filter(attendance_type="sick").count()
+        late = attendances.filter(attendance_type="late").count()
+        none = attendances.filter(attendance_type="none").count()
+
+        attendance_rate = (attended / total * 100) if total > 0 else 0
+
+        return (
+            f"총 {total}회 | "
+            f"출석: {attended}회 | "
+            f"결석: {absent}회 | "
+            f"병결: {sick}회 | "
+            f"지각: {late}회 | "
+            f"미정: {none}회 | "
+            f"출석률: {attendance_rate:.1f}%"
+        )
+
+    get_total_attendance_info.short_description = "출석 통계"
+
+    def get_recent_attendances_display(self, obj):
+        """최근 출석 기록들을 배열 형식으로 상세 표시"""
+        if not obj.is_student:
+            return "강사/관리자는 출석 정보가 없습니다."
+
+        recent_attendances = obj.clinic_attendances.select_related(
+            "clinic", "clinic__clinic_subject", "clinic__clinic_teacher"
+        ).order_by("-date")[
+            :10
+        ]  # 최근 10개
+
+        if not recent_attendances:
+            return "출석 기록이 없습니다."
+
+        status_display = {
+            "attended": "✅ 출석",
+            "absent": "❌ 결석",
+            "sick": "🏥 병결",
+            "late": "⏰ 지각",
+            "none": "❓ 미정",
+        }
+
+        records = []
+        for attendance in recent_attendances:
+            clinic = attendance.clinic
+            subject_name = (
+                getattr(
+                    clinic.clinic_subject, "subject_kr", clinic.clinic_subject.subject
+                )
+                if clinic.clinic_subject
+                else "과목미정"
+            )
+            teacher_name = (
+                clinic.clinic_teacher.name if clinic.clinic_teacher else "강사미정"
+            )
+
+            record = (
+                f"📅 {attendance.date.strftime('%Y-%m-%d')} | "
+                f"📚 {subject_name} | "
+                f"👨‍🏫 {teacher_name} | "
+                f"🏠 {clinic.clinic_room} | "
+                f"⏰ {clinic.get_clinic_day_display()} {clinic.clinic_time} | "
+                f"{status_display.get(attendance.attendance_type, '❓ 미정')}"
+            )
+            records.append(record)
+
+        # HTML로 줄바꿈 처리하여 가독성 향상
+        from django.utils.safestring import mark_safe
+
+        return mark_safe("<br/>".join(records))
+
+    get_recent_attendances_display.short_description = "최근 출석 기록 (10개)"
 
 
 # StudentAdmin 삭제 - User 모델로 통합됨

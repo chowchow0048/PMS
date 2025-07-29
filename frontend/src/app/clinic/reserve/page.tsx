@@ -134,6 +134,15 @@ const ClinicReservePage: React.FC = () => {
     return targetDayOrder >= currentDayOrder;
   };
 
+  // 당일 취소 가능한지 확인하는 함수
+  const isSameDayCancellable = (day: string) => {
+    const currentDayOrder = getCurrentDayOrder();
+    const targetDayOrder = dayOrder[day];
+    
+    // 당일이면 취소 불가능
+    return targetDayOrder !== currentDayOrder;
+  };
+
   // 다음주 월요일 00:00까지의 시간 계산 함수 (24시간계)
   const getTimeUntilNextMonday = () => {
     const now = new Date();
@@ -392,6 +401,18 @@ const ClinicReservePage: React.FC = () => {
     const isReserved = clinic.students.some(student => student.id === user.id);
     if (!isReserved) return;
 
+    // 당일 취소 불가능 체크 (프론트엔드 체크)
+    if (!isSameDayCancellable(day)) {
+      toast({
+        title: '취소 불가',
+        description: `당일 예약 취소는 불가능합니다. 예약 취소는 전일까지만 가능합니다.`,
+        status: 'warning',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/clinics/cancel_reservation/`, {
         method: 'POST',
@@ -419,6 +440,15 @@ const ClinicReservePage: React.FC = () => {
         // 스케줄 새로고침
         await loadWeeklySchedule();
         onClose(); // 모달 닫기
+      } else if (response.status === 403 && data.error === 'same_day_cancellation_not_allowed') {
+        // 백엔드에서 당일 취소 차단된 경우
+        toast({
+          title: '취소 불가',
+          description: data.message || '당일 예약 취소는 불가능합니다.',
+          status: 'warning',
+          duration: 5000,
+          isClosable: true,
+        });
       } else {
         toast({
           title: '취소 실패',
@@ -448,6 +478,7 @@ const ClinicReservePage: React.FC = () => {
     const isReserved = user && clinic.students.some(student => student.id === user.id);
     const hasClinic = clinic.clinic_id !== null;
     const isPastDay = !isDayReservable(day); // 이전 요일인지 확인
+    const isSameDay = !isSameDayCancellable(day); // 당일인지 확인 (당일이면 취소 불가)
 
     return (
       <GridItem key={`${day}-${time}`}>
@@ -466,19 +497,30 @@ const ClinicReservePage: React.FC = () => {
               : isPastDay
               ? "gray.100"
               : isReserved
-              ? "blue.50"
+              ? (isSameDay ? "orange.50" : "blue.50")
               : clinic.is_full
               ? "red.50"
               : "white"
           }
           _hover={{
-            shadow: hasClinic && !clinic.is_full && !isPastDay ? "md" : "none",
-            cursor: hasClinic && !clinic.is_full && !isPastDay ? "pointer" : "default",
+            shadow: hasClinic && !clinic.is_full && !isPastDay && !(isReserved && isSameDay) ? "md" : "none",
+            cursor: hasClinic && !isPastDay && (!isReserved || (isReserved && !isSameDay)) && !clinic.is_full ? "pointer" : isReserved && isSameDay ? "not-allowed" : "default",
           }}
           transition="all 0.2s"
           onClick={() => {
             if (hasClinic && !isPastDay) {
               if (isReserved) {
+                // 당일 취소 불가능한 경우
+                if (isSameDay) {
+                  toast({
+                    title: '취소 불가',
+                    description: '당일 예약 취소는 불가능합니다. 예약 취소는 전일까지만 가능합니다.',
+                    status: 'warning',
+                    duration: 5000,
+                    isClosable: true,
+                  });
+                  return;
+                }
                 // 예약 취소 확인 모달 표시
                 setSelectedSlot({ day, time, clinic, action: 'cancel' });
                 onOpen();
@@ -518,19 +560,25 @@ const ClinicReservePage: React.FC = () => {
                   </Text>
                 </HStack>
                 
-                                 {/* 예약됨 뱃지 - 상단 우측에서 중앙 상단으로 이동 */}
-                 {isReserved && (
-                   <Center mb={0.5}>
-                     <Badge 
-                       colorScheme="blue" 
-                       fontSize={{ base: "0.6rem", sm: "0.8rem", md: "0.8rem" }}
-                       px={0.8}
-                       py={0.2}
-                     >
-                       예약됨
-                     </Badge>
-                   </Center>
-                 )}
+                {/* 예약됨 뱃지 영역 - 고정 높이로 레이아웃 안정화 */}
+                <Box
+                  height="1.2rem" // 뱃지 영역 고정 높이
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  mb={0.5}
+                >
+                  {isReserved && (
+                    <Badge 
+                      colorScheme={isSameDay ? "blue" : "blue"}
+                      fontSize={{ base: "0.6rem", sm: "0.8rem", md: "0.8rem" }}
+                      px={0.8}
+                      py={0.2}
+                    >
+                      {isSameDay ? "예약됨" : "예약됨"}
+                    </Badge>
+                  )}
+                </Box>
                 
                 {/* 정가운데 인원수 표시 또는 마감 표시 */}
                 <Box
