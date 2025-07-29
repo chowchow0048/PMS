@@ -262,6 +262,7 @@ class Clinic(models.Model):
         limit_choices_to={"is_teacher": True},
         verbose_name="담당 강사",
         blank=True,
+        null=True,
     )  # 담당 강사
     clinic_students = models.ManyToManyField(
         User,
