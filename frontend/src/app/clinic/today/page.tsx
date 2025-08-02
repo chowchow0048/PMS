@@ -34,7 +34,7 @@ import {
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 import { Clinic, User, DAY_CHOICES } from '@/lib/types';
-import { getClinics, getStudents, getClinicAttendances, updateAttendance, createAttendanceForClinic, getOrCreateAttendance } from '@/lib/api';
+import { getClinics, getStudents, getClinicAttendances, updateAttendance, getOrCreateAttendance } from '@/lib/api';
 import { AuthGuard } from '@/lib/authGuard';
 
 // 출석 상태 타입 정의
@@ -152,36 +152,28 @@ const TodayClinicPageContent: React.FC = () => {
       // 상태 키 생성 (클리닉ID-학생ID)
       const stateKey = `${clinicId}-${studentId}`;
       
-      // 로컬 상태 먼저 업데이트 (즉시 UI 반영)
+      // 즉시 UI 업데이트 (낙관적 업데이트)
       setAttendanceStates(prev => ({
         ...prev,
         [stateKey]: attendanceType
       }));
 
       // 출석 데이터 ID 확인
-      let attendanceId = attendanceIds[stateKey];
-      
-      // 출석 데이터가 없으면 생성
+      const attendanceId = attendanceIds[stateKey];
+
       if (!attendanceId) {
-        // console.log(`📝 출석 데이터 생성 필요 - 클리닉: ${clinicId}, 학생: ${studentId}`);
-        const attendance = await getOrCreateAttendance(clinicId, studentId);
-        attendanceId = attendance.id;
-        
-        // 새로 생성된 ID 저장
-        setAttendanceIds(prev => ({
-          ...prev,
-          [stateKey]: attendanceId
-        }));
+        throw new Error('출석 데이터를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
       }
 
-      // API 호출로 서버에 출석 상태 업데이트
+      // API 호출
       await updateAttendance(attendanceId, attendanceType);
-      
-      // console.log(`🔄 출석 상태 업데이트 완료: 클리닉 ${clinicId}, 학생 ${studentId}, 상태 ${attendanceType}`);
-      
+
       toast({
-        title: '출석 상태 업데이트',
-        description: `${ATTENDANCE_OPTIONS.find(opt => opt.value === attendanceType)?.label} 처리되었습니다.`,
+        title: '출석 상태 업데이트 완료',
+        description: `출석 상태가 '${attendanceType === 'attended' ? '출석' : 
+                      attendanceType === 'absent' ? '결석' : 
+                      attendanceType === 'late' ? '지각' : 
+                      attendanceType === 'sick' ? '병결' : '미정'}'으로 변경되었습니다.`,
         status: 'success',
         duration: 2000,
         isClosable: true,
@@ -200,40 +192,6 @@ const TodayClinicPageContent: React.FC = () => {
       toast({
         title: '출석 상태 업데이트 실패',
         description: '출석 상태 업데이트 중 오류가 발생했습니다.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
-  };
-
-  // 클리닉 시간에 맞춰 출석 데이터 생성하는 함수
-  const initializeAttendanceForClinic = async (clinic: Clinic) => {
-    try {
-      // console.log(`📝 클리닉 ${clinic.id}의 출석 데이터 초기화 시작`);
-      
-      // API 호출로 해당 클리닉의 출석 데이터 일괄 생성
-      await createAttendanceForClinic(clinic.id);
-      
-      // 생성 후 출석 데이터 다시 로드
-      await loadAttendanceData(clinic);
-      
-      // console.log(`✅ 클리닉 ${clinic.id}의 출석 데이터 초기화 완료`);
-      
-      toast({
-        title: '출석 체크 준비 완료',
-        description: `${clinic.clinic_time} 클리닉의 출석 체크가 준비되었습니다.`,
-        status: 'info',
-        duration: 3000,
-        isClosable: true,
-      });
-      
-    } catch (error) {
-      // console.error('❌ 출석 데이터 초기화 오류:', error);
-      
-      toast({
-        title: '출석 체크 준비 실패',
-        description: '출석 체크 준비 중 오류가 발생했습니다.',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -305,56 +263,26 @@ const TodayClinicPageContent: React.FC = () => {
         let clinicsNeedingAttendance = 0;
         
         for (const clinic of todayClinicsData) {
-          if (clinic.clinic_students && clinic.clinic_students.length > 0) {
-            // console.log(`🔍 [출석데이터] ${clinic.clinic_time} 클리닉 (ID: ${clinic.id}) 출석 데이터 로드 중...`);
-            
-            try {
-              // 기존 출석 데이터 확인
+            // 각 클리닉별로 출석 데이터 처리
+            if (clinic.clinic_students && clinic.clinic_students.length > 0) {
+              // 예약된 학생이 있는 클리닉만 출석 데이터 조회
               const existingAttendances = await getClinicAttendances(clinic.id);
               const attendanceCount = existingAttendances.length;
               
               if (attendanceCount === 0) {
-                // 출석 데이터가 없으면 자동 생성
-                // console.log(`📝 [자동생성] ${clinic.clinic_time} 클리닉: 출석 데이터가 없어서 자동 생성 시작...`);
-                clinicsNeedingAttendance++;
+                // 예약된 학생이 있지만 출석 데이터가 없는 경우 (이론적으로는 발생하지 않아야 함)
+                // console.log(`⚠️ [경고] ${clinic.clinic_time} 클리닉: 예약된 학생이 있지만 출석 데이터가 없습니다.`);
                 
-                try {
-                  const createResult = await createAttendanceForClinic(clinic.id);
-                  // console.log(`✅ [자동생성] ${clinic.clinic_time} 클리닉: ${createResult.created?.length || 0}개 출석 데이터 생성 완료`);
-                  
-                  // 생성 후 다시 로드
-                  await loadAttendanceData(clinic);
-                  
-                  // 생성된 데이터 다시 조회하여 카운트 업데이트
-                  const newAttendances = await getClinicAttendances(clinic.id);
-                  totalAttendanceRecords += newAttendances.length;
-                  
-                  if (newAttendances.length > 0) {
-                    clinicsWithAttendance++;
-                    // console.log(`🎯 [자동생성] ${clinic.clinic_time} 클리닉: 최종 ${newAttendances.length}개 출석 기록 확인`);
-                    
-                    // 출석 상태별 통계 (생성 후에는 모두 'none'이어야 함)
-                    const attendanceStats = newAttendances.reduce((stats: any, att: any) => {
-                      stats[att.attendance_type] = (stats[att.attendance_type] || 0) + 1;
-                      return stats;
-                    }, {});
-                    
-                    // console.log(`   📊 [출석통계] none: ${attendanceStats.none || 0}, attended: ${attendanceStats.attended || 0}, absent: ${attendanceStats.absent || 0}, late: ${attendanceStats.late || 0}, sick: ${attendanceStats.sick || 0}`);
-                  }
-                  
-                } catch (createError) {
-                  // console.error(`❌ [자동생성] ${clinic.clinic_time} 클리닉 출석 데이터 생성 실패:`, createError);
-                  // 생성 실패해도 기존 로직 계속 진행
-                  await loadAttendanceData(clinic);
-                }
+                // 그냥 기존 로직대로 진행 (출석 데이터 로드)
+                await loadAttendanceData(clinic);
                 
               } else {
-                // 기존 출석 데이터가 있는 경우
+                // 기존 출석 데이터가 있는 경우 (정상적인 경우)
                 await loadAttendanceData(clinic);
                 totalAttendanceRecords += attendanceCount;
                 clinicsWithAttendance++;
                 
-                // console.log(`✅ [출석데이터] ${clinic.clinic_time} 클리닉: ${attendanceCount}개 출석 기록 발견 (기존 데이터)`);
+                // console.log(`✅ [출석데이터] ${clinic.clinic_time} 클리닉: ${attendanceCount}개 출석 기록 발견 (예약과 함께 자동 생성됨)`);
                 
                 // 출석 상태별 통계
                 const attendanceStats = existingAttendances.reduce((stats: any, att: any) => {
@@ -365,12 +293,10 @@ const TodayClinicPageContent: React.FC = () => {
                 // console.log(`   📊 [출석통계] none: ${attendanceStats.none || 0}, attended: ${attendanceStats.attended || 0}, absent: ${attendanceStats.absent || 0}, late: ${attendanceStats.late || 0}, sick: ${attendanceStats.sick || 0}`);
               }
               
-            } catch (error) {
-              // console.error(`❌ [출석데이터] ${clinic.clinic_time} 클리닉 출석 데이터 처리 실패:`, error);
+            } else {
+              // 예약된 학생이 없는 클리닉 - 출석 데이터 처리 건너뜀
+              // console.log(`⏭️ [출석데이터] ${clinic.clinic_time} 클리닉: 예약 학생 없음, 출석 데이터 처리 건너뜀`);
             }
-          } else {
-            // console.log(`⏭️ [출석데이터] ${clinic.clinic_time} 클리닉: 예약 학생 없음, 출석 데이터 처리 건너뜀`);
-          }
         }
 
         // === 디버깅 로그: 전체 요약 ===

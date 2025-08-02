@@ -708,8 +708,19 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_409_CONFLICT,
                     )
 
-                    # 예약 성공
+                # 예약 성공 및 출결 생성
                 clinic.clinic_students.add(user)
+
+                from django.utils import timezone
+
+                today = timezone.now().date()
+
+                ClinicAttendance.objects.create(
+                    clinic=clinic,
+                    student=user,
+                    date=today,
+                    attendance_type="none",
+                )
 
                 # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
                 # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
@@ -1468,75 +1479,6 @@ class ClinicAttendanceViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(date=today)
 
         return queryset.select_related("clinic", "student")
-
-    @action(detail=False, methods=["post"])
-    def bulk_create_today(self, request):
-        """
-        오늘 클리닉에 등록된 학생들의 출석 데이터를 일괄 생성
-        클리닉 시간이 되면 해당 클리닉의 모든 학생에 대해 출석 데이터를 생성
-        """
-        try:
-            clinic_id = request.data.get("clinic_id")
-            if not clinic_id:
-                return Response(
-                    {"error": "clinic_id가 필요합니다."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # 클리닉 존재 확인
-            try:
-                clinic = Clinic.objects.get(id=clinic_id)
-            except Clinic.DoesNotExist:
-                return Response(
-                    {"error": "존재하지 않는 클리닉입니다."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            from django.utils import timezone
-
-            today = timezone.now().date()
-
-            # 해당 클리닉에 등록된 학생들 조회
-            students = clinic.clinic_students.all()
-
-            created_attendances = []
-            already_exists = []
-
-            for student in students:
-                # 이미 출석 데이터가 있는지 확인
-                attendance, created = ClinicAttendance.objects.get_or_create(
-                    clinic=clinic,
-                    student=student,
-                    date=today,
-                    defaults={"attendance_type": "none"},
-                )
-
-                if created:
-                    created_attendances.append(attendance)
-                else:
-                    already_exists.append(attendance)
-
-            # 생성된 출석 데이터 직렬화
-            created_serializer = ClinicAttendanceSerializer(
-                created_attendances, many=True
-            )
-            existing_serializer = ClinicAttendanceSerializer(already_exists, many=True)
-
-            return Response(
-                {
-                    "message": f"{len(created_attendances)}개의 출석 데이터가 생성되었습니다.",
-                    "created": created_serializer.data,
-                    "already_exists": existing_serializer.data,
-                    "clinic": ClinicSerializer(clinic).data,
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
-        except Exception as e:
-            logger.error(f"[api/views.py] bulk_create_today 오류: {str(e)}")
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
     @action(detail=True, methods=["patch"])
     def update_attendance(self, request, pk=None):

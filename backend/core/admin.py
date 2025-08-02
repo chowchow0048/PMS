@@ -1119,7 +1119,14 @@ class ClinicAttendanceAdmin(admin.ModelAdmin):
     mark_as_sick.short_description = "선택한 출석을 '병결'으로 변경"
 
     def bulk_create_for_today_clinics(self, request, queryset):
-        """오늘 활성화된 모든 클리닉에 대해 출석 데이터 일괄 생성"""
+        """
+        [더 이상 필요 없는 기능] 오늘 활성화된 모든 클리닉에 대해 출석 데이터 일괄 생성
+
+        ⚠️ 주의: 2025년 1월부터 클리닉 예약 시 출석 데이터가 자동으로 생성되므로
+        이 기능은 더 이상 필요하지 않습니다.
+
+        기존 시스템과의 호환성을 위해 남겨두지만, 실제로는 거의 사용되지 않을 것입니다.
+        """
         from django.utils import timezone
 
         today = timezone.now().date()
@@ -1147,6 +1154,7 @@ class ClinicAttendanceAdmin(admin.ModelAdmin):
 
         for clinic in active_clinics:
             for student in clinic.clinic_students.all():
+                # 이미 출석 데이터가 있는지 확인 (get_or_create로 중복 방지)
                 attendance, created = ClinicAttendance.objects.get_or_create(
                     clinic=clinic,
                     student=student,
@@ -1160,11 +1168,12 @@ class ClinicAttendanceAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f"출석 데이터 생성 완료: 신규 {created_count}개, 기존 {existing_count}개",
+            f"출석 데이터 처리 완료: 신규 {created_count}개, 기존 {existing_count}개 "
+            f"(참고: 이제 예약 시 출석 데이터가 자동 생성됩니다)",
         )
 
     bulk_create_for_today_clinics.short_description = (
-        "오늘 클리닉의 출석 데이터 일괄 생성"
+        "[더 이상 필요 없음] 오늘 클리닉의 출석 데이터 일괄 생성"
     )
 
     def export_attendance_csv(self, request, queryset):

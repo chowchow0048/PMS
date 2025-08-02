@@ -413,23 +413,6 @@ export const getTodayClinic = async () => {
 // 출석 상태 타입 정의
 type AttendanceType = 'attended' | 'absent' | 'sick' | 'late' | 'none';
 
-// 클리닉 출석 데이터 일괄 생성 (클리닉 시간에 맞춰 자동 생성)
-export const createAttendanceForClinic = async (clinicId: number) => {
-  try {
-    console.log(`🔍 [api.ts] createAttendanceForClinic 시작 - 클리닉 ID: ${clinicId}`);
-    
-    const response = await api.post('/clinic-attendances/bulk_create_today/', {
-      clinic_id: clinicId
-    });
-    
-    console.log('✅ [api.ts] 출석 데이터 일괄 생성 완료:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('❌ [api.ts] 출석 데이터 일괄 생성 오류:', error);
-    throw error;
-  }
-};
-
 // 특정 클리닉의 출석 데이터 조회
 export const getClinicAttendances = async (clinicId: number, date?: string) => {
   try {
