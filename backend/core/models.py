@@ -352,6 +352,11 @@ class ClinicAttendance(models.Model):
         ("none", "미정"),
     )
 
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="활성화 상태",
+        help_text="활성화된 출석 데이터만 조회 가능합니다.",
+    )  # 활성화 상태
     clinic = models.ForeignKey(
         Clinic,
         on_delete=models.CASCADE,
@@ -376,8 +381,10 @@ class ClinicAttendance(models.Model):
     )  # 출석 상태 (출석/결석/지각/병결)
 
     # 메타데이터
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성 시간")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="수정 시간")
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name="보충 예약 생성 시간"
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="보충 예약 수정 시간")
 
     class Meta:
         ordering = ["-date", "-created_at"]

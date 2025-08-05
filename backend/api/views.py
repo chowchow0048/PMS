@@ -711,14 +711,10 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 # 예약 성공 및 출결 생성
                 clinic.clinic_students.add(user)
 
-                from django.utils import timezone
-
-                today = timezone.now().date()
-
                 ClinicAttendance.objects.create(
+                    is_active=True,
                     clinic=clinic,
                     student=user,
-                    date=today,
                     attendance_type="none",
                 )
 
@@ -849,7 +845,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
                     clinic=clinic, student=user
                 )
                 deleted_count = deleted_attendances.count()
-                deleted_attendances.delete()
+                deleted_attendances.update(is_active=False)
 
             # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
             # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
@@ -1456,12 +1452,15 @@ class ClinicAttendanceViewSet(viewsets.ModelViewSet):
         """필터링된 queryset 반환"""
         queryset = super().get_queryset()
 
+        # 활성화된 출석 데이터만 조회
+        queryset = queryset.filter(is_active=True)
+
         # 클리닉 ID로 필터링
         clinic_id = self.request.query_params.get("clinic_id")
         if clinic_id:
             queryset = queryset.filter(clinic_id=clinic_id)
 
-        # 날짜로 필터링 (기본값: 오늘)
+        # 날짜로 필터링 (선택적)
         date = self.request.query_params.get("date")
         if date:
             try:
@@ -1471,12 +1470,7 @@ class ClinicAttendanceViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(date=filter_date)
             except ValueError:
                 pass  # 잘못된 날짜 형식이면 필터링하지 않음
-        else:
-            # 기본값: 오늘 날짜
-            from django.utils import timezone
-
-            today = timezone.now().date()
-            queryset = queryset.filter(date=today)
+        # 날짜 파라미터가 없으면 모든 활성화된 출석 데이터 반환 (날짜 제한 없음)
 
         return queryset.select_related("clinic", "student")
 
@@ -1495,7 +1489,13 @@ class ClinicAttendanceViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            # 출석 상태 업데이트 시 date를 오늘 날짜로 설정
+            from django.utils import timezone
+
+            today = timezone.now().date()
+
             attendance.attendance_type = attendance_type
+            attendance.date = today  # 실제 출석 체크한 날짜로 업데이트
             attendance.save()
 
             serializer = self.get_serializer(attendance)
