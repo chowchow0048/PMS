@@ -121,28 +121,56 @@ const TodayClinicPageContent: React.FC = () => {
   // 출석 데이터 로드 함수
   const loadAttendanceData = async (clinic: Clinic) => {
     try {
-      // console.log(`📋 출석 데이터 로드 시작 - 클리닉 ${clinic.id}`);
+      console.log(`📋 [DEBUG] === 출석 데이터 로드 시작 - 클리닉 ${clinic.id} ===`);
       
       // 해당 클리닉의 출석 데이터 조회
+      console.log(`📋 [DEBUG] getClinicAttendances 호출 - 클리닉 ID: ${clinic.id}`);
+      console.log(`📋 [DEBUG] 클리닉 정보:`, {
+        id: clinic.id,
+        clinic_day: clinic.clinic_day,
+        clinic_time: clinic.clinic_time,
+        clinic_students: clinic.clinic_students?.map(s => ({id: s.id, name: s.name})) || []
+      });
+      
+      // is_active=True인 출석 데이터만 조회 (날짜 제한 없음)
+      console.log(`📋 [DEBUG] 활성화된 출석 데이터 조회 (날짜 제한 없음)`);
+      
       const attendances = await getClinicAttendances(clinic.id);
+      console.log(`📋 [DEBUG] API 응답 받은 출석 데이터:`, attendances);
+      console.log(`📋 [DEBUG] 출석 데이터 개수:`, attendances.length);
       
       // 상태 업데이트
       const newAttendanceStates: { [key: string]: AttendanceType } = {};
       const newAttendanceIds: { [key: string]: number } = {};
       
-      attendances.forEach((attendance: any) => {
+      attendances.forEach((attendance: any, index: number) => {
         const stateKey = `${clinic.id}-${attendance.student}`;
         newAttendanceStates[stateKey] = attendance.attendance_type;
         newAttendanceIds[stateKey] = attendance.id;
+        
+        console.log(`📋 [DEBUG] [${index + 1}] 출석 데이터 처리:`);
+        console.log(`📋 [DEBUG]   - 출석 ID: ${attendance.id}`);
+        console.log(`📋 [DEBUG]   - 학생 ID: ${attendance.student}`);
+        console.log(`📋 [DEBUG]   - 출석 상태: ${attendance.attendance_type}`);
+        console.log(`📋 [DEBUG]   - 상태 키: ${stateKey}`);
+        console.log(`📋 [DEBUG]   - 원본 데이터:`, attendance);
       });
+      
+      console.log(`📋 [DEBUG] 생성된 attendanceStates:`, newAttendanceStates);
+      console.log(`📋 [DEBUG] 생성된 attendanceIds:`, newAttendanceIds);
       
       setAttendanceStates(prev => ({ ...prev, ...newAttendanceStates }));
       setAttendanceIds(prev => ({ ...prev, ...newAttendanceIds }));
       
-      // console.log(`✅ 출석 데이터 로드 완료 - 클리닉 ${clinic.id}:`, attendances.length, '건');
+      console.log(`✅ [DEBUG] 출석 데이터 로드 완료 - 클리닉 ${clinic.id}:`, attendances.length, '건');
       
           } catch (error) {
-        // console.error(`❌ 출석 데이터 로드 오류 - 클리닉 ${clinic.id}:`, error);
+        console.error(`❌ [DEBUG] 출석 데이터 로드 오류 - 클리닉 ${clinic.id}:`, error);
+        console.error(`❌ [DEBUG] 오류 상세:`, {
+          message: (error as any)?.message,
+          response: (error as any)?.response?.data,
+          status: (error as any)?.response?.status
+        });
       }
   };
 
@@ -152,6 +180,20 @@ const TodayClinicPageContent: React.FC = () => {
       // 상태 키 생성 (클리닉ID-학생ID)
       const stateKey = `${clinicId}-${studentId}`;
       
+      // === 디버깅 로그 시작 ===
+      console.log('🎯 [DEBUG] === 출석 상태 업데이트 시작 ===');
+      console.log('🎯 [DEBUG] 클리닉 ID:', clinicId);
+      console.log('🎯 [DEBUG] 학생 ID:', studentId);
+      console.log('🎯 [DEBUG] 변경할 출석 상태:', attendanceType);
+      console.log('🎯 [DEBUG] 상태 키:', stateKey);
+      
+      // 현재 상태 정보 출력
+      console.log('🎯 [DEBUG] === 현재 상태 정보 ===');
+      console.log('🎯 [DEBUG] 전체 attendanceStates:', attendanceStates);
+      console.log('🎯 [DEBUG] 현재 학생의 출석 상태:', attendanceStates[stateKey]);
+      console.log('🎯 [DEBUG] 전체 attendanceIds:', attendanceIds);
+      console.log('🎯 [DEBUG] 현재 학생의 출석 ID:', attendanceIds[stateKey]);
+      
       // 즉시 UI 업데이트 (낙관적 업데이트)
       setAttendanceStates(prev => ({
         ...prev,
@@ -160,13 +202,19 @@ const TodayClinicPageContent: React.FC = () => {
 
       // 출석 데이터 ID 확인
       const attendanceId = attendanceIds[stateKey];
+      console.log('🎯 [DEBUG] 찾은 출석 ID:', attendanceId);
 
       if (!attendanceId) {
+        console.error('❌ [DEBUG] 출석 ID를 찾을 수 없음!');
+        console.error('❌ [DEBUG] 가능한 attendanceIds 키들:', Object.keys(attendanceIds));
+        console.error('❌ [DEBUG] 찾고 있는 키:', stateKey);
         throw new Error('출석 데이터를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
       }
 
       // API 호출
-      await updateAttendance(attendanceId, attendanceType);
+      console.log('🎯 [DEBUG] API 호출 시작 - updateAttendance:', attendanceId, attendanceType);
+      const result = await updateAttendance(attendanceId, attendanceType);
+      console.log('🎯 [DEBUG] API 호출 결과:', result);
 
       toast({
         title: '출석 상태 업데이트 완료',
@@ -180,12 +228,25 @@ const TodayClinicPageContent: React.FC = () => {
       });
 
     } catch (error) {
-      // console.error('❌ 출석 상태 업데이트 오류:', error);
+      console.error('❌ [DEBUG] === 출석 상태 업데이트 오류 ===');
+      console.error('❌ [DEBUG] 오류:', error);
+      console.error('❌ [DEBUG] 오류 타입:', typeof error);
+      console.error('❌ [DEBUG] 오류 메시지:', (error as any)?.message);
+      
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any;
+        console.error('❌ [DEBUG] HTTP 상태:', axiosError.response?.status);
+        console.error('❌ [DEBUG] 응답 데이터:', axiosError.response?.data);
+        console.error('❌ [DEBUG] 요청 URL:', axiosError.config?.url);
+        console.error('❌ [DEBUG] 요청 메서드:', axiosError.config?.method);
+        console.error('❌ [DEBUG] 요청 데이터:', axiosError.config?.data);
+      }
       
       // 오류 시 원래 상태로 복원
       setAttendanceStates(prev => {
         const restored = { ...prev };
         delete restored[`${clinicId}-${studentId}`];
+        console.log('🔄 [DEBUG] 상태 복원 완료. 복원된 상태:', restored);
         return restored;
       });
       
@@ -368,12 +429,12 @@ const TodayClinicPageContent: React.FC = () => {
           </CardHeader>
           <CardBody pt={0}>
             <HStack spacing={4} flexWrap="wrap">
-              <Badge colorScheme="blue" size="md">
+              {/* <Badge colorScheme="blue" size="md">
                 {getKoreanSubjectName(clinic.clinic_subject)}
-              </Badge>
-              <Badge colorScheme="green" size="md">
+              </Badge> */}
+              {/* <Badge colorScheme="green" size="md">
                 {(clinic.clinic_teacher as any)?.name || clinic.teacher_name || '강사 없음'}
-              </Badge>
+              </Badge> */}
               <Badge colorScheme="purple" size="md">
                 {clinic.clinic_room}
               </Badge>
