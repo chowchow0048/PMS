@@ -371,7 +371,10 @@ class ClinicAttendance(models.Model):
         verbose_name="학생",
     )  # 학생 (User 모델에서 is_student=True인 사용자)
     date = models.DateField(
-        verbose_name="출석 날짜", help_text="출석을 체크한 날짜 (년-월-일)"
+        null=True,
+        blank=True,
+        verbose_name="출석 날짜",
+        help_text="출석을 체크한 날짜 (년-월-일). 예약 생성 시에는 NULL, 출석 체크 시에만 설정됨.",
     )  # 출석 날짜 (년-월-일까지만)
     attendance_type = models.CharField(
         max_length=10,
