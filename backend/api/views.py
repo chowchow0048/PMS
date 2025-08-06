@@ -676,6 +676,51 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
+                # 기존의 비활성화된 출석 데이터가 있다면 삭제 (unique 제약 조건 문제 해결)
+                # 현재 주의 클리닉 날짜 계산
+                from datetime import datetime, timedelta
+
+                # 클리닉 요일을 숫자로 변환 (0=월요일, 6=일요일)
+                clinic_day_map = {
+                    "mon": 0,
+                    "tue": 1,
+                    "wed": 2,
+                    "thu": 3,
+                    "fri": 4,
+                    "sat": 5,
+                    "sun": 6,
+                }
+
+                clinic_weekday = clinic_day_map.get(clinic.clinic_day, 0)
+                today = datetime.now().date()
+                today_weekday = today.weekday()
+
+                # 이번 주의 클리닉 날짜 계산
+                days_until_clinic = clinic_weekday - today_weekday
+
+                if days_until_clinic >= 0:
+                    # 이번 주 클리닉 날짜 (오늘 포함)
+                    expected_clinic_date = today + timedelta(days=days_until_clinic)
+                else:
+                    # 다음 주 클리닉 날짜
+                    expected_clinic_date = today + timedelta(days=days_until_clinic + 7)
+
+                # 기존의 비활성화된 출석 데이터 삭제 (unique 제약 조건 충돌 방지)
+                existing_inactive_attendances = ClinicAttendance.objects.filter(
+                    clinic=clinic,
+                    student=user,
+                    expected_clinic_date=expected_clinic_date,
+                    is_active=False,
+                )
+                if existing_inactive_attendances.exists():
+                    deleted_inactive_count = existing_inactive_attendances.count()
+                    existing_inactive_attendances.delete()
+                    logger.info(
+                        f"[api/views.py] 클리닉 예약 - 기존 비활성화 출석 데이터 삭제: "
+                        f"clinic_id={clinic_id}, student_id={user_id}, "
+                        f"expected_clinic_date={expected_clinic_date}, count={deleted_inactive_count}"
+                    )
+
                 # no_show 체크 (2회 이상 무단결석한 학생은 예약 불가)
                 if user.no_show >= 2:
                     logger.warning(
@@ -711,11 +756,14 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 # 예약 성공 및 출결 생성
                 clinic.clinic_students.add(user)
 
+                # 위에서 계산한 expected_clinic_date 재사용
                 ClinicAttendance.objects.create(
                     is_active=True,
                     clinic=clinic,
                     student=user,
                     attendance_type="none",
+                    reservation_date=today,  # 오늘 날짜로 예약 날짜 설정
+                    expected_clinic_date=expected_clinic_date,  # 위에서 계산된 예상 클리닉 날짜 사용
                 )
 
                 # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
@@ -840,12 +888,52 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 # 예약 취소
                 clinic.clinic_students.remove(user)
 
-                # 관련된 ClinicAttendance 데이터도 삭제하여 유령 데이터 방지
+                # 관련된 ClinicAttendance 데이터 삭제하여 유령 데이터 방지
+                # 같은 클리닉에 다시 예약할 수 있도록 실제로 삭제 (unique 제약 조건 해결)
+                from datetime import datetime, timedelta
+
+                # 클리닉 요일을 숫자로 변환 (0=월요일, 6=일요일)
+                clinic_day_map = {
+                    "mon": 0,
+                    "tue": 1,
+                    "wed": 2,
+                    "thu": 3,
+                    "fri": 4,
+                    "sat": 5,
+                    "sun": 6,
+                }
+
+                clinic_weekday = clinic_day_map.get(clinic.clinic_day, 0)
+                today = datetime.now().date()
+                today_weekday = today.weekday()
+
+                # 이번 주의 클리닉 날짜 계산
+                days_until_clinic = clinic_weekday - today_weekday
+
+                if days_until_clinic >= 0:
+                    # 이번 주 클리닉 날짜 (오늘 포함)
+                    expected_clinic_date = today + timedelta(days=days_until_clinic)
+                else:
+                    # 다음 주 클리닉 날짜
+                    expected_clinic_date = today + timedelta(days=days_until_clinic + 7)
+
+                # 해당 주의 클리닉 예약 데이터만 삭제 (다른 주 데이터는 보존)
                 deleted_attendances = ClinicAttendance.objects.filter(
-                    clinic=clinic, student=user
+                    clinic=clinic,
+                    student=user,
+                    expected_clinic_date=expected_clinic_date,
+                    is_active=True,
                 )
                 deleted_count = deleted_attendances.count()
-                deleted_attendances.update(is_active=False)
+
+                # 실제로 삭제하여 unique 제약 조건 문제 해결
+                deleted_attendances.delete()
+
+                logger.info(
+                    f"[api/views.py] 클리닉 예약 취소 - 삭제된 출석 데이터: "
+                    f"clinic_id={clinic_id}, student_id={user_id}, "
+                    f"expected_clinic_date={expected_clinic_date}, count={deleted_count}"
+                )
 
             # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
             # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
@@ -1460,17 +1548,73 @@ class ClinicAttendanceViewSet(viewsets.ModelViewSet):
         if clinic_id:
             queryset = queryset.filter(clinic_id=clinic_id)
 
-        # 날짜로 필터링 (선택적)
+        # 날짜로 필터링 (개선된 로직)
         date = self.request.query_params.get("date")
         if date:
             try:
                 from datetime import datetime
 
                 filter_date = datetime.strptime(date, "%Y-%m-%d").date()
-                queryset = queryset.filter(date=filter_date)
+                # 특정 날짜에 해당하는 출석 데이터 조회
+                # expected_clinic_date가 해당 날짜인 데이터를 우선 조회
+                queryset = queryset.filter(expected_clinic_date=filter_date)
             except ValueError:
                 pass  # 잘못된 날짜 형식이면 필터링하지 않음
-        # 날짜 파라미터가 없으면 모든 활성화된 출석 데이터 반환 (날짜 제한 없음)
+        else:
+            # 날짜 파라미터가 없는 경우, 오늘의 클리닉에 해당하는 데이터만 조회
+            if clinic_id:
+                try:
+                    from datetime import datetime, timedelta
+
+                    # 클리닉 정보 조회
+                    from core.models import Clinic
+
+                    clinic = Clinic.objects.get(id=clinic_id)
+
+                    # 클리닉 요일을 숫자로 변환 (0=월요일, 6=일요일)
+                    clinic_day_map = {
+                        "mon": 0,
+                        "tue": 1,
+                        "wed": 2,
+                        "thu": 3,
+                        "fri": 4,
+                        "sat": 5,
+                        "sun": 6,
+                    }
+
+                    clinic_weekday = clinic_day_map.get(clinic.clinic_day, 0)
+                    today = datetime.now().date()
+                    today_weekday = today.weekday()
+
+                    # 이번 주의 클리닉 날짜 계산
+                    days_until_clinic = clinic_weekday - today_weekday
+
+                    if days_until_clinic >= 0:
+                        # 이번 주 클리닉 날짜 (오늘 포함)
+                        expected_clinic_date = today + timedelta(days=days_until_clinic)
+                    else:
+                        # 다음 주 클리닉 날짜
+                        expected_clinic_date = today + timedelta(
+                            days=days_until_clinic + 7
+                        )
+
+                    # 해당 날짜의 클리닉 예약 데이터만 조회
+                    queryset = queryset.filter(
+                        expected_clinic_date=expected_clinic_date
+                    )
+
+                    logger.info(
+                        f"[api/views.py] 출석 데이터 조회 - 클리닉 ID: {clinic_id}, "
+                        f"오늘: {today}, 예상 클리닉 날짜: {expected_clinic_date}, "
+                        f"필터링된 데이터: {queryset.count()}건"
+                    )
+
+                except Clinic.DoesNotExist:
+                    logger.warning(
+                        f"[api/views.py] 존재하지 않는 클리닉 ID: {clinic_id}"
+                    )
+                except Exception as e:
+                    logger.error(f"[api/views.py] 출석 데이터 조회 오류: {str(e)}")
 
         return queryset.select_related("clinic", "student")
 
@@ -1489,13 +1633,15 @@ class ClinicAttendanceViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # 출석 상태 업데이트 시 date를 오늘 날짜로 설정
+            # 출석 상태 업데이트 시 actual_attendance_date를 오늘 날짜로 설정
             from django.utils import timezone
 
             today = timezone.now().date()
 
             attendance.attendance_type = attendance_type
-            attendance.date = today  # 실제 출석 체크한 날짜로 업데이트
+            attendance.actual_attendance_date = (
+                today  # 실제 출석 체크한 날짜로 업데이트
+            )
             attendance.save()
 
             serializer = self.get_serializer(attendance)

@@ -132,9 +132,10 @@ const TodayClinicPageContent: React.FC = () => {
         clinic_students: clinic.clinic_students?.map(s => ({id: s.id, name: s.name})) || []
       });
       
-      // is_active=True인 출석 데이터만 조회 (날짜 제한 없음)
-      console.log(`📋 [DEBUG] 활성화된 출석 데이터 조회 (날짜 제한 없음)`);
+      // 오늘의 클리닉에 해당하는 출석 데이터만 조회 (개선된 로직)
+      console.log(`📋 [DEBUG] 오늘의 클리닉 출석 데이터 조회`);
       
+      // 날짜 파라미터 없이 호출하면 백엔드에서 자동으로 오늘의 클리닉 데이터만 필터링
       const attendances = await getClinicAttendances(clinic.id);
       console.log(`📋 [DEBUG] API 응답 받은 출석 데이터:`, attendances);
       console.log(`📋 [DEBUG] 출석 데이터 개수:`, attendances.length);

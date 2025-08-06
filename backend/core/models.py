@@ -370,12 +370,25 @@ class ClinicAttendance(models.Model):
         limit_choices_to={"is_student": True},
         verbose_name="학생",
     )  # 학생 (User 모델에서 is_student=True인 사용자)
-    date = models.DateField(
+
+    # 날짜 관련 필드들
+    reservation_date = models.DateField(
+        verbose_name="예약 생성 날짜",
+        help_text="클리닉 예약을 생성한 날짜 (언제 예약했는지)",
+        default="2025-01-01",  # 기존 데이터 및 새 레코드에 대한 기본값
+    )  # 예약 생성 날짜
+    expected_clinic_date = models.DateField(
+        verbose_name="예상 클리닉 날짜",
+        help_text="해당 주에서 클리닉이 열리는 예상 날짜 (클리닉 요일 기준으로 계산됨)",
+        default="2025-01-01",  # 기존 데이터에 대한 임시 기본값
+    )  # 예상 클리닉 날짜 (클리닉 요일을 기준으로 해당 주의 실제 날짜)
+    actual_attendance_date = models.DateField(
         null=True,
         blank=True,
-        verbose_name="출석 날짜",
-        help_text="출석을 체크한 날짜 (년-월-일). 예약 생성 시에는 NULL, 출석 체크 시에만 설정됨.",
-    )  # 출석 날짜 (년-월-일까지만)
+        verbose_name="실제 출석 체크 날짜",
+        help_text="실제로 출석을 체크한 날짜. 출석 상태를 업데이트할 때만 설정됨.",
+    )  # 실제 출석 체크 날짜
+
     attendance_type = models.CharField(
         max_length=10,
         choices=ATTENDANCE_CHOICES,
@@ -390,24 +403,37 @@ class ClinicAttendance(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="보충 예약 수정 시간")
 
     class Meta:
-        ordering = ["-date", "-created_at"]
+        ordering = ["-expected_clinic_date", "-created_at"]
         verbose_name = "클리닉 출석"
         verbose_name_plural = "클리닉 출석"
-        # 같은 학생이 같은 클리닉에 같은 날짜에 중복 출석 체크 방지
-        unique_together = ("clinic", "student", "date")
+        # 같은 학생이 같은 클리닉에 같은 예상 클리닉 날짜에 중복 예약 방지
+        unique_together = ("clinic", "student", "expected_clinic_date")
         indexes = [
-            models.Index(fields=["student", "-date"]),
-            models.Index(fields=["clinic", "-date"]),
+            models.Index(fields=["student", "-expected_clinic_date"]),
+            models.Index(fields=["clinic", "-expected_clinic_date"]),
             models.Index(fields=["attendance_type"]),
+            models.Index(fields=["expected_clinic_date"]),  # 클리닉 날짜별 조회용
         ]
 
     def __str__(self):
-        return f"{self.student.name} - {self.clinic} ({self.date}: {self.get_attendance_type_display()})"
+        return f"{self.student.name} - {self.clinic} ({self.expected_clinic_date}: {self.get_attendance_type_display()})"
 
     def save(self, *args, **kwargs):
         """
-        출석 데이터 저장 시 no_show 카운트 업데이트
+        출석 데이터 저장 시 no_show 카운트 업데이트 및 날짜 필드 자동 설정
         """
+        from django.utils import timezone
+
+        # 새 레코드 생성 시에만 자동 설정
+        if not self.pk:
+            # 예약 날짜를 오늘로 설정 (기본값 덮어쓰기)
+            if str(self.reservation_date) == "2025-01-01":
+                self.reservation_date = timezone.now().date()
+
+            # 예상 클리닉 날짜 계산 (기본값이 아닌 경우에만)
+            if str(self.expected_clinic_date) == "2025-01-01":
+                self.expected_clinic_date = self._calculate_expected_clinic_date()
+
         # 기존 데이터인지 확인 (수정인지 새로 생성인지)
         is_update = self.pk is not None
         old_attendance_type = None
@@ -423,6 +449,40 @@ class ClinicAttendance(models.Model):
 
         # no_show 카운트 업데이트
         self._update_no_show_count(old_attendance_type)
+
+    def _calculate_expected_clinic_date(self):
+        """
+        클리닉 요일을 기준으로 예상 클리닉 날짜 계산
+        현재 시간을 기준으로 이번 주 또는 다음 주의 클리닉 날짜를 반환
+        """
+        from datetime import datetime, timedelta
+
+        # 클리닉 요일을 숫자로 변환 (0=월요일, 6=일요일)
+        clinic_day_map = {
+            "mon": 0,
+            "tue": 1,
+            "wed": 2,
+            "thu": 3,
+            "fri": 4,
+            "sat": 5,
+            "sun": 6,
+        }
+
+        clinic_weekday = clinic_day_map.get(self.clinic.clinic_day, 0)
+        today = datetime.now().date()
+        today_weekday = today.weekday()
+
+        # 이번 주의 클리닉 날짜 계산
+        days_until_clinic = clinic_weekday - today_weekday
+
+        if days_until_clinic >= 0:
+            # 이번 주 클리닉 날짜 (오늘 포함)
+            expected_date = today + timedelta(days=days_until_clinic)
+        else:
+            # 다음 주 클리닉 날짜
+            expected_date = today + timedelta(days=days_until_clinic + 7)
+
+        return expected_date
 
     def delete(self, *args, **kwargs):
         """

@@ -392,7 +392,9 @@ class ClinicAttendanceSerializer(serializers.ModelSerializer):
             "student",
             "student_name",
             "clinic_info",
-            "date",
+            "reservation_date",
+            "expected_clinic_date",
+            "actual_attendance_date",
             "attendance_type",
             "attendance_type_display",
             "created_at",
@@ -403,17 +405,13 @@ class ClinicAttendanceSerializer(serializers.ModelSerializer):
             "student_name",
             "clinic_info",
             "attendance_type_display",
+            "reservation_date",
             "created_at",
             "updated_at",
         ]
 
     def create(self, validated_data):
         """
-        ClinicAttendance 생성 시 오늘 날짜로 자동 설정
+        ClinicAttendance 생성 시 자동 날짜 설정은 모델의 save 메서드에서 처리됨
         """
-        from django.utils import timezone
-
-        # 오늘 날짜로 설정
-        validated_data["date"] = timezone.now().date()
-
         return super().create(validated_data)

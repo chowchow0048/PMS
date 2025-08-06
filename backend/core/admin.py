@@ -23,9 +23,15 @@ class ClinicAttendanceInline(admin.TabularInline):
     model = ClinicAttendance
     fk_name = "student"  # User 모델의 어떤 필드를 참조하는지 명시
     extra = 0  # 빈 폼 개수 (0으로 설정하여 기존 데이터만 표시)
-    fields = ("clinic", "date", "attendance_type", "get_clinic_info_short")
+    fields = (
+        "clinic",
+        "expected_clinic_date",
+        "actual_attendance_date",
+        "attendance_type",
+        "get_clinic_info_short",
+    )
     readonly_fields = ("get_clinic_info_short",)
-    ordering = ("-date",)  # 최신 날짜부터 정렬
+    ordering = ("-expected_clinic_date",)  # 최신 예상 클리닉 날짜부터 정렬
 
     def get_clinic_info_short(self, obj):
         """클리닉 정보를 간단하게 표시"""
@@ -1017,14 +1023,16 @@ class ClinicAttendanceAdmin(admin.ModelAdmin):
     list_display = (
         "get_student_name",
         "get_clinic_info",
-        "date",
+        "expected_clinic_date",
+        "actual_attendance_date",
         "get_attendance_display",
         "get_created_time",
         "id",
     )
     list_filter = (
         "attendance_type",
-        "date",
+        "expected_clinic_date",
+        "actual_attendance_date",
         "clinic__clinic_day",
         "clinic__clinic_time",
         "clinic__clinic_subject",
@@ -1036,9 +1044,9 @@ class ClinicAttendanceAdmin(admin.ModelAdmin):
         "clinic__clinic_teacher__name",
         "clinic__clinic_room",
     )
-    readonly_fields = ("created_at", "updated_at")
-    date_hierarchy = "date"
-    ordering = ("-date", "-created_at")
+    readonly_fields = ("created_at", "updated_at", "reservation_date")
+    date_hierarchy = "expected_clinic_date"
+    ordering = ("-expected_clinic_date", "-created_at")
 
     # 필터링 최적화를 위한 select_related와 prefetch_related
     def get_queryset(self, request):
