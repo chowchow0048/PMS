@@ -392,7 +392,7 @@ class CustomUserAdmin(UserAdmin):
             return "-"
 
         recent_attendances = obj.clinic_attendances.select_related("clinic").order_by(
-            "-date"
+            "-expected_clinic_date"
         )[:5]
         if not recent_attendances:
             return "출석기록 없음"
@@ -408,7 +408,7 @@ class CustomUserAdmin(UserAdmin):
         statuses = []
         for attendance in recent_attendances:
             icon = status_icons.get(attendance.attendance_type, "❓")
-            date_str = attendance.date.strftime("%m/%d")
+            date_str = attendance.expected_clinic_date.strftime("%m/%d")
             statuses.append(f"{icon}{date_str}")
 
         return " | ".join(statuses)
@@ -452,7 +452,7 @@ class CustomUserAdmin(UserAdmin):
 
         recent_attendances = obj.clinic_attendances.select_related(
             "clinic", "clinic__clinic_subject", "clinic__clinic_teacher"
-        ).order_by("-date")[
+        ).order_by("-expected_clinic_date")[
             :10
         ]  # 최근 10개
 
@@ -482,7 +482,7 @@ class CustomUserAdmin(UserAdmin):
             )
 
             record = (
-                f"📅 {attendance.date.strftime('%Y-%m-%d')} | "
+                f"📅 {attendance.expected_clinic_date.strftime('%Y-%m-%d')} | "
                 f"📚 {subject_name} | "
                 f"👨‍🏫 {teacher_name} | "
                 f"🏠 {clinic.clinic_room} | "
@@ -1217,7 +1217,7 @@ class ClinicAttendanceAdmin(admin.ModelAdmin):
 
             writer.writerow(
                 [
-                    obj.date.strftime("%Y-%m-%d"),
+                    obj.expected_clinic_date.strftime("%Y-%m-%d"),
                     obj.student.name,
                     obj.student.username,
                     obj.student.school,
