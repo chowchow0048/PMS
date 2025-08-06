@@ -95,13 +95,18 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 
 # 프로덕션 환경에서 Vercel 도메인 패턴 허용
 if not DEBUG:
-    # Vercel 도메인 패턴 허용 (*.vercel.app)
+    # 허용된 도메인 패턴들
     CORS_ALLOWED_ORIGIN_REGEXES = [
         r"^https://.*\.vercel\.app$",  # 모든 *.vercel.app 도메인 허용
         r"^https://pms-murex\.vercel\.app$",  # 메인 도메인
+        r"^https://www\.mullidan\.xyz$",  # 새로운 프로덕션 도메인
+        r"^https://mullidan\.xyz$",  # www 없는 버전도 허용
     ]
 else:
     CORS_ALLOWED_ORIGIN_REGEXES = []
+
+# CORS 추가 설정
+CORS_ALLOW_CREDENTIALS = True  # 쿠키와 인증 정보 허용
 
 # 메인 URL 설정
 ROOT_URLCONF = "config.urls"

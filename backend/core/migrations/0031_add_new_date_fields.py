@@ -3,6 +3,73 @@
 from django.db import migrations, models
 
 
+def cleanup_duplicate_attendance_before_constraint(apps, schema_editor):
+    """
+    unique 제약 조건 생성 전에 중복 데이터를 정리합니다.
+    Railway 콘솔 접속 불가 시를 위한 마이그레이션 내 정리 로직
+    """
+    ClinicAttendance = apps.get_model('core', 'ClinicAttendance')
+    
+    print("🔍 [마이그레이션] 중복 출석 데이터 정리 시작...")
+    
+    # 1. 비활성화된 데이터 삭제
+    inactive_count = ClinicAttendance.objects.filter(is_active=False).count()
+    if inactive_count > 0:
+        print(f"📊 [마이그레이션] 비활성화된 데이터 {inactive_count}개 삭제 중...")
+        ClinicAttendance.objects.filter(is_active=False).delete()
+    
+    # 2. 중복 데이터 정리 - SQL 직접 실행
+    from django.db import connection
+    with connection.cursor() as cursor:
+        # 중복 데이터 확인
+        cursor.execute("""
+            SELECT 
+                clinic_id, 
+                student_id, 
+                expected_clinic_date,
+                COUNT(*) as count
+            FROM core_clinicattendance 
+            GROUP BY clinic_id, student_id, expected_clinic_date
+            HAVING COUNT(*) > 1
+            LIMIT 5
+        """)
+        duplicates = cursor.fetchall()
+        
+        if duplicates:
+            print(f"📊 [마이그레이션] 중복 데이터 발견: {len(duplicates)}개 그룹")
+            for clinic_id, student_id, date, count in duplicates:
+                print(f"  - 클리닉 {clinic_id}, 학생 {student_id}, 날짜 {date}: {count}개")
+        
+        # 중복 데이터 정리 (가장 최근 것만 유지)
+        cursor.execute("""
+            WITH duplicate_rows AS (
+                SELECT id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY clinic_id, student_id, expected_clinic_date 
+                           ORDER BY created_at DESC
+                       ) as rn
+                FROM core_clinicattendance
+            )
+            DELETE FROM core_clinicattendance 
+            WHERE id IN (
+                SELECT id FROM duplicate_rows WHERE rn > 1
+            )
+        """)
+        deleted_count = cursor.rowcount
+        
+        if deleted_count > 0:
+            print(f"✅ [마이그레이션] {deleted_count}개 중복 데이터 정리 완료")
+        else:
+            print("✅ [마이그레이션] 중복 데이터가 없습니다")
+    
+    print("🎉 [마이그레이션] 중복 데이터 정리 완료!")
+
+
+def reverse_cleanup_duplicate_attendance(apps, schema_editor):
+    """역방향 마이그레이션 - 실제로는 복구할 수 없으므로 경고만 출력"""
+    print("⚠️ [마이그레이션] 중복 데이터 정리는 되돌릴 수 없습니다.")
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +77,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # 🚨 중요: unique 제약 조건 생성 전에 중복 데이터를 먼저 정리
+        migrations.RunPython(
+            cleanup_duplicate_attendance_before_constraint,
+            reverse_cleanup_duplicate_attendance,
+        ),
         # 먼저 기존 unique_together 제거 (date 필드가 포함되어 있음)
         migrations.AlterUniqueTogether(
             name="clinicattendance",
