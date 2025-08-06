@@ -18,49 +18,34 @@ def cleanup_duplicate_attendance_before_constraint(apps, schema_editor):
         print(f"📊 [마이그레이션] 비활성화된 데이터 {inactive_count}개 삭제 중...")
         ClinicAttendance.objects.filter(is_active=False).delete()
     
-    # 2. 중복 데이터 정리 - SQL 직접 실행
-    from django.db import connection
-    with connection.cursor() as cursor:
-        # 중복 데이터 확인
-        cursor.execute("""
-            SELECT 
-                clinic_id, 
-                student_id, 
-                expected_clinic_date,
-                COUNT(*) as count
-            FROM core_clinicattendance 
-            GROUP BY clinic_id, student_id, expected_clinic_date
-            HAVING COUNT(*) > 1
-            LIMIT 5
-        """)
-        duplicates = cursor.fetchall()
-        
-        if duplicates:
-            print(f"📊 [마이그레이션] 중복 데이터 발견: {len(duplicates)}개 그룹")
-            for clinic_id, student_id, date, count in duplicates:
-                print(f"  - 클리닉 {clinic_id}, 학생 {student_id}, 날짜 {date}: {count}개")
-        
-        # 중복 데이터 정리 (가장 최근 것만 유지)
-        cursor.execute("""
-            WITH duplicate_rows AS (
-                SELECT id,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY clinic_id, student_id, expected_clinic_date 
-                           ORDER BY created_at DESC
-                       ) as rn
-                FROM core_clinicattendance
-            )
-            DELETE FROM core_clinicattendance 
-            WHERE id IN (
-                SELECT id FROM duplicate_rows WHERE rn > 1
-            )
-        """)
-        deleted_count = cursor.rowcount
-        
-        if deleted_count > 0:
-            print(f"✅ [마이그레이션] {deleted_count}개 중복 데이터 정리 완료")
-        else:
-            print("✅ [마이그레이션] 중복 데이터가 없습니다")
+    # 2. 간단한 중복 데이터 정리 - ORM 사용
+    from collections import defaultdict
+    
+    # 모든 출석 데이터를 (clinic_id, student_id) 기준으로 그룹화
+    all_attendances = ClinicAttendance.objects.all().order_by('clinic_id', 'student_id', 'created_at')
+    grouped = defaultdict(list)
+    
+    for attendance in all_attendances:
+        key = (attendance.clinic_id, attendance.student_id)
+        grouped[key].append(attendance)
+    
+    total_deleted = 0
+    for key, attendances in grouped.items():
+        if len(attendances) > 1:
+            # 가장 최근 것만 남기고 나머지 삭제
+            to_keep = attendances[-1]  # 가장 최근 것
+            to_delete = attendances[:-1]  # 나머지
+            
+            print(f"📊 [마이그레이션] 클리닉 {key[0]}, 학생 {key[1]}: {len(to_delete)}개 중복 삭제")
+            
+            for attendance in to_delete:
+                attendance.delete()
+                total_deleted += 1
+    
+    if total_deleted > 0:
+        print(f"✅ [마이그레이션] {total_deleted}개 중복 데이터 정리 완료")
+    else:
+        print("✅ [마이그레이션] 중복 데이터가 없습니다")
     
     print("🎉 [마이그레이션] 중복 데이터 정리 완료!")
 
