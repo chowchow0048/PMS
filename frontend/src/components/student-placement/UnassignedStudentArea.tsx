@@ -31,13 +31,14 @@ import {
   Spinner,
   Center
 } from '@chakra-ui/react';
-import { SearchIcon, AttachmentIcon, DownloadIcon, ChevronDownIcon, ChevronUpIcon, AddIcon } from '@chakra-ui/icons';
+import { SearchIcon, AttachmentIcon, DownloadIcon, ChevronDownIcon, ChevronUpIcon, AddIcon, SettingsIcon } from '@chakra-ui/icons';
 import { useDrop } from 'react-dnd';
 import StudentItem, { ItemTypes } from './StudentItem'; // Student는 types.ts에서 import
 import { Student } from '@/lib/types'; // types.ts에서 Student import
 import { uploadStudentExcel } from '@/lib/api'; // 삭제된 함수들 제거
 import * as XLSX from 'xlsx';
 import { useCallback } from 'react';
+import MandatoryClinicModal from './MandatoryClinicModal';
 
 // 미배치 학생 영역 컴포넌트 props 인터페이스
 interface UnassignedStudentAreaProps {
@@ -80,6 +81,13 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   const [uploadType, setUploadType] = useState<'student' | 'generate'>('student');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
+  
+  // 의무 클리닉 모달 관련
+  const { 
+    isOpen: isMandatoryOpen, 
+    onOpen: onMandatoryOpen, 
+    onClose: onMandatoryClose 
+  } = useDisclosure();
   
   // 다중 선택 관련 상태
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
@@ -433,7 +441,44 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                 </Button>
               </>
             )}
-                           <Button
+            <Button
+              leftIcon={<SettingsIcon />}
+              colorScheme="orange"
+              variant="solid"
+              size="md"
+              bg="orange.500"
+              _hover={{ bg: "orange.400" }}
+              onClick={() => {
+                // 현재 non_pass=true인 학생들을 콘솔에 출력
+                const mandatoryStudents = students.filter(student => student.non_pass === true);
+                console.log('🔍 [UnassignedStudentArea] 의무 클리닉 버튼 클릭 시점');
+                console.log('🔍 [UnassignedStudentArea] 전체 학생 수:', students.length);
+                console.log('🔍 [UnassignedStudentArea] non_pass=true인 학생 수:', mandatoryStudents.length);
+                console.log('🔍 [UnassignedStudentArea] non_pass=true인 학생들:', 
+                  mandatoryStudents.map(s => ({ 
+                    id: s.id, 
+                    name: s.student_name, 
+                    non_pass: s.non_pass,
+                    username: s.username
+                  }))
+                );
+                
+                // 전체 학생들의 non_pass 상태 확인
+                console.log('🔍 [UnassignedStudentArea] 모든 학생의 non_pass 상태:', 
+                  students.map(s => ({ 
+                    id: s.id, 
+                    name: s.student_name, 
+                    non_pass: s.non_pass 
+                  }))
+                );
+                
+                onMandatoryOpen();
+              }}
+              mr={2}
+            >
+              의무 클리닉
+            </Button>
+            <Button
                leftIcon={<AttachmentIcon />}
                colorScheme="blue"
                variant="solid"
@@ -823,6 +868,12 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* 의무 클리닉 관리 모달 */}
+      <MandatoryClinicModal
+        isOpen={isMandatoryOpen}
+        onClose={onMandatoryClose}
+      />
     </Box>
   );
 };

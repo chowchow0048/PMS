@@ -30,6 +30,54 @@ import {
 } from '@chakra-ui/react';
 import { useAuth } from '@/lib/authContext';
 
+// 의무 대상자 애니메이션 컴포넌트 (개선된 버전)
+const MandatoryText: React.FC<{ delay: number }> = ({ delay }) => {
+  // 랜덤 폰트 크기 생성 (1rem ~ 200px)
+  const getRandomFontSize = () => {
+    const minSize = 16; // 1rem = 16px
+    const maxSize = 200; // 200px
+    return Math.floor(Math.random() * (maxSize - minSize + 1)) + minSize;
+  };
+
+  const fontSize = getRandomFontSize();
+  const horizontalPosition = Math.random() * 80 + 10; // 10% ~ 90%
+
+  return (
+    <Text
+      position="absolute"
+      fontSize={`${fontSize}px`}
+      fontWeight="bold"
+      color="orange.500" // 주황색으로 변경
+      zIndex={-1}
+      left={`${horizontalPosition}%`}
+      pointerEvents="none"
+      userSelect="none"
+      sx={{
+        '@keyframes mandatoryFallFromSky': {
+          '0%': {
+            transform: 'translateY(-150vh) rotate(0deg)', // 더 높은 위치에서 시작
+            opacity: 0.9,
+          },
+          '10%': {
+            opacity: 0.8,
+          },
+          '90%': {
+            opacity: 0.3,
+          },
+          '100%': {
+            transform: 'translateY(100vh) rotate(360deg)',
+            opacity: 0,
+          },
+        },
+        animation: 'mandatoryFallFromSky 4s linear infinite', // 4초로 조금 더 길게
+        animationDelay: `${delay}s`,
+      }}
+    >
+      의무 대상자!!!
+    </Text>
+  );
+};
+
 // 타입 정의
 interface Student {
   id: number;
@@ -73,7 +121,7 @@ const ClinicReservePage: React.FC = () => {
     day: string;
     time: string;
     clinic: ClinicSlot;
-    action: 'reserve' | 'cancel';  // 예약 또는 취소 구분
+    action: 'reserve';  // 예약만 가능 (취소는 불가능)
   } | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>(''); // 타이머 상태
   
@@ -81,6 +129,9 @@ const ClinicReservePage: React.FC = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { user, token, isLoading } = useAuth();
   const toast = useToast();
+
+  // 의무 대상자 애니메이션을 위한 상태
+  const [showMandatoryAnimation, setShowMandatoryAnimation] = useState(false);
 
   // 요일 매핑
   const dayNames: { [key: string]: string } = {
@@ -118,7 +169,7 @@ const ClinicReservePage: React.FC = () => {
     const weekday = today.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
     
     // 테스팅용: 월요일로 가정
-    // return 0; // 월요일로 고정
+    return 0; // 월요일로 고정
     
     // 일요일(0)을 토요일 다음(6)으로 처리
     if (weekday === 0) return 6; // 일요일은 모든 요일 예약 가능
@@ -151,13 +202,9 @@ const ClinicReservePage: React.FC = () => {
     return targetDayOrder >= currentDayOrder;
   };
 
-  // 당일 취소 가능한지 확인하는 함수
-  const isSameDayCancellable = (day: string) => {
-    const currentDayOrder = getCurrentDayOrder();
-    const targetDayOrder = dayOrder[day];
-    
-    // 당일이면 취소 불가능
-    return targetDayOrder !== currentDayOrder;
+  // 예약 취소는 완전히 불가능 (관리자 문의 필요)
+  const isCancellationAllowed = () => {
+    return false; // 모든 예약 취소 불가능
   };
 
   // 다음주 월요일 00:00까지의 시간 계산 함수 (24시간계)
@@ -186,8 +233,13 @@ const ClinicReservePage: React.FC = () => {
   useEffect(() => {
     if (!isLoading && token) {
       loadWeeklySchedule();
+      
+      // 의무 대상자인 경우 애니메이션 표시
+      if (user?.non_pass) {
+        setShowMandatoryAnimation(true);
+      }
     }
-  }, [token, isLoading]);
+  }, [token, isLoading, user]);
 
   // 타이머 업데이트 (1초마다)
   useEffect(() => {
@@ -229,7 +281,7 @@ const ClinicReservePage: React.FC = () => {
         title: '오류',
         description: '스케줄을 불러오는데 실패했습니다.',
         status: 'error',
-        duration: 3000,
+        duration: 1000,
         isClosable: true,
       });
     } finally {
@@ -256,7 +308,7 @@ const ClinicReservePage: React.FC = () => {
         title: '로그인 필요',
         description: '로그인 후 이용해주세요.',
         status: 'error',
-        duration: 3000,
+        duration: 1000,
         isClosable: true,
       });
       return;
@@ -268,7 +320,7 @@ const ClinicReservePage: React.FC = () => {
         title: '예약 불가',
         description: `${dayNames[day]}은 이미 지나간 요일로 예약할 수 없습니다.`,
         status: 'warning',
-        duration: 3000,
+        duration: 1000,
         isClosable: true,
       });
       return;
@@ -279,7 +331,7 @@ const ClinicReservePage: React.FC = () => {
         title: '예약 불가',
         description: '해당 시간대에 클리닉이 없습니다.',
         status: 'warning',
-        duration: 3000,
+        duration: 1000,
         isClosable: true,
       });
       return;
@@ -291,7 +343,7 @@ const ClinicReservePage: React.FC = () => {
         title: '예약 마감',
         description: '해당 시간대는 이미 마감되었습니다.',
         status: 'warning',
-        duration: 3000,
+        duration: 1000,
         isClosable: true,
       });
       return;
@@ -307,7 +359,7 @@ const ClinicReservePage: React.FC = () => {
         title: '이미 예약됨',
         description: '이미 해당 클리닉에 예약되어 있습니다.',
         status: 'info',
-        duration: 3000,
+        duration: 1000,
         isClosable: true,
       });
       return;
@@ -322,10 +374,7 @@ const ClinicReservePage: React.FC = () => {
   const confirmReservation = async () => {
     if (!selectedSlot || !user) return;
 
-    if (selectedSlot.action === 'cancel') {
-      // 예약 취소 처리
-      return handleCancelReservation(selectedSlot.day, selectedSlot.time, selectedSlot.clinic);
-    }
+    // 예약 취소는 불가능하므로 해당 로직 제거
 
     try {
       setReserving(true);
@@ -345,13 +394,22 @@ const ClinicReservePage: React.FC = () => {
 
                   if (response.ok) {
               // 예약 성공
+              const isWasMandatory = user?.non_pass; // 예약 전 의무 대상자 상태 확인
+              
               toast({
                 title: '예약 완료',
-                description: data.message,
+                description: isWasMandatory 
+                  ? `${data.message} 의무 클리닉 상태가 해제되었습니다!` 
+                  : data.message,
                 status: 'success',
-                duration: 3000,
+                duration: isWasMandatory ? 3000 : 1000,
                 isClosable: true,
               });
+
+              // 의무 대상자였다면 애니메이션 중지
+              if (isWasMandatory) {
+                setShowMandatoryAnimation(false);
+              }
 
               // 스케줄 새로고침
               await loadWeeklySchedule();
@@ -362,7 +420,7 @@ const ClinicReservePage: React.FC = () => {
                 title: '예약 마감',
                 description: data.message,
                 status: 'warning',
-                duration: 3000,
+                duration: 1000,
                 isClosable: true,
               });
               onClose();
@@ -373,7 +431,7 @@ const ClinicReservePage: React.FC = () => {
                 title: '예약 제한',
                 description: data.message || `${data.user_name || '학생'}은 ${data.no_show_count || 2}회 이상 무단결석하여 금주 보충 예약이 불가능합니다.`,
                 status: 'error',
-                duration: 8000, // 길게 표시
+                duration: 1000, // 길게 표시
                 isClosable: true,
               });
               onClose();
@@ -383,7 +441,7 @@ const ClinicReservePage: React.FC = () => {
                 title: '예약 불가',
                 description: '보충 예약 가능 기간이 아닙니다.',
                 status: 'warning',
-                duration: 5000,
+                duration: 1000,
                 isClosable: true,
               });
               onClose();
@@ -393,7 +451,7 @@ const ClinicReservePage: React.FC = () => {
                 title: '예약 실패',
                 description: data.error || '예약 중 오류가 발생했습니다.',
                 status: 'error',
-                duration: 3000,
+                duration: 1000,
                 isClosable: true,
               });
             }
@@ -403,7 +461,7 @@ const ClinicReservePage: React.FC = () => {
         title: '네트워크 오류',
         description: '예약 요청 중 오류가 발생했습니다.',
         status: 'error',
-        duration: 3000,
+        duration: 1000,
         isClosable: true,
       });
     } finally {
@@ -411,80 +469,15 @@ const ClinicReservePage: React.FC = () => {
     }
   };
 
-  // 예약 취소 처리
-  const handleCancelReservation = async (day: string, time: string, clinic: ClinicSlot) => {
-    if (!user || !clinic.clinic_id) return;
-
-    const isReserved = clinic.students.some(student => student.id === user.id);
-    if (!isReserved) return;
-
-    // 당일 취소 불가능 체크 (프론트엔드 체크)
-    if (!isSameDayCancellable(day)) {
-      toast({
-        title: '취소 불가',
-        description: `당일 예약 취소는 불가능합니다. 예약 취소는 전일까지만 가능합니다.`,
-        status: 'warning',
-        duration: 5000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/clinics/cancel_reservation/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          clinic_id: clinic.clinic_id,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        toast({
-          title: '취소 완료',
-          description: data.message,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
-
-        // 스케줄 새로고침
-        await loadWeeklySchedule();
-        onClose(); // 모달 닫기
-      } else if (response.status === 403 && data.error === 'same_day_cancellation_not_allowed') {
-        // 백엔드에서 당일 취소 차단된 경우
-        toast({
-          title: '취소 불가',
-          description: data.message || '당일 예약 취소는 불가능합니다.',
-          status: 'warning',
-          duration: 5000,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: '취소 실패',
-          description: data.error || '취소 중 오류가 발생했습니다.',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-      }
-    } catch (error) {
-      // console.error('취소 오류:', error);
-      toast({
-        title: '네트워크 오류',
-        description: '취소 요청 중 오류가 발생했습니다.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
+  // 예약된 클리닉 클릭 시 관리자 문의 안내
+  const handleReservedClinicClick = () => {
+    toast({
+      title: '예약 취소 불가',
+      description: '예약 취소는 관리자에게 문의하세요!',
+      status: 'info',
+      duration: 1000,
+      isClosable: true,
+    });
   };
 
   // 슬롯 렌더링 - 모바일 최적화
@@ -495,7 +488,6 @@ const ClinicReservePage: React.FC = () => {
     const isReserved = user && clinic.students.some(student => student.id === user.id);
     const hasClinic = clinic.clinic_id !== null;
     const isPastDay = !isDayReservable(day); // 이전 요일인지 확인
-    const isSameDay = !isSameDayCancellable(day); // 당일인지 확인 (당일이면 취소 불가)
 
     return (
       <GridItem key={`${day}-${time}`}>
@@ -514,33 +506,21 @@ const ClinicReservePage: React.FC = () => {
               : isPastDay
               ? "gray.100"
               : isReserved
-              ? (isSameDay ? "orange.50" : "blue.50")
+              ? "blue.50"
               : clinic.is_full
               ? "red.50"
               : "white"
           }
           _hover={{
-            shadow: hasClinic && !clinic.is_full && !isPastDay && !(isReserved && isSameDay) ? "md" : "none",
-            cursor: hasClinic && !isPastDay && (!isReserved || (isReserved && !isSameDay)) && !clinic.is_full ? "pointer" : isReserved && isSameDay ? "not-allowed" : "default",
+            shadow: hasClinic && !clinic.is_full && !isPastDay && !isReserved ? "md" : "none",
+            cursor: hasClinic && !isPastDay && !isReserved && !clinic.is_full ? "pointer" : isReserved ? "pointer" : "default",
           }}
           transition="all 0.2s"
           onClick={() => {
             if (hasClinic && !isPastDay) {
               if (isReserved) {
-                // 당일 취소 불가능한 경우
-                if (isSameDay) {
-                  toast({
-                    title: '취소 불가',
-                    description: '당일 예약 취소는 불가능합니다. 예약 취소는 전일까지만 가능합니다.',
-                    status: 'warning',
-                    duration: 5000,
-                    isClosable: true,
-                  });
-                  return;
-                }
-                // 예약 취소 확인 모달 표시
-                setSelectedSlot({ day, time, clinic, action: 'cancel' });
-                onOpen();
+                // 예약된 클리닉 클릭 시 관리자 문의 안내
+                handleReservedClinicClick();
               } else if (!clinic.is_full) {
                 handleReserveClinic(day, time, clinic);
               }
@@ -587,12 +567,12 @@ const ClinicReservePage: React.FC = () => {
                 >
                   {isReserved && (
                     <Badge 
-                      colorScheme={isSameDay ? "blue" : "blue"}
+                      colorScheme="blue"
                       fontSize={{ base: "0.6rem", sm: "0.8rem", md: "0.8rem" }}
                       px={0.8}
                       py={0.2}
                     >
-                      {isSameDay ? "예약됨" : "예약됨"}
+                      예약됨
                     </Badge>
                   )}
                 </Box>
@@ -673,7 +653,22 @@ const ClinicReservePage: React.FC = () => {
   }
 
   return (
-    <Container maxW="container.xl" py={{ base: 2, md: 4 }} px={{ base: 2, md: 4 }}>
+    <Container 
+      maxW="container.xl" 
+      py={{ base: 2, md: 4 }} 
+      px={{ base: 2, md: 4 }}
+      position="relative"
+      overflow="hidden"
+    >
+      {/* 의무 대상자 애니메이션 */}
+      {/* {showMandatoryAnimation && user?.non_pass && (
+        <>
+          {Array.from({ length: 20 }, (_, i) => (
+            <MandatoryText key={i} delay={i * 0.2} />
+          ))}
+        </>
+      )} */}
+      
       <VStack spacing={4} align="stretch">
         <VStack spacing={2} textAlign="center">
           <Heading 
@@ -776,11 +771,7 @@ const ClinicReservePage: React.FC = () => {
                   mb={4}
                   lineHeight="1.5"
                 >
-                  {/* {selectedSlot.action === 'reserve' 
-                    ? `${dayNames[selectedSlot.day]} ${selectedSlot.time} ${selectedSlot.clinic.room} 예약 하시겠습니까?`
-                    : `${dayNames[selectedSlot.day]} ${selectedSlot.time} ${selectedSlot.clinic.room} 예약을 취소하시겠습니까?`
-                  } */}
-                  {selectedSlot.action === 'reserve' ? (selectedSlot.day === getCurrentDay() ? "당일 보충 예약 취소는 불가능합니다. 예약 하시겠습니까?" : `${dayNames[selectedSlot.day]} ${selectedSlot.time} 예약 하시겠습니까?`) : `${dayNames[selectedSlot.day]} ${selectedSlot.time} 예약을 취소하시겠습니까?`}
+                  {selectedSlot.day === getCurrentDay() ? "당일 보충 예약 취소는 불가능합니다. 예약 하시겠습니까?" : `${dayNames[selectedSlot.day]} ${selectedSlot.time} 예약 하시겠습니까?`}
                 </Text>
               </ModalBody>
               <ModalFooter px={{ base: 4, md: 6 }}>
@@ -794,13 +785,13 @@ const ClinicReservePage: React.FC = () => {
                   닫기
                 </Button>
                 <Button
-                  colorScheme={selectedSlot.action === 'cancel' ? "red" : "blue"}
+                  colorScheme="blue"
                   onClick={confirmReservation}
                   isLoading={reserving}
-                  loadingText={selectedSlot.action === 'cancel' ? "취소 중..." : "예약 중..."}
+                  loadingText="예약 중..."
                   size={{ base: "md", md: "sm" }}
                 >
-                  {selectedSlot.action === 'cancel' ? "예약 취소" : "예약 확정"}
+                  예약 확정
                 </Button>
               </ModalFooter>
             </>

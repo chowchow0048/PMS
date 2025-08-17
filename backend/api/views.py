@@ -118,6 +118,50 @@ class UserViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @action(detail=True, methods=["patch"])
+    def update_non_pass(self, request, pk=None):
+        """학생의 의무 클리닉 상태(non_pass) 업데이트"""
+        try:
+            user = self.get_object()
+            non_pass_status = request.data.get("non_pass")
+
+            if non_pass_status is None:
+                return Response(
+                    {"error": "non_pass 값이 필요합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # boolean 변환
+            if isinstance(non_pass_status, str):
+                non_pass_status = non_pass_status.lower() == "true"
+
+            user.non_pass = non_pass_status
+            user.save(update_fields=["non_pass"])
+
+            logger.info(
+                f"[api/views.py] non_pass 상태 업데이트: user_id={user.id}, "
+                f"name={user.name}, non_pass={non_pass_status}"
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "message": f"{user.name} 학생의 의무 클리닉 상태가 {'설정' if non_pass_status else '해제'}되었습니다.",
+                    "user_id": user.id,
+                    "name": user.name,
+                    "non_pass": non_pass_status,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[api/views.py] non_pass 상태 업데이트 오류: {error_msg}")
+            return Response(
+                {"error": f"상태 업데이트 중 오류가 발생했습니다: {error_msg}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=["post"])
     def upload_student_excel(self, request):
         """학생 명단 엑셀 파일로 학생 사용자(is_student=True) 추가"""
@@ -766,6 +810,15 @@ class ClinicViewSet(viewsets.ModelViewSet):
                     expected_clinic_date=expected_clinic_date,  # 위에서 계산된 예상 클리닉 날짜 사용
                 )
 
+                # 의무 클리닉 대상자인 경우 non_pass를 False로 변경
+                if user.non_pass:
+                    user.non_pass = False
+                    user.save(update_fields=["non_pass"])
+                    logger.info(
+                        f"[api/views.py] 의무 클리닉 대상자 예약 완료: user_id={user_id}, "
+                        f"non_pass를 False로 변경"
+                    )
+
                 # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
                 # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
 
@@ -804,164 +857,22 @@ class ClinicViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"])
     def cancel_reservation(self, request):
         """
-        학생이 클리닉 예약을 취소하는 API
-        당일 취소는 불가능하도록 제한
+        클리닉 예약 취소 API - 완전히 비활성화
+        모든 예약 취소는 관리자에게 문의 필요
         """
-        logger.info("[api/views.py] 클리닉 예약 취소 요청 시작")
+        logger.info("[api/views.py] 클리닉 예약 취소 요청 - 비활성화됨")
 
-        try:
-            user_id = request.data.get("user_id")
-            clinic_id = request.data.get("clinic_id")
+        # 모든 예약 취소 요청을 차단
+        return Response(
+            {
+                "error": "cancellation_disabled",
+                "message": "예약 취소는 관리자에게 문의하세요!",
+                "admin_contact": "관리자 문의가 필요합니다.",
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
-            if not user_id or not clinic_id:
-                return Response(
-                    {"error": "user_id와 clinic_id가 필요합니다."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # 사용자 유효성 검사 (트랜잭션 외부에서 수행)
-            try:
-                user = User.objects.get(
-                    id=user_id
-                )  # 모든 종류의 사용자가 클리닉 예약 취소 가능 (학생 < 강사 < 관리자 < 슈퍼유저)
-            except User.DoesNotExist:
-                return Response(
-                    {
-                        "error": "유효하지 않은 사용자입니다."
-                    },  # 모든 사용자 대상으로 메시지 변경
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            # 트랜잭션 내에서 클리닉 조회 및 예약 취소 처리
-            with transaction.atomic():
-                # 클리닉 조회
-                try:
-                    clinic = Clinic.objects.get(id=clinic_id)
-                except Clinic.DoesNotExist:
-                    return Response(
-                        {"error": "유효하지 않은 클리닉입니다."},
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
-
-                # 당일 취소 불가능 체크
-                from datetime import datetime
-
-                today = datetime.now()
-                weekday = today.weekday()  # 0=월요일, 1=화요일, ..., 6=일요일
-
-                # 요일 매핑 (weekday 0~6 -> clinic_day 문자열)
-                day_mapping = {
-                    0: "mon",  # 월요일
-                    1: "tue",  # 화요일
-                    2: "wed",  # 수요일
-                    3: "thu",  # 목요일
-                    4: "fri",  # 금요일
-                    5: "sat",  # 토요일
-                    6: "sun",  # 일요일
-                }
-
-                today_day = day_mapping.get(weekday, "mon")
-
-                # 당일 클리닉인지 확인
-                if clinic.clinic_day == today_day:
-                    logger.warning(
-                        f"[api/views.py] 당일 예약 취소 시도 차단: user_id={user_id}, "
-                        f"clinic_id={clinic_id}, clinic_day={clinic.clinic_day}, today={today_day}"
-                    )
-                    return Response(
-                        {
-                            "error": "same_day_cancellation_not_allowed",
-                            "message": "당일 예약 취소는 불가능합니다. 예약 취소는 전일까지만 가능합니다.",
-                            "clinic_day": clinic.clinic_day,
-                            "today": today_day,
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-
-                # 예약되어 있는지 확인
-                if not clinic.clinic_students.filter(id=user_id).exists():
-                    return Response(
-                        {"error": "해당 클리닉에 예약되어 있지 않습니다."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                # 예약 취소
-                clinic.clinic_students.remove(user)
-
-                # 관련된 ClinicAttendance 데이터 삭제하여 유령 데이터 방지
-                # 같은 클리닉에 다시 예약할 수 있도록 실제로 삭제 (unique 제약 조건 해결)
-                from datetime import datetime, timedelta
-
-                # 클리닉 요일을 숫자로 변환 (0=월요일, 6=일요일)
-                clinic_day_map = {
-                    "mon": 0,
-                    "tue": 1,
-                    "wed": 2,
-                    "thu": 3,
-                    "fri": 4,
-                    "sat": 5,
-                    "sun": 6,
-                }
-
-                clinic_weekday = clinic_day_map.get(clinic.clinic_day, 0)
-                today = datetime.now().date()
-                today_weekday = today.weekday()
-
-                # 이번 주의 클리닉 날짜 계산
-                days_until_clinic = clinic_weekday - today_weekday
-
-                if days_until_clinic >= 0:
-                    # 이번 주 클리닉 날짜 (오늘 포함)
-                    expected_clinic_date = today + timedelta(days=days_until_clinic)
-                else:
-                    # 다음 주 클리닉 날짜
-                    expected_clinic_date = today + timedelta(days=days_until_clinic + 7)
-
-                # 해당 주의 클리닉 예약 데이터만 삭제 (다른 주 데이터는 보존)
-                deleted_attendances = ClinicAttendance.objects.filter(
-                    clinic=clinic,
-                    student=user,
-                    expected_clinic_date=expected_clinic_date,
-                    is_active=True,
-                )
-                deleted_count = deleted_attendances.count()
-
-                # 실제로 삭제하여 unique 제약 조건 문제 해결
-                deleted_attendances.delete()
-
-                logger.info(
-                    f"[api/views.py] 클리닉 예약 취소 - 삭제된 출석 데이터: "
-                    f"clinic_id={clinic_id}, student_id={user_id}, "
-                    f"expected_clinic_date={expected_clinic_date}, count={deleted_count}"
-                )
-
-            # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
-            # ClinicReservationOptimizer.invalidate_clinic_cache(clinic_id)
-
-            logger.info(
-                f"[api/views.py] 클리닉 예약 취소 성공: user_id={user_id}, "
-                f"clinic_id={clinic_id}, user_name={user.name}, "
-                f"삭제된 출석 데이터: {deleted_count}개"
-            )
-
-            return Response(
-                {
-                    "success": True,
-                    "message": "클리닉 예약이 취소되었습니다.",
-                    "remaining_spots": clinic.get_remaining_spots(),
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"[api/views.py] 클리닉 예약 취소 오류: {error_msg}")
-            logger.error(f"[api/views.py] 스택 트레이스:\n{traceback.format_exc()}")
-
-            return Response(
-                {"error": f"클리닉 예약 취소 중 오류가 발생했습니다: {error_msg}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # 기존 취소 로직은 모두 제거됨 - 관리자 문의 필요
 
     @action(detail=False, methods=["get"])
     @log_performance("주간 스케줄 조회")

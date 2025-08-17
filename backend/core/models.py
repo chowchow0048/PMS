@@ -87,6 +87,13 @@ class User(AbstractUser):
         help_text="2회 이상 무단결석 시 보충 예약이 제한됩니다.",
     )  # 무단결석 횟수
 
+    # 의무 클리닉 관리 필드
+    non_pass = models.BooleanField(
+        default=False,
+        verbose_name="의무 클리닉 대상자",
+        help_text="True인 경우 의무적으로 보충 클리닉을 수강해야 합니다.",
+    )  # 의무 클리닉 대상 여부
+
     def __str__(self):
         return self.name
 

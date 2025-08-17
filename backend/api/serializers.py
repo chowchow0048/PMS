@@ -59,6 +59,8 @@ class UserSerializer(serializers.ModelSerializer):
             "student_parent_phone_num",
             "school",
             "grade",
+            "no_show",  # 무단결석 횟수
+            "non_pass",  # 의무 클리닉 대상자 여부
         ]
         read_only_fields = ["id"]
 

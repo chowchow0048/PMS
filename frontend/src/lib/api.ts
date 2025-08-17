@@ -159,6 +159,25 @@ export const getStudents = async (): Promise<Student[]> => {
       const response: any = await api.get(nextUrl);
       console.log('🔍 [api.ts] User(is_student=true) 응답:', response);
       
+      // API 응답에서 non_pass 필드 확인
+      if (Array.isArray(response.data)) {
+        const sampleUsers = response.data.slice(0, 3);
+        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map(u => ({
+          id: u.id,
+          name: u.name,
+          non_pass: u.non_pass,
+          no_show: u.no_show
+        })));
+      } else if (response.data.results) {
+        const sampleUsers = response.data.results.slice(0, 3);
+        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map(u => ({
+          id: u.id,
+          name: u.name,
+          non_pass: u.non_pass,
+          no_show: u.no_show
+        })));
+      }
+      
       // 현재 페이지의 학생 데이터 추가
       if (Array.isArray(response.data)) {
         // 페이지네이션이 없는 경우 (전체 배열 반환)
@@ -191,9 +210,18 @@ export const getStudents = async (): Promise<Student[]> => {
       student_parent_phone_num: user.student_parent_phone_num || '',
       school: user.school || '',
       grade: user.grade || '',
+      non_pass: Boolean(user.non_pass), // non_pass 필드 명시적으로 매핑 (undefined/null도 false로 처리)
     }));
     
     console.log(`🔍 [api.ts] 전체 학생 수: ${students.length}명`);
+    
+    // non_pass 상태 확인을 위한 로깅
+    const nonPassStudents = students.filter(s => s.non_pass);
+    console.log(`🔍 [api.ts] 의무 클리닉 대상자: ${nonPassStudents.length}명`);
+    if (nonPassStudents.length > 0) {
+      console.log(`🔍 [api.ts] 의무 클리닉 대상자 목록:`, nonPassStudents.map(s => ({ name: s.student_name, id: s.id, non_pass: s.non_pass })));
+    }
+    
     return students;
   } catch (error) {
     console.error('❌ [api.ts] 학생 데이터 가져오기 오류:', error);
@@ -502,36 +530,12 @@ export const getOrCreateAttendance = async (clinicId: number, studentId: number)
 };
 
 
-// 클리닉 예약 취소 API
+// 클리닉 예약 취소 API - 완전히 비활성화
 export const cancelClinicReservation = async (userId: number, clinicId: number) => {
-  try {
-    console.log('🔍 [api.ts] cancelClinicReservation 함수 시작:', { userId, clinicId });
-    
-    const response = await api.post('/clinics/cancel_reservation/', {
-      user_id: userId,
-      clinic_id: clinicId,
-    });
-    
-    console.log('✅ [api.ts] 클리닉 예약 취소 완료:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('❌ [api.ts] 클리닉 예약 취소 오류:', error);
-    
-    // 백엔드 에러 응답 처리
-    if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as any;
-      console.error('❌ [api.ts] 응답 상태:', axiosError.response?.status);
-      console.error('❌ [api.ts] 응답 데이터:', axiosError.response?.data);
-      
-      // 당일 취소 불가 에러인 경우 특별 처리
-      if (axiosError.response?.status === 403 && 
-          axiosError.response?.data?.error === 'same_day_cancellation_not_allowed') {
-        throw new Error('SAME_DAY_CANCELLATION_NOT_ALLOWED');
-      }
-    }
-    
-    throw error;
-  }
+  console.warn('🚫 [api.ts] 예약 취소 기능이 비활성화되었습니다 - 관리자에게 문의하세요');
+  
+  // 항상 예약 취소 불가 메시지 반환
+  throw new Error('CANCELLATION_DISABLED');
 };
 
 // 클리닉 예약 API
@@ -548,6 +552,26 @@ export const reserveClinic = async (userId: number, clinicId: number) => {
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 클리닉 예약 오류:', error);
+    throw error;
+  }
+};
+
+// 학생 의무 클리닉 상태 업데이트 API
+export const updateStudentNonPass = async (userId: number, nonPass: boolean) => {
+  try {
+    console.log(`🔍 [api.ts] updateStudentNonPass 시작 - ID: ${userId}, non_pass: ${nonPass}`);
+    
+    // API 엔드포인트 수정: update_non_pass -> update-non-pass (하이픈 사용)
+    const response = await api.patch(`/users/${userId}/update_non_pass/`, {
+      non_pass: nonPass
+    });
+    
+    console.log('✅ [api.ts] 의무 클리닉 상태 업데이트 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 의무 클리닉 상태 업데이트 오류:', error);
+    console.error('❌ [api.ts] 오류 응답:', error.response?.data);
+    console.error('❌ [api.ts] 오류 상태:', error.response?.status);
     throw error;
   }
 };

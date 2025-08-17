@@ -71,19 +71,14 @@ class ClinicAttendanceInline(admin.TabularInline):
 class CustomUserAdmin(UserAdmin):
     model = User
     list_display = (
+        "is_active",
         "id",
         "username",
         "name",  # user_name → name
         "is_teacher",
         "is_student",
-        "is_staff",
-        "is_superuser",
         "school",
         "grade",
-        "no_show",  # 무단결석 횟수 추가
-        "get_clinic_attendance_count",  # 출석 기록 수
-        "get_recent_attendance_status",  # 최근 출석 상태
-        "is_active",
     )
     list_filter = (
         "is_teacher",
@@ -117,6 +112,7 @@ class CustomUserAdmin(UserAdmin):
                     "school",
                     "grade",
                     "no_show",  # 무단결석 횟수 추가
+                    "non_pass",  # 의무 클리닉 대상자 여부
                 )
             },
         ),
