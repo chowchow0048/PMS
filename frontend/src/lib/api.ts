@@ -162,7 +162,7 @@ export const getStudents = async (): Promise<Student[]> => {
       // API 응답에서 non_pass 필드 확인
       if (Array.isArray(response.data)) {
         const sampleUsers = response.data.slice(0, 3);
-        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map(u => ({
+        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map((u: any) => ({
           id: u.id,
           name: u.name,
           non_pass: u.non_pass,
@@ -170,7 +170,7 @@ export const getStudents = async (): Promise<Student[]> => {
         })));
       } else if (response.data.results) {
         const sampleUsers = response.data.results.slice(0, 3);
-        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map(u => ({
+        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map((u: any) => ({
           id: u.id,
           name: u.name,
           non_pass: u.non_pass,
