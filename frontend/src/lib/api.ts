@@ -570,8 +570,14 @@ export const updateStudentNonPass = async (userId: number, nonPass: boolean) => 
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 의무 클리닉 상태 업데이트 오류:', error);
-    console.error('❌ [api.ts] 오류 응답:', error.response?.data);
-    console.error('❌ [api.ts] 오류 상태:', error.response?.status);
+    
+    // axios 에러인지 확인하고 타입 캐스팅
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      console.error('❌ [api.ts] 오류 응답:', axiosError.response?.data);
+      console.error('❌ [api.ts] 오류 상태:', axiosError.response?.status);
+    }
+    
     throw error;
   }
 };
