@@ -169,7 +169,7 @@ const ClinicReservePage: React.FC = () => {
     const weekday = today.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
     
     // 테스팅용: 월요일로 가정
-    return 0; // 월요일로 고정
+    // return 0; // 월요일로 고정
     
     // 일요일(0)을 토요일 다음(6)으로 처리
     if (weekday === 0) return 6; // 일요일은 모든 요일 예약 가능
