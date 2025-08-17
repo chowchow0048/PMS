@@ -79,6 +79,7 @@ class CustomUserAdmin(UserAdmin):
         "is_student",
         "school",
         "grade",
+        "non_pass",
     )
     list_filter = (
         "is_teacher",
