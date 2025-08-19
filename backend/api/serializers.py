@@ -83,6 +83,15 @@ class ClinicSerializer(serializers.ModelSerializer):
     remaining_spots = serializers.SerializerMethodField()
     is_full = serializers.SerializerMethodField()
 
+    # clinic_students 필드를 커스텀 처리 (유효성 검사 비활성화)
+    clinic_students = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True,
+        write_only=True,
+        help_text="사용자 ID 배열 (모든 사용자 유형 허용)",
+    )
+
     class Meta:
         model = Clinic
         fields = "__all__"
@@ -109,9 +118,39 @@ class ClinicSerializer(serializers.ModelSerializer):
         return representation
 
     def update(self, instance, validated_data):
-        """클리닉 업데이트 시 clinic_students 필드 처리"""
+        """클리닉 업데이트 시 clinic_students 필드 처리 및 의무 클리닉 상태 자동 업데이트"""
+        # 로그 기록을 위해 미리 import
+        import logging
+
+        logger = logging.getLogger("api.clinic")
+
+        # 디버깅용 로그
+        logger.info(f"[ClinicSerializer] update 시작 - clinic_id={instance.id}")
+        logger.info(
+            f"[ClinicSerializer] validated_data keys: {list(validated_data.keys())}"
+        )
+
         # clinic_students 데이터 추출
         clinic_students_data = validated_data.pop("clinic_students", None)
+        logger.info(f"[ClinicSerializer] clinic_students_data: {clinic_students_data}")
+        logger.info(
+            f"[ClinicSerializer] clinic_students_data type: {type(clinic_students_data)}"
+        )
+
+        # clinic_students 데이터 유효성 검사
+        if clinic_students_data is not None:
+            if not isinstance(clinic_students_data, list):
+                logger.error(
+                    f"[ClinicSerializer] clinic_students는 리스트여야 합니다: {clinic_students_data}"
+                )
+                raise serializers.ValidationError(
+                    {"clinic_students": "리스트 형태의 사용자 ID 배열이어야 합니다."}
+                )
+
+            # ListField(child=IntegerField())로 정의했으므로 항상 정수 배열로 들어옴
+            logger.info(
+                f"[ClinicSerializer] clinic_students_data 검증 완료: 정수 배열 {clinic_students_data}"
+            )
 
         # 다른 필드들 업데이트
         for attr, value in validated_data.items():
@@ -120,16 +159,190 @@ class ClinicSerializer(serializers.ModelSerializer):
 
         # clinic_students 업데이트
         if clinic_students_data is not None:
+            logger.info(f"[ClinicSerializer] clinic_students_data 처리 시작")
             if isinstance(clinic_students_data, list):
-                # ID 배열인 경우
-                if clinic_students_data and isinstance(clinic_students_data[0], int):
-                    user_ids = clinic_students_data
-                    users = User.objects.filter(id__in=user_ids)
-                    instance.clinic_students.set(users)
-                else:
-                    # User 객체 배열인 경우 (보통은 이런 경우는 없음)
-                    instance.clinic_students.set(clinic_students_data)
+                logger.info(
+                    f"[ClinicSerializer] clinic_students_data는 리스트: {clinic_students_data}"
+                )
+                # ListField(child=IntegerField())로 정의했으므로 항상 정수 배열
+                user_ids = clinic_students_data
+                logger.info(f"[ClinicSerializer] user_ids: {user_ids}")
 
+                # 빈 배열 체크
+                if len(user_ids) == 0:
+                    logger.info(f"[ClinicSerializer] 빈 배열 - 모든 사용자 배치 해제")
+                    users = User.objects.none()
+                else:
+                    # 모든 사용자 유형 허용 (학생, 강사, 관리자)
+                    users = User.objects.filter(id__in=user_ids)
+                    logger.info(f"[ClinicSerializer] 정수 배열 처리: {user_ids}")
+
+                # 항상 처리 (빈 배열인 경우도 포함)
+                user_count = users.count() if hasattr(users, "count") else len(users)
+                logger.info(f"[ClinicSerializer] 찾은 사용자 수: {user_count}")
+
+                # 존재하지 않는 사용자 ID들 확인 (빈 배열이 아닌 경우만)
+                if user_ids:
+                    if hasattr(users, "values_list"):
+                        found_user_ids = set(users.values_list("id", flat=True))
+                    else:
+                        found_user_ids = set([user.id for user in users])
+                    missing_user_ids = set(user_ids) - found_user_ids
+
+                    if missing_user_ids:
+                        missing_ids_list = list(missing_user_ids)
+                        logger.error(
+                            f"[ClinicSerializer] 존재하지 않는 사용자 ID들: {missing_ids_list}"
+                        )
+                        raise serializers.ValidationError(
+                            {
+                                "clinic_students": f"다음 사용자 ID들이 존재하지 않습니다: {missing_ids_list}"
+                            }
+                        )
+
+                # 기존 사용자들 ID 조회
+                existing_all_users = instance.clinic_students.all()
+                existing_all_user_ids = set(
+                    existing_all_users.values_list("id", flat=True)
+                )
+
+                logger.info(
+                    f"[ClinicSerializer] 기존 사용자 ID들: {existing_all_user_ids}"
+                )
+
+                # 새로 추가된 사용자들과 제거된 사용자들 찾기
+                new_user_ids = set(user_ids) - existing_all_user_ids
+                removed_user_ids = existing_all_user_ids - set(user_ids)
+
+                logger.info(
+                    f"[ClinicSerializer] 새로 추가된 사용자 ID들: {new_user_ids}"
+                )
+                logger.info(
+                    f"[ClinicSerializer] 제거된 사용자 ID들: {removed_user_ids}"
+                )
+
+                # 클리닉에 사용자 배치 (새로운 사용자 목록으로 완전 교체)
+                final_users = User.objects.filter(id__in=user_ids)
+                instance.clinic_students.set(final_users)
+                logger.info(f"[ClinicSerializer] 클리닉에 사용자 배치 완료")
+
+                # ClinicAttendance 모델 import
+                from core.models import ClinicAttendance
+                from datetime import datetime, timedelta
+
+                # 클리닉 날짜 계산 (공통 로직)
+                clinic_day_map = {
+                    "mon": 0,
+                    "tue": 1,
+                    "wed": 2,
+                    "thu": 3,
+                    "fri": 4,
+                    "sat": 5,
+                    "sun": 6,
+                }
+                clinic_weekday = clinic_day_map.get(instance.clinic_day, 0)
+                today = datetime.now().date()
+                today_weekday = today.weekday()
+
+                # 이번 주의 클리닉 날짜 계산
+                days_until_clinic = clinic_weekday - today_weekday
+                if days_until_clinic >= 0:
+                    expected_clinic_date = today + timedelta(days=days_until_clinic)
+                else:
+                    expected_clinic_date = today + timedelta(days=days_until_clinic + 7)
+
+                # 제거된 사용자들의 ClinicAttendance 삭제
+                if removed_user_ids:
+                    logger.info(
+                        f"[ClinicSerializer] 제거된 사용자들의 ClinicAttendance 삭제 시작: {removed_user_ids}"
+                    )
+
+                    deleted_attendances = ClinicAttendance.objects.filter(
+                        clinic=instance,
+                        student_id__in=removed_user_ids,
+                        expected_clinic_date=expected_clinic_date,
+                    )
+                    deleted_count = deleted_attendances.count()
+
+                    if deleted_count > 0:
+                        deleted_attendances.delete()
+                        logger.info(
+                            f"[ClinicSerializer] ClinicAttendance 삭제 완료: {deleted_count}건"
+                        )
+                    else:
+                        logger.info(
+                            f"[ClinicSerializer] 삭제할 ClinicAttendance가 없음"
+                        )
+
+                # 새로 추가된 사용자들 처리 (학생만 ClinicAttendance 생성)
+                if new_user_ids:
+                    logger.info(
+                        f"[ClinicSerializer] 새로 추가된 사용자들 처리 시작: {new_user_ids}"
+                    )
+
+                    # 새로 추가된 사용자들 조회
+                    newly_assigned_users = User.objects.filter(id__in=new_user_ids)
+                    logger.info(
+                        f"[ClinicSerializer] 새로 추가된 사용자 수: {newly_assigned_users.count()}"
+                    )
+
+                    for user in newly_assigned_users:
+                        logger.info(
+                            f"[ClinicSerializer] 사용자 처리 중 - user_id={user.id}, name={user.name}, is_student={user.is_student}"
+                        )
+
+                        # 학생인 경우에만 ClinicAttendance 생성
+                        if user.is_student:
+                            # ClinicAttendance 생성 또는 업데이트
+                            attendance, created = (
+                                ClinicAttendance.objects.get_or_create(
+                                    clinic=instance,
+                                    student=user,
+                                    expected_clinic_date=expected_clinic_date,
+                                    defaults={
+                                        "is_active": True,
+                                        "attendance_type": "none",
+                                        "reservation_date": today,
+                                    },
+                                )
+                            )
+
+                            if created:
+                                logger.info(
+                                    f"[ClinicSerializer] ClinicAttendance 생성: attendance_id={attendance.id}"
+                                )
+                            else:
+                                # 기존 attendance가 비활성화되어 있다면 활성화
+                                if not attendance.is_active:
+                                    attendance.is_active = True
+                                    attendance.save(update_fields=["is_active"])
+                                    logger.info(
+                                        f"[ClinicSerializer] ClinicAttendance 활성화: attendance_id={attendance.id}"
+                                    )
+
+                            # 의무 클리닉 대상자인 경우 non_pass를 False로 변경
+                            if user.non_pass:
+                                logger.info(
+                                    f"[ClinicSerializer] 처리 전 - user_id={user.id}, name={user.name}, non_pass={user.non_pass}"
+                                )
+                                user.non_pass = False
+                                user.save(update_fields=["non_pass"])
+                                logger.info(
+                                    f"[ClinicSerializer] 처리 후 - user_id={user.id}, name={user.name}, non_pass={user.non_pass}"
+                                )
+                                logger.info(
+                                    f"[ClinicSerializer] 의무 클리닉 상태 자동 해제: user_id={user.id}, name={user.name}, clinic_id={instance.id}"
+                                )
+                        else:
+                            logger.info(
+                                f"[ClinicSerializer] 비학생 사용자는 ClinicAttendance 생성 안함: user_id={user.id}, name={user.name}"
+                            )
+                else:
+                    logger.info(f"[ClinicSerializer] 새로 추가된 사용자가 없음")
+        else:
+            logger.info(f"[ClinicSerializer] clinic_students_data가 None")
+
+        logger.info(f"[ClinicSerializer] update 완료 - clinic_id={instance.id}")
         return instance
 
 

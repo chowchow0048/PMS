@@ -36,6 +36,82 @@ function StudentPlacementPageContent() {
   // 선택 해제 함수를 위한 ref
   const clearSelectionRef = useRef<(() => void) | null>(null);
 
+  // 클리닉 데이터 업데이트 함수 (낙관적 업데이트용)
+  const updateClinicData = (clinicId: number, studentId: number, isAdd: boolean) => {
+    console.log('🔍 [student-placement/page.tsx] 클리닉 데이터 업데이트:', { clinicId, studentId, isAdd });
+    
+    setClinics(prevClinics => {
+      return prevClinics.map(clinic => {
+        if (clinic.id === clinicId) {
+          const updatedClinic = { ...clinic };
+          
+          if (isAdd) {
+            // 학생 추가 - 중복 체크
+            const isAlreadyExists = updatedClinic.clinic_students?.some(s => s.id === studentId);
+            if (!isAlreadyExists) {
+              // 학생 정보를 찾아서 추가 (unassignedStudents에서 검색)
+              const studentToAdd = unassignedStudents.find(s => s.id === studentId);
+              if (studentToAdd) {
+                updatedClinic.clinic_students = [
+                  ...(updatedClinic.clinic_students || []),
+                  {
+                    id: studentToAdd.id,
+                    name: studentToAdd.student_name,
+                    username: studentToAdd.username || studentToAdd.student_name,
+                    is_student: true,
+                    is_teacher: false,
+                    is_staff: false,
+                    is_superuser: false,
+                    is_active: true,
+                    student_parent_phone_num: studentToAdd.student_parent_phone_num || '',
+                    student_phone_num: studentToAdd.student_phone_num || '',
+                    school: studentToAdd.school || '',
+                    grade: studentToAdd.grade || '',
+                    subject: studentToAdd.subject,
+                  } as User
+                ];
+              }
+            }
+          } else {
+            // 학생 제거
+            updatedClinic.clinic_students = (updatedClinic.clinic_students || []).filter(
+              s => s.id !== studentId
+            );
+          }
+          
+          console.log('✅ [student-placement/page.tsx] 클리닉 업데이트 완료:', {
+            clinicId,
+            studentCount: updatedClinic.clinic_students?.length || 0
+          });
+          
+          return updatedClinic;
+        }
+        return clinic;
+      });
+    });
+  };
+
+  // 학생의 non_pass 상태 업데이트 함수 (의무 클리닉 대상자 뱃지 제거용)
+  const updateStudentNonPassStatus = (studentId: number, nonPass: boolean) => {
+    console.log('🔍 [student-placement/page.tsx] 학생 non_pass 상태 업데이트:', { studentId, nonPass });
+    
+    setUnassignedStudents(prevStudents => {
+      return prevStudents.map(student => {
+        if (student.id === studentId) {
+          const updatedStudent = { ...student, non_pass: nonPass };
+          console.log('✅ [student-placement/page.tsx] 학생 non_pass 상태 업데이트 완료:', {
+            studentId,
+            name: student.student_name,
+            oldNonPass: student.non_pass,
+            newNonPass: nonPass
+          });
+          return updatedStudent;
+        }
+        return student;
+      });
+    });
+  };
+
   // 초기 데이터 로딩
   useEffect(() => {
     fetchData();
@@ -258,7 +334,7 @@ function StudentPlacementPageContent() {
         <Flex h="calc(100vh)" gap={6}>
           {/* 학생 목록 (왼쪽) */}
           <Box 
-            flex="4" 
+            flex="5" 
             marginBottom={4}
             border="1px solid" 
             borderColor="#d6d6d6" 
@@ -274,11 +350,13 @@ function StudentPlacementPageContent() {
               onRefresh={fetchData}
               clearSelectionRef={clearSelectionRef}
               onStudentClick={setSelectedStudent}
+              onClinicDataUpdate={updateClinicData}
+              onUpdateStudentNonPass={updateStudentNonPassStatus}
             />
           </Box>
           
           {/* 클리닉 데이 박스 영역 (오른쪽) */}
-          <Box flex="6" borderRadius="lg" overflow="hidden">
+          <Box flex="5" borderRadius="lg" overflow="hidden">
             <Grid 
               templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
               gap={4} 

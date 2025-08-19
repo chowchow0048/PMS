@@ -32,13 +32,14 @@ import {
   Center
 } from '@chakra-ui/react';
 import { SearchIcon, AttachmentIcon, DownloadIcon, ChevronDownIcon, ChevronUpIcon, AddIcon, SettingsIcon } from '@chakra-ui/icons';
-import { useDrop } from 'react-dnd';
+// import { useDrop } from 'react-dnd'; // drag&drop 주석처리
 import StudentItem, { ItemTypes } from './StudentItem'; // Student는 types.ts에서 import
 import { Student } from '@/lib/types'; // types.ts에서 Student import
 import { uploadStudentExcel } from '@/lib/api'; // 삭제된 함수들 제거
 import * as XLSX from 'xlsx';
 import { useCallback } from 'react';
 import MandatoryClinicModal from './MandatoryClinicModal';
+import ClinicPlacementModal from './ClinicPlacementModal';
 
 // 미배치 학생 영역 컴포넌트 props 인터페이스
 interface UnassignedStudentAreaProps {
@@ -48,6 +49,8 @@ interface UnassignedStudentAreaProps {
   onRefresh?: () => void; // 데이터 새로고침 함수
   clearSelectionRef?: React.MutableRefObject<(() => void) | null>; // 선택 해제 함수 ref
   onStudentClick?: (student: Student | null) => void; // 학생 클릭 핸들러 (하이라이트용)
+  onClinicDataUpdate?: (clinicId: number, studentId: number, isAdd: boolean) => void; // 클리닉 데이터 업데이트 함수
+  onUpdateStudentNonPass?: (studentId: number, nonPass: boolean) => void; // 학생 non_pass 상태 업데이트 함수
 }
 
 // 학교 구분의 정렬 순서 정의
@@ -63,7 +66,9 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   onUnassignMultipleStudents,
   onRefresh,
   clearSelectionRef,
-  onStudentClick
+  onStudentClick,
+  onClinicDataUpdate,
+  onUpdateStudentNonPass
 }) => {
   // 검색어 상태 관리
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,39 +94,47 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
     onClose: onMandatoryClose 
   } = useDisclosure();
   
+  // 클리닉 배치 모달 관련
+  const { 
+    isOpen: isPlacementOpen, 
+    onOpen: onPlacementOpen, 
+    onClose: onPlacementClose 
+  } = useDisclosure();
+  const [selectedStudentForPlacement, setSelectedStudentForPlacement] = useState<Student | null>(null);
+  
   // 다중 선택 관련 상태
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   // 마지막 선택된 학생의 그룹 정보 추가
   const [lastSelectedGroup, setLastSelectedGroup] = useState<string | null>(null);
 
-  // 드롭 기능 구현 (배치된 학생이 다시 미배치 상태로 돌아올 때)
-  const [{ isOver }, dropRef] = useDrop({
-    accept: ItemTypes.STUDENT,
-    drop: (item: { 
-      id: number; 
-      student: Student; 
-      selectedStudents?: Student[]; 
-      isMultiple?: boolean; 
-    }) => {
-      // 다중 선택된 학생들이 있는 경우
-      if (item.isMultiple && item.selectedStudents && onUnassignMultipleStudents) {
-        // 다중 학생 미배치 함수 사용
-        onUnassignMultipleStudents(item.selectedStudents);
-      } else {
-        // 단일 학생 미배치
-        onUnassignStudent(item.id);
-      }
-      
-      // 드래그 완료 후 선택 해제
-      clearSelection();
-      
-      return { unassigned: true };
-    },
-    collect: (monitor) => ({
-      isOver: !!monitor.isOver(),
-    }),
-  });
+  // 드롭 기능 구현 (배치된 학생이 다시 미배치 상태로 돌아올 때) - drag&drop 주석처리
+  // const [{ isOver }, dropRef] = useDrop({
+  //   accept: ItemTypes.STUDENT,
+  //   drop: (item: { 
+  //     id: number; 
+  //     student: Student; 
+  //     selectedStudents?: Student[]; 
+  //     isMultiple?: boolean; 
+  //   }) => {
+  //     // 다중 선택된 학생들이 있는 경우
+  //     if (item.isMultiple && item.selectedStudents && onUnassignMultipleStudents) {
+  //       // 다중 학생 미배치 함수 사용
+  //       onUnassignMultipleStudents(item.selectedStudents);
+  //     } else {
+  //       // 단일 학생 미배치
+  //       onUnassignStudent(item.id);
+  //     }
+  //     
+  //     // 드래그 완료 후 선택 해제
+  //     clearSelection();
+  //     
+  //     return { unassigned: true };
+  //   },
+  //   collect: (monitor) => ({
+  //     isOver: !!monitor.isOver(),
+  //   }),
+  // });
 
   // 파일 선택 핸들러
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -348,6 +361,47 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
     }
   }, [onStudentClick]);
 
+  // 학생을 클리닉에 배치하는 핸들러 (낙관적 업데이트 적용)
+  const handlePlaceStudentToClinic = async (clinicId: number, studentId: number) => {
+    console.log('🔍 [UnassignedStudentArea] 학생 클리닉 배치 시작 (낙관적 업데이트):', { clinicId, studentId });
+    
+    // 1. 즉시 UI 업데이트 (낙관적 업데이트) - 선택 해제만 수행
+    clearSelection();
+    
+    try {
+      // 2. 백그라운드에서 API 호출
+      const { assignStudentToClinic } = await import('@/lib/api');
+      await assignStudentToClinic(clinicId, [studentId]);
+      
+      console.log('✅ [UnassignedStudentArea] 학생 클리닉 배치 완료 (백엔드 동기화 성공)');
+      
+      // 3. 성공 시에는 추가 작업 없음 (이미 UI가 업데이트됨)
+      // 전체 새로고침 제거 - 모달이 닫히는 문제 해결
+      
+    } catch (error) {
+      console.error('❌ [UnassignedStudentArea] 학생 클리닉 배치 오류:', error);
+      
+      // 4. 실패 시 롤백이 필요하다면 여기서 처리 (현재는 선택 해제만 했으므로 롤백 불필요)
+      throw error; // 에러를 모달에서 처리하도록 다시 throw
+    }
+  };
+
+  // 학생 클릭 시 배치 모달 열기
+  const handleStudentClickForPlacement = (student: Student) => {
+    console.log('🔍 [UnassignedStudentArea] 학생 배치 모달 열기:', student);
+    console.log('🔍 [UnassignedStudentArea] student.id:', student.id);
+    console.log('🔍 [UnassignedStudentArea] student.student_name:', student.student_name);
+    console.log('🔍 [UnassignedStudentArea] 전체 student 객체:', JSON.stringify(student, null, 2));
+    setSelectedStudentForPlacement(student);
+    onPlacementOpen();
+  };
+
+  // 배치 모달 닫기
+  const handlePlacementModalClose = () => {
+    setSelectedStudentForPlacement(null);
+    onPlacementClose();
+  };
+
   // 검색어에 따른 학생 필터링
   const filteredStudents = students.filter(student => 
     student.student_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -373,9 +427,9 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   // 각 그룹 내에서 학생들을 이름순으로 정렬
   Object.keys(groupedStudents).forEach(school => {
     Object.keys(groupedStudents[school]).forEach(grade => {
-      groupedStudents[school][grade].sort((a, b) => 
-        a.student_name.localeCompare(b.student_name, 'ko')
-      );
+      groupedStudents[school][grade].sort((a, b) => {
+        return a.student_name.localeCompare(b.student_name, 'ko');
+      });
     });
   });
 
@@ -411,8 +465,8 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
 
   return (
     <Box
-      ref={dropRef as any}
-      bg={isOver ? 'gray.100' : 'gray.50'}
+      // ref={dropRef as any} // drag&drop 주석처리
+      bg="gray.50" // isOver 조건 제거
       borderRadius="md"
       width="100%"
       height="100%"
@@ -422,32 +476,18 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       {/* 헤더: 제목과 엑셀 업로드 버튼 (고정) */}
       <Box p={4} pb={2} flexShrink={0}>
         <Flex justify="space-between" align="center" mb={4}>
-          <Heading as="h2" size="lg">
+          <Heading as="h1" size="md" fontWeight='bold'>
             학생 명단
           </Heading>
           <HStack spacing={2}>
-            {selectedStudents.size > 0 && (
-              <>
-                <Text fontSize="sm" color="blue.600" fontWeight="medium">
-                  {selectedStudents.size}명 선택됨
-                </Text>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  colorScheme="blue"
-                  onClick={clearSelection}
-                >
-                  선택 해제
-                </Button>
-              </>
-            )}
             <Button
               leftIcon={<SettingsIcon />}
-              colorScheme="orange"
+              colorScheme="green"
               variant="solid"
-              size="md"
-              bg="orange.500"
-              _hover={{ bg: "orange.400" }}
+              size="sm"
+              bg="green.400"
+              fontWeight='bold'
+              _hover={{ bg: "green.500" }}
               onClick={() => {
                 // 현재 non_pass=true인 학생들을 콘솔에 출력
                 const mandatoryStudents = students.filter(student => student.non_pass === true);
@@ -480,11 +520,12 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
             </Button>
             <Button
                leftIcon={<AttachmentIcon />}
-               colorScheme="blue"
+               colorScheme="green"
                variant="solid"
-               size="md"
-               bg="blue.600"
-               _hover={{ bg: "blue.400" }}
+               size="sm"
+               fontWeight='bold'
+               bg="green.400"
+               _hover={{ bg: "green.500" }}
                onClick={() => handleOpenModal('student')}
                mr={2}
              >
@@ -595,7 +636,8 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                                       isHighlighted={searchTerm.length > 0 && student.student_name.toLowerCase().includes(searchTerm.toLowerCase())}
                                       isSelected={selectedStudents.has(student.id)}
                                       onSelect={(student, event) => handleStudentSelect(student, event, school, grade)}
-                                      selectedStudents={filteredStudents.filter(s => selectedStudents.has(s.id))}
+                                      // selectedStudents={filteredStudents.filter(s => selectedStudents.has(s.id))} // drag&drop 주석처리
+                                      onClick={(student) => handleStudentClickForPlacement(student)}
                                     />
                                   ))}
                                 </SimpleGrid>
@@ -873,6 +915,59 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       <MandatoryClinicModal
         isOpen={isMandatoryOpen}
         onClose={onMandatoryClose}
+      />
+
+      {/* 클리닉 배치 모달 */}
+      <ClinicPlacementModal
+        isOpen={isPlacementOpen}
+        onClose={handlePlacementModalClose}
+        selectedStudent={selectedStudentForPlacement}
+        onPlaceStudent={handlePlaceStudentToClinic}
+        onClinicDataUpdate={onClinicDataUpdate}
+        onUpdateStudentNonPass={onUpdateStudentNonPass}
+        onUnassignStudent={async (studentId: number) => {
+          // 학생 배치 해제 (낙관적 업데이트 적용)
+          console.log('🔍 [UnassignedStudentArea] 학생 배치 해제 시작 (낙관적 업데이트):', studentId);
+          
+          try {
+            // 1. 백그라운드에서 API 호출 (UI는 모달에서 이미 업데이트됨)
+            const { getClinics, updateClinic } = await import('@/lib/api');
+            const allClinics = await getClinics();
+            
+            // 해당 학생이 배치된 클리닉 찾기
+            const assignedClinic = allClinics.find((clinic: any) => 
+              clinic.clinic_students && clinic.clinic_students.some((student: any) => student.id === studentId)
+            );
+            
+            if (!assignedClinic) {
+              throw new Error('해당 학생이 배치된 클리닉을 찾을 수 없습니다.');
+            }
+            
+            console.log('🔍 [UnassignedStudentArea] 배치된 클리닉 발견:', assignedClinic.id);
+            
+            // 해당 학생을 제외한 학생 ID 배열 생성
+            const updatedStudentIds = assignedClinic.clinic_students
+              .filter((student: any) => student.id !== studentId)
+              .map((student: any) => student.id);
+            
+            console.log('🔍 [UnassignedStudentArea] 업데이트될 학생 ID들:', updatedStudentIds);
+            
+            // 클리닉 업데이트 (해당 학생 제거)
+            await updateClinic(assignedClinic.id, {
+              clinic_students: updatedStudentIds
+            });
+            
+            console.log('✅ [UnassignedStudentArea] 학생 배치 해제 완료 (백엔드 동기화 성공)');
+            
+            // 2. 성공 시에는 추가 작업 없음 - 전체 새로고침 제거로 모달이 닫히는 문제 해결
+            
+          } catch (error) {
+            console.error('❌ [UnassignedStudentArea] 학생 배치 해제 오류:', error);
+            
+            // 3. 실패 시 롤백이 필요하다면 여기서 처리 (모달에서 이미 에러 처리됨)
+            throw error; // 에러를 모달에서 처리하도록 다시 throw
+          }
+        }}
       />
     </Box>
   );

@@ -60,8 +60,13 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         student.school?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.grade?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      // 필터링된 결과도 이름 오름차순으로 정렬
+      // 필터링된 결과도 non_pass=true인 학생 먼저, 그 다음 이름 오름차순으로 정렬
       const sortedFiltered = filtered.sort((a, b) => {
+        // 1. non_pass 상태로 먼저 정렬 (true가 먼저)
+        if (a.non_pass !== b.non_pass) {
+          return a.non_pass ? -1 : 1;
+        }
+        // 2. non_pass 상태가 같으면 이름순으로 정렬
         return a.student_name.localeCompare(b.student_name, 'ko-KR');
       });
       setFilteredStudents(sortedFiltered);
@@ -74,8 +79,13 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       setLoading(true);
       const studentsData = await getStudents();
       
-      // 이름 오름차순으로 정렬
+      // non_pass=true인 학생 먼저, 그 다음 이름 오름차순으로 정렬
       const sortedStudents = studentsData.sort((a, b) => {
+        // 1. non_pass 상태로 먼저 정렬 (true가 먼저)
+        if (a.non_pass !== b.non_pass) {
+          return a.non_pass ? -1 : 1;
+        }
+        // 2. non_pass 상태가 같으면 이름순으로 정렬
         return a.student_name.localeCompare(b.student_name, 'ko-KR');
       });
       
@@ -109,6 +119,11 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       s.id === student.id ? { ...s, non_pass: newNonPassStatus } : s
     );
     const sortedOptimisticStudents = optimisticStudents.sort((a, b) => {
+      // 1. non_pass 상태로 먼저 정렬 (true가 먼저)
+      if (a.non_pass !== b.non_pass) {
+        return a.non_pass ? -1 : 1;
+      }
+      // 2. non_pass 상태가 같으면 이름순으로 정렬
       return a.student_name.localeCompare(b.student_name, 'ko-KR');
     });
     setStudents(sortedOptimisticStudents);
@@ -130,6 +145,11 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
           s.id === student.id ? { ...s, non_pass: actualNonPassStatus } : s
         );
         const sortedCorrectedStudents = correctedStudents.sort((a, b) => {
+          // 1. non_pass 상태로 먼저 정렬 (true가 먼저)
+          if (a.non_pass !== b.non_pass) {
+            return a.non_pass ? -1 : 1;
+          }
+          // 2. non_pass 상태가 같으면 이름순으로 정렬
           return a.student_name.localeCompare(b.student_name, 'ko-KR');
         });
         setStudents(sortedCorrectedStudents);
@@ -154,6 +174,11 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         s.id === student.id ? originalStudent : s
       );
       const sortedRolledBackStudents = rolledBackStudents.sort((a, b) => {
+        // 1. non_pass 상태로 먼저 정렬 (true가 먼저)
+        if (a.non_pass !== b.non_pass) {
+          return a.non_pass ? -1 : 1;
+        }
+        // 2. non_pass 상태가 같으면 이름순으로 정렬
         return a.student_name.localeCompare(b.student_name, 'ko-KR');
       });
       setStudents(sortedRolledBackStudents);
@@ -263,8 +288,6 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                       borderColor={student.non_pass ? "red.300" : "gray.300"}
                       _hover={{
                         bg: student.non_pass ? "red.100" : "gray.50",
-                        transform: updating === student.id ? "none" : "translateY(-1px)",
-                        shadow: updating === student.id ? "sm" : "md",
                       }}
                       transition="all 0.15s ease-in-out"
                       onClick={() => handleToggleNonPass(student)}

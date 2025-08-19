@@ -2,7 +2,7 @@
 
 import { FC, useRef } from 'react';
 import { Box, Text } from '@chakra-ui/react';
-import { useDrag } from 'react-dnd';
+// import { useDrag } from 'react-dnd'; // drag&drop 기능 주석처리
 import { Student } from '@/lib/types'; // types.ts에서 Student import
 
 // 시간 객체 인터페이스 정의
@@ -24,7 +24,8 @@ interface StudentItemProps {
   isHighlighted?: boolean; // 검색 결과 하이라이트 여부
   isSelected?: boolean; // 선택 상태
   onSelect?: (student: Student, event: React.MouseEvent) => void; // 선택 핸들러
-  selectedStudents?: Student[]; // 선택된 학생들 목록 (다중 드래그용)
+  // selectedStudents?: Student[]; // 선택된 학생들 목록 (다중 드래그용) - drag&drop 주석처리
+  onClick?: (student: Student) => void; // 클릭 핸들러 (클리닉 배치용)
 }
 
 // 드래그 아이템 타입 정의
@@ -39,78 +40,96 @@ const StudentItem: FC<StudentItemProps> = ({
   isHighlighted = false, 
   isSelected = false, 
   onSelect,
-  selectedStudents = []
+  // selectedStudents = [], // drag&drop 주석처리
+  onClick
 }) => {
-  // 드래그 기능 구현
-  const [{ isDragging }, dragRef] = useDrag(() => ({
-    type: ItemTypes.STUDENT,
-    item: () => {
-      // 선택된 학생이 있고 현재 학생이 선택된 상태라면 모든 선택된 학생을 드래그
-      if (isSelected && selectedStudents.length > 1) {
-        return { 
-          id: student.id, 
-          student,
-          selectedStudents: selectedStudents,
-          isMultiple: true
-        };
-      }
-      // 단일 드래그
-      return { 
-        id: student.id, 
-        student,
-        selectedStudents: [student],
-        isMultiple: false
-      };
-    },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-    }),
-  }), [student, isSelected, selectedStudents]);
+  // 드래그 기능 구현 - 주석처리
+  // const [{ isDragging }, dragRef] = useDrag(() => ({
+  //   type: ItemTypes.STUDENT,
+  //   item: () => {
+  //     // 선택된 학생이 있고 현재 학생이 선택된 상태라면 모든 선택된 학생을 드래그
+  //     if (isSelected && selectedStudents.length > 1) {
+  //       return { 
+  //         id: student.id, 
+  //         student,
+  //         selectedStudents: selectedStudents,
+  //         isMultiple: true
+  //       };
+  //     }
+  //     // 단일 드래그
+  //     return { 
+  //       id: student.id, 
+  //       student,
+  //       selectedStudents: [student],
+  //       isMultiple: false
+  //     };
+  //   },
+  //   collect: (monitor) => ({
+  //     isDragging: !!monitor.isDragging(),
+  //   }),
+  // }), [student, isSelected, selectedStudents]);
 
   // 클릭 핸들러
   const handleClick = (event: React.MouseEvent) => {
+    // 선택 핸들러가 있으면 먼저 실행 (다중 선택 등)
     if (onSelect) {
       onSelect(student, event);
     }
+    
+    // 클리닉 배치 모달 열기 (클릭으로 변경)
+    if (onClick && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+      onClick(student);
+    }
   };
+
+  // 더블클릭 핸들러 - 주석처리
+  // const handleDoubleClick = (event: React.MouseEvent) => {
+  //   event.preventDefault();
+  //   event.stopPropagation();
+  //   if (onDoubleClick) {
+  //     onDoubleClick(student);
+  //   }
+  // };
 
   // 학생 아이템 스타일 설정
   return (
     <Box
-      ref={dragRef as any}
-      opacity={isDragging ? 0.4 : 1}
-      cursor="move"
+      // ref={dragRef as any} // drag&drop 주석처리
+      // opacity={isDragging ? 0.4 : 1} // drag&drop 주석처리
+      cursor="pointer" // move -> pointer로 변경
       p={0}
       mb={1}
       borderRadius="md"
       bg={
-        isSelected ? 'blue.200' : 
+        isSelected ? 'blue.50' : 
         isHighlighted ? 'blue.50' : 
         'transparent'
       }
       border="1px solid"
       borderColor={
-        isSelected ? 'blue.300' :
-        isHighlighted ? 'blue.200' : 
-        'transparent'
+        isSelected ? 'blue.100' :
+        isHighlighted ? 'blue.100' : 
+        'gray.300'
       }
       _hover={{ 
-        bg: isSelected ? 'blue.300' :
+        bg: isSelected ? 'blue.100' :
             isHighlighted ? 'blue.100' : 
             'gray.100' 
       }}
-      _focus={{
-        outline: 'none',
-        borderColor: isSelected ? 'blue.400' : 'blue.300',
-        bg: isSelected ? 'blue.300' : 'blue.100'
-      }}
+      // _focus={{
+      //   outline: 'none',
+      //   borderColor: isSelected ? 'blue.400' : 'blue.300',
+      //   bg: isSelected ? 'blue.300' : 'blue.100'
+      // }}
       display="flex"
       justifyContent="center"
       alignItems="center"
       width="100%"
+      height="60px" // 기본 40px의 1.8배
       textAlign="center"
       transition="all 0.2s"
       onClick={handleClick}
+      // onDoubleClick={handleDoubleClick} // 더블클릭 주석처리
       userSelect="none" // 텍스트 선택 방지
       position="relative"
       boxSizing="border-box" // 크기 변화 방지
@@ -132,8 +151,8 @@ const StudentItem: FC<StudentItemProps> = ({
         {student.student_name}
       </Text>
       
-      {/* 다중 선택 시 개수 표시 */}
-      {isSelected && selectedStudents.length > 1 && isDragging && (
+      {/* 다중 선택 시 개수 표시 - drag&drop 주석처리 */}
+      {/* {isSelected && selectedStudents.length > 1 && isDragging && (
         <Box
           position="absolute"
           top="-8px"
@@ -151,7 +170,7 @@ const StudentItem: FC<StudentItemProps> = ({
         >
           {selectedStudents.length}
         </Box>
-      )}
+      )} */}
     </Box>
   );
 };

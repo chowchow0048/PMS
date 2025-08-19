@@ -275,7 +275,6 @@ class Clinic(models.Model):
         User,
         blank=True,
         related_name="enrolled_clinics",
-        limit_choices_to={"is_student": True},
         verbose_name="예약한 학생들",
         default=None,
     )  # 예약한 학생들 (User 모델에서 is_student=True인 사용자들)
@@ -374,7 +373,6 @@ class ClinicAttendance(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name="clinic_attendances",
-        limit_choices_to={"is_student": True},
         verbose_name="학생",
     )  # 학생 (User 모델에서 is_student=True인 사용자)
 
@@ -539,14 +537,12 @@ class StudentPlacement(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name="placements",
-        limit_choices_to={"is_student": True},
-    )  # 학생 사용자 (is_student=True인 User)
+    )
     teacher = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="student_placements",
-        limit_choices_to={"is_teacher": True},
-    )  # 강사 사용자 (is_teacher=True인 User)
+    )
     subject = models.ForeignKey(
         Subject, on_delete=models.CASCADE, related_name="placements"
     )

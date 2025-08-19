@@ -69,7 +69,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
   const toast = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false); // 로딩 상태 관리
-  const [studentToRemove, setStudentToRemove] = useState<User | null>(null); // 제거할 학생
+  const [studentToRemove, setStudentToRemove] = useState<User | null>(null); // 배치 해제할 학생
   const [selectedTabIndex, setSelectedTabIndex] = useState(0); // 선택된 탭 인덱스
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure(); // 삭제 확인 다이얼로그
   const cancelRef = React.useRef<HTMLButtonElement>(null); // 삭제 확인 다이얼로그 취소 버튼 레퍼런스
@@ -93,46 +93,103 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
     router.push('/clinic/today'); // 오늘의 보충 페이지로 이동
   };
 
-  // 학생을 클리닉에서 제거하는 함수
+  // 학생을 클리닉에서 배치 해제하는 함수
   const handleRemoveStudent = async (studentToRemove: User) => {
     const currentClinic = dayClinics[selectedTabIndex];
-    if (!currentClinic) return;
+    
+    console.log('🔍 [ClinicManagementModal] === 학생 배치 해제 시작 ===');
+    console.log('🔍 [ClinicManagementModal] selectedTabIndex:', selectedTabIndex);
+    console.log('🔍 [ClinicManagementModal] currentClinic:', currentClinic);
+    console.log('🔍 [ClinicManagementModal] studentToRemove:', {
+      id: studentToRemove.id,
+      name: studentToRemove.name,
+      username: studentToRemove.username,
+      is_student: studentToRemove.is_student
+    });
+    
+    if (!currentClinic) {
+      console.error('❌ [ClinicManagementModal] currentClinic이 없습니다!');
+      return;
+    }
 
     try {
       setIsLoading(true);
-      console.log('🔍 [ClinicManagementModal] 학생 제거 시도:', studentToRemove.name || studentToRemove.username || studentToRemove.id);
+      
+      console.log('🔍 [ClinicManagementModal] 클리닉 정보:', {
+        id: currentClinic.id,
+        clinic_day: currentClinic.clinic_day,
+        clinic_time: currentClinic.clinic_time,
+        clinic_capacity: currentClinic.clinic_capacity,
+        current_students_count: currentClinic.clinic_students?.length || 0
+      });
+      
+      console.log('🔍 [ClinicManagementModal] 현재 학생 목록:', 
+        currentClinic.clinic_students?.map(s => ({ 
+          id: s.id, 
+          name: s.name || s.username, 
+          is_student: s.is_student 
+        })) || []
+      );
 
-      // 현재 학생 목록에서 해당 학생을 제거
+      // 현재 학생 목록에서 해당 학생을 배치 해제
       const updatedStudents = currentClinic.clinic_students.filter(
         student => student.id !== studentToRemove.id
       );
+      
+      console.log('🔍 [ClinicManagementModal] 배치 해제 후 학생 목록:', 
+        updatedStudents.map(s => ({ 
+          id: s.id, 
+          name: s.name || s.username, 
+          is_student: s.is_student 
+        }))
+      );
+      
+      const studentIds = updatedStudents.map(student => student.id);
+      console.log('🔍 [ClinicManagementModal] 전송할 학생 ID 배열:', studentIds);
+      console.log('🔍 [ClinicManagementModal] 학생 ID들 타입 검증:', 
+        studentIds.map((id, index) => `[${index}]: ${id} (type: ${typeof id}, isInteger: ${Number.isInteger(id)})`)
+      );
+
+      const updateData = {
+        ...currentClinic,
+        clinic_students: studentIds
+      };
+      console.log('🔍 [ClinicManagementModal] API 호출 데이터:', updateData);
 
       // 클리닉 업데이트 API 호출
-      const updatedClinic = await updateClinic(currentClinic.id, {
-        ...currentClinic,
-        clinic_students: updatedStudents.map(student => student.id) // ID 배열로 전송
-      });
+      console.log('🔍 [ClinicManagementModal] updateClinic API 호출 시작...');
+      const updatedClinic = await updateClinic(currentClinic.id, updateData);
+      console.log('🔍 [ClinicManagementModal] updateClinic API 응답:', updatedClinic);
 
       // 상태 업데이트
       onUpdate(updatedClinic);
 
       // 성공 메시지 표시
       toast({
-        title: '학생 제거 완료',
-        description: `${studentToRemove.name || studentToRemove.username || '학생'}을 ${currentClinic.clinic_time} 클리닉에서 제거했습니다.`,
+        title: '학생 배치 해제 완료',
+        description: `${studentToRemove.name || studentToRemove.username || '학생'}을 ${currentClinic.clinic_time} 클리닉에서 배치 해제했습니다.`,
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
 
-      console.log('✅ [ClinicManagementModal] 학생 제거 완료');
+      console.log('✅ [ClinicManagementModal] 학생 배치 해제 완료');
 
     } catch (error) {
-      console.error('❌ [ClinicManagementModal] 학생 제거 오류:', error);
+      console.error('❌ [ClinicManagementModal] 학생 배치 해제 오류:', error);
+      
+      // 오류 상세 정보 출력
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any;
+        console.error('❌ [ClinicManagementModal] 오류 상태:', axiosError.response?.status);
+        console.error('❌ [ClinicManagementModal] 오류 데이터:', axiosError.response?.data);
+        console.error('❌ [ClinicManagementModal] 요청 URL:', axiosError.config?.url);
+        console.error('❌ [ClinicManagementModal] 요청 데이터:', axiosError.config?.data);
+      }
       
       toast({
-        title: '학생 제거 실패',
-        description: '학생 제거 중 오류가 발생했습니다. 다시 시도해주세요.',
+        title: '학생 배치 해제 실패',
+        description: '학생 배치 해제 중 오류가 발생했습니다. 다시 시도해주세요.',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -144,7 +201,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
     }
   };
 
-  // 학생 제거 확인 다이얼로그 열기
+  // 학생 배치 해제 확인 다이얼로그 열기
   const openDeleteConfirmation = (student: User) => {
     setStudentToRemove(student);
     onDeleteOpen();
@@ -164,7 +221,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
       );
     }
 
-    const currentStudentCount = clinic.clinic_students?.length || 0;
+    const currentStudentCount = clinic.clinic_students?.filter(user => user.is_student).length || 0;
     const remainingCapacity = clinic.clinic_capacity - currentStudentCount;
     const isFullCapacity = remainingCapacity <= 0;
 
@@ -196,12 +253,19 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
                   {clinic.clinic_students.map((student, index) => (
                     <Tr key={`student-${student.id}-${index}-${timeSlot}`}>
                       <Td>{index + 1}</Td>
-                      <Td fontWeight="semibold">{student.name || student.username || '이름 없음'}</Td>
+                      <Td fontWeight="semibold">
+                        {student.name || student.username || '이름 없음'}
+                        {!student.is_student && (
+                          <Badge ml={2} colorScheme="orange" size="sm">
+                            {student.is_superuser ? '관리자' : '강사'}
+                          </Badge>
+                        )}
+                      </Td>
                       <Td>{student.student_parent_phone_num || '-'}</Td>
                       <Td>{student.student_phone_num || '-'}</Td>
                       <Td>
                         <IconButton
-                          aria-label="학생 제거"
+                          aria-label={`${student.is_student ? '학생' : student.is_superuser ? '관리자' : '강사'} 배치 해제`}
                           icon={<DeleteIcon />}
                           size="sm"
                           colorScheme="red"
@@ -249,7 +313,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
                 </Text>
                 {TIME_SLOTS.map(timeSlot => {
                   const clinic = dayClinics.find(c => c?.clinic_time === timeSlot);
-                  const count = clinic?.clinic_students?.length || 0;
+                  const count = clinic?.clinic_students?.filter(user => user.is_student).length || 0;
                   const capacity = clinic?.clinic_capacity || 0;
                   
                   return (
@@ -277,7 +341,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
                 <TabList>
                   {TIME_SLOTS.map((timeSlot, index) => {
                     const clinic = dayClinics[index];
-                    const count = clinic?.clinic_students?.length || 0;
+                    const count = clinic?.clinic_students?.filter(user => user.is_student).length || 0;
                     const isActive = clinic !== undefined;
                     
                     return (
@@ -326,7 +390,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
         </ModalContent>
       </Modal>
 
-      {/* 학생 제거 확인 다이얼로그 */}
+      {/* 학생 배치 해제 확인 다이얼로그 */}
       <AlertDialog
         isOpen={isDeleteOpen}
         leastDestructiveRef={cancelRef}
@@ -335,13 +399,14 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              학생 제거 확인
+              사용자 배치 해제 확인
             </AlertDialogHeader>
 
             <AlertDialogBody>
               <Text>
-                <strong>{studentToRemove?.name || studentToRemove?.username || '알 수 없는 학생'}</strong> 학생을 
-                이 클리닉에서 제거하시겠습니까?
+                <strong>{studentToRemove?.name || studentToRemove?.username || '알 수 없는 사용자'}</strong>
+                {studentToRemove?.is_student ? ' 학생을' : studentToRemove?.is_superuser ? ' 관리자를' : ' 강사를'} 
+                이 클리닉에서 배치 해제하시겠습니까?
               </Text>
               <Text fontSize="sm" color="gray.600" mt={2}>
                 이 작업은 되돌릴 수 없습니다.
@@ -358,7 +423,7 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
                 ml={3}
                 isLoading={isLoading}
               >
-                제거
+                배치 해제
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

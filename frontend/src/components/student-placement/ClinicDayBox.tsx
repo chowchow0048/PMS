@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, VStack, Text, Badge, Button, Flex, Tooltip, Center } from '@chakra-ui/react';
-import { useDrop } from 'react-dnd';
+// import { useDrop } from 'react-dnd'; // drag&drop 주석처리
 import { Clinic, Student } from '@/lib/types'; // types.ts에서 Student와 Clinic import
-import { ItemTypes } from './StudentItem'; // ItemTypes만 StudentItem에서 import
+// import { ItemTypes } from './StudentItem'; // ItemTypes만 StudentItem에서 import - drag&drop 주석처리
 
 interface ClinicDayBoxProps {
   day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -32,55 +32,55 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
   // 해당 요일에 클리닉이 하나라도 있는지 확인
   const hasAnyClinics = dayClinics.some(clinic => clinic !== undefined);
 
-  // 드롭 기능 구현
-  const [{ isOver, canDrop }, dropRef] = useDrop({
-    accept: ItemTypes.STUDENT,
-    canDrop: (item: { 
-      id: number; 
-      student: Student; 
-      selectedStudents?: Student[]; 
-      isMultiple?: boolean; 
-    }) => {
-      // 클리닉이 없으면 드롭 불가
-      if (!hasAnyClinics) return false;
-      
-      // 이미 배치된 학생이 있는지 확인
-      if (isStudentAlreadyAssigned) {
-        const studentsToCheck = item.isMultiple && item.selectedStudents ? 
-          item.selectedStudents : [item.student];
-        
-        // 하나라도 이미 배치된 학생이 있으면 드롭 불가
-        return !studentsToCheck.some(student => 
-          isStudentAlreadyAssigned(student.id, day)
-        );
-      }
-      
-      return true;
-    },
-    drop: (item: { 
-      id: number; 
-      student: Student; 
-      selectedStudents?: Student[]; 
-      isMultiple?: boolean; 
-    }) => {
-      // 드롭 이벤트 핸들러 호출
-      if (onStudentDrop) {
-        // 다중 선택된 학생들이 있는 경우
-        if (item.isMultiple && item.selectedStudents) {
-          onStudentDrop(day, item.selectedStudents);
-        } else {
-          // 단일 학생
-          onStudentDrop(day, [item.student]);
-        }
-      }
-      
-      return { dropped: true };
-    },
-    collect: (monitor) => ({
-      isOver: !!monitor.isOver(),
-      canDrop: !!monitor.canDrop(),
-    }),
-  });
+  // 드롭 기능 구현 - drag&drop 주석처리
+  // const [{ isOver, canDrop }, dropRef] = useDrop({
+  //   accept: ItemTypes.STUDENT,
+  //   canDrop: (item: { 
+  //     id: number; 
+  //     student: Student; 
+  //     selectedStudents?: Student[]; 
+  //     isMultiple?: boolean; 
+  //   }) => {
+  //     // 클리닉이 없으면 드롭 불가
+  //     if (!hasAnyClinics) return false;
+  //     
+  //     // 이미 배치된 학생이 있는지 확인
+  //     if (isStudentAlreadyAssigned) {
+  //       const studentsToCheck = item.isMultiple && item.selectedStudents ? 
+  //         item.selectedStudents : [item.student];
+  //       
+  //       // 하나라도 이미 배치된 학생이 있으면 드롭 불가
+  //       return !studentsToCheck.some(student => 
+  //         isStudentAlreadyAssigned(student.id, day)
+  //       );
+  //     }
+  //     
+  //     return true;
+  //   },
+  //   drop: (item: { 
+  //     id: number; 
+  //     student: Student; 
+  //     selectedStudents?: Student[]; 
+  //     isMultiple?: boolean; 
+  //   }) => {
+  //     // 드롭 이벤트 핸들러 호출
+  //     if (onStudentDrop) {
+  //       // 다중 선택된 학생들이 있는 경우
+  //       if (item.isMultiple && item.selectedStudents) {
+  //         onStudentDrop(day, item.selectedStudents);
+  //       } else {
+  //         // 단일 학생
+  //         onStudentDrop(day, [item.student]);
+  //       }
+  //     }
+  //     
+  //     return { dropped: true };
+  //   },
+  //   collect: (monitor) => ({
+  //     isOver: !!monitor.isOver(),
+  //     canDrop: !!monitor.canDrop(),
+  //   }),
+  // });
 
   const handleBoxClick = () => {
     onClinicClick(day); // 요일을 전달
@@ -88,22 +88,14 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
 
   return (
     <Box
-      ref={dropRef as any}
+      // ref={dropRef as any} // drag&drop 주석처리
       border="1px solid"
-      borderColor={
-        isOver && canDrop ? 'green.400' : 
-        isOver ? 'red.400' : 
-        'gray.300'
-      }
+      borderColor="gray.300" // drag&drop 조건 제거
       borderRadius="lg"
       p={4}
       h="full"
       minH="300px"
-      bg={
-        isOver && canDrop ? 'green.50' : 
-        isOver ? 'red.50' : 
-        'white'
-      }
+      bg="white" // drag&drop 조건 제거
       cursor={hasAnyClinics ? "pointer" : "default"}
       _hover={hasAnyClinics ? { 
         borderColor: 'blue.400', 
@@ -113,8 +105,8 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
       onClick={handleBoxClick}
       position="relative"
     >
-      {/* 드롭 오버레이 */}
-      {isOver && (
+      {/* 드롭 오버레이 - drag&drop 주석처리 */}
+      {/* {isOver && (
         <Box
           position="absolute"
           top={0}
@@ -138,7 +130,7 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
             </Text>
           </VStack>
         </Box>
-      )}
+      )} */}
       
       {/* 요일 헤더 */}
       <Flex justify="center" align="center" mb={6}>

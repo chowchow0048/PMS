@@ -765,8 +765,8 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         f"expected_clinic_date={expected_clinic_date}, count={deleted_inactive_count}"
                     )
 
-                # no_show 체크 (2회 이상 무단결석한 학생은 예약 불가)
-                if user.no_show >= 2:
+                # no_show 체크 (학생만 해당, 2회 이상 무단결석한 학생은 예약 불가)
+                if user.is_student and user.no_show >= 2:
                     logger.warning(
                         f"[api/views.py] 노쇼 학생 예약 차단: user_id={user_id}, "
                         f"user_name={user.name}, no_show_count={user.no_show}"
@@ -797,26 +797,35 @@ class ClinicViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_409_CONFLICT,
                     )
 
-                # 예약 성공 및 출결 생성
+                # 예약 성공
                 clinic.clinic_students.add(user)
 
-                # 위에서 계산한 expected_clinic_date 재사용
-                ClinicAttendance.objects.create(
-                    is_active=True,
-                    clinic=clinic,
-                    student=user,
-                    attendance_type="none",
-                    reservation_date=today,  # 오늘 날짜로 예약 날짜 설정
-                    expected_clinic_date=expected_clinic_date,  # 위에서 계산된 예상 클리닉 날짜 사용
-                )
-
-                # 의무 클리닉 대상자인 경우 non_pass를 False로 변경
-                if user.non_pass:
-                    user.non_pass = False
-                    user.save(update_fields=["non_pass"])
+                # 학생인 경우에만 ClinicAttendance 생성
+                if user.is_student:
+                    # 위에서 계산한 expected_clinic_date 재사용
+                    ClinicAttendance.objects.create(
+                        is_active=True,
+                        clinic=clinic,
+                        student=user,
+                        attendance_type="none",
+                        reservation_date=today,  # 오늘 날짜로 예약 날짜 설정
+                        expected_clinic_date=expected_clinic_date,  # 위에서 계산된 예상 클리닉 날짜 사용
+                    )
                     logger.info(
-                        f"[api/views.py] 의무 클리닉 대상자 예약 완료: user_id={user_id}, "
-                        f"non_pass를 False로 변경"
+                        f"[api/views.py] 학생용 ClinicAttendance 생성 완료: user_id={user_id}"
+                    )
+
+                    # 의무 클리닉 대상자인 경우 non_pass를 False로 변경
+                    if user.non_pass:
+                        user.non_pass = False
+                        user.save(update_fields=["non_pass"])
+                        logger.info(
+                            f"[api/views.py] 의무 클리닉 대상자 예약 완료: user_id={user_id}, "
+                            f"non_pass를 False로 변경"
+                        )
+                else:
+                    logger.info(
+                        f"[api/views.py] 비학생 사용자는 ClinicAttendance 생성 안함: user_id={user_id}, name={user.name}"
                     )
 
                 # 캐시 무효화 비활성화 (Railway 분산 환경 동기화 문제로 인해 임시 비활성화)
@@ -905,8 +914,12 @@ class ClinicViewSet(viewsets.ModelViewSet):
                 .order_by("clinic_time")
             )
 
-            # 기본값 설정 (DB에 데이터가 없는 경우)
-            days = days_in_db if days_in_db else ["mon", "tue", "wed", "thu", "fri"]
+            # 기본값 설정 (DB에 데이터가 없는 경우) - 토요일, 일요일까지 포함
+            days = (
+                days_in_db
+                if days_in_db
+                else ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+            )
             times = times_in_db if times_in_db else ["18:00", "19:00", "20:00", "21:00"]
 
             schedule_grid = {}

@@ -94,9 +94,9 @@ api.interceptors.response.use(
 // 로그인 API
 export const login = async (username: string, password: string) => {
   try {
-    console.log('로그인 시도:', { username });
+    // console.log('로그인 시도:', { username });
     const response = await api.post('/auth/login/', { username, password });
-    console.log('로그인 응답:', response.data);
+    // console.log('로그인 응답:', response.data);
     return response.data;
   } catch (error) {
     console.error('로그인 에러:', error);
@@ -149,7 +149,7 @@ export const register = async (userData: any) => {
 // 모든 학생 가져오기 (is_student=true인 User들)
 export const getStudents = async (): Promise<Student[]> => {
   try {
-    console.log('🔍 [api.ts] getStudents 함수 시작 - User 기반 (is_student=true)');
+    // console.log('🔍 [api.ts] getStudents 함수 시작 - User 기반 (is_student=true)');
     
     let allStudents: any[] = []; // 모든 학생 데이터를 담을 배열
     let nextUrl: string | null = '/users/?is_student=true&page_size=100'; // User 엔드포인트로 변경
@@ -157,26 +157,26 @@ export const getStudents = async (): Promise<Student[]> => {
     // 모든 페이지를 순회하여 데이터 수집
     while (nextUrl) {
       const response: any = await api.get(nextUrl);
-      console.log('🔍 [api.ts] User(is_student=true) 응답:', response);
+      // console.log('🔍 [api.ts] User(is_student=true) 응답:', response);
       
       // API 응답에서 non_pass 필드 확인
-      if (Array.isArray(response.data)) {
-        const sampleUsers = response.data.slice(0, 3);
-        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          non_pass: u.non_pass,
-          no_show: u.no_show
-        })));
-      } else if (response.data.results) {
-        const sampleUsers = response.data.results.slice(0, 3);
-        console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          non_pass: u.non_pass,
-          no_show: u.no_show
-        })));
-      }
+      // if (Array.isArray(response.data)) {
+      //   const sampleUsers = response.data.slice(0, 3);
+      //   console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map((u: any) => ({
+      //     id: u.id,
+      //     name: u.name,
+      //     non_pass: u.non_pass,
+      //     no_show: u.no_show
+      //   })));
+      // } else if (response.data.results) {
+      //   const sampleUsers = response.data.results.slice(0, 3);
+      //   console.log('🔍 [api.ts] API 응답 샘플 (처리 전):', sampleUsers.map((u: any) => ({
+      //     id: u.id,
+      //     name: u.name,
+      //     non_pass: u.non_pass,
+      //     no_show: u.no_show
+      //   })));
+      // }
       
       // 현재 페이지의 학생 데이터 추가
       if (Array.isArray(response.data)) {
@@ -202,25 +202,38 @@ export const getStudents = async (): Promise<Student[]> => {
     }
     
     // User 데이터를 Student 인터페이스에 맞게 변환
-    const students: Student[] = allStudents.map((user: any) => ({
-      ...user,
-      student_name: user.name, // name을 student_name으로 매핑 (기존 코드 호환성)
-      is_student: true,
-      student_phone_num: user.student_phone_num || '',
-      student_parent_phone_num: user.student_parent_phone_num || '',
-      school: user.school || '',
-      grade: user.grade || '',
-      non_pass: Boolean(user.non_pass), // non_pass 필드 명시적으로 매핑 (undefined/null도 false로 처리)
-    }));
+    const students: Student[] = allStudents.map((user: any, index: number) => {
+      // 강범석 학생 디버깅을 위한 로그
+      // if (user.name === '강범석' || user.student_name === '강범석') {
+      //   console.log(`🔍 [api.ts] 강범석 학생 데이터 확인 (index: ${index}):`, {
+      //     id: user.id,
+      //     name: user.name,
+      //     student_name: user.student_name,
+      //     username: user.username,
+      //     original_user: user
+      //   });
+      // }
+      
+      return {
+        ...user,
+        student_name: user.name, // name을 student_name으로 매핑 (기존 코드 호환성)
+        is_student: true,
+        student_phone_num: user.student_phone_num || '',
+        student_parent_phone_num: user.student_parent_phone_num || '',
+        school: user.school || '',
+        grade: user.grade || '',
+        non_pass: Boolean(user.non_pass), // non_pass 필드 명시적으로 매핑 (undefined/null도 false로 처리)
+      };
+    });
     
-    console.log(`🔍 [api.ts] 전체 학생 수: ${students.length}명`);
+    // console.log(`🔍 [api.ts] 전체 학생 수: ${students.length}명`);
     
     // non_pass 상태 확인을 위한 로깅
-    const nonPassStudents = students.filter(s => s.non_pass);
-    console.log(`🔍 [api.ts] 의무 클리닉 대상자: ${nonPassStudents.length}명`);
-    if (nonPassStudents.length > 0) {
-      console.log(`🔍 [api.ts] 의무 클리닉 대상자 목록:`, nonPassStudents.map(s => ({ name: s.student_name, id: s.id, non_pass: s.non_pass })));
-    }
+    // const nonPassStudents = students.filter(s => s.non_pass);
+    // console.log(`🔍 [api.ts] 의무 클리닉 대상자: ${nonPassStudents.length}명`);
+    // if (nonPassStudents.length > 0) {
+    //   console.log(`🔍 [api.ts] 의무 클리닉 대상자 목록:`, nonPassStudents.map(s => ({ name: s.student_name, id: s.id, non_pass: s.non_pass })));
+    // }
     
     return students;
   } catch (error) {
@@ -232,19 +245,19 @@ export const getStudents = async (): Promise<Student[]> => {
 // 모든 선생님 가져오기 (is_teacher=true인 User들)
 export const getTeachers = async () => {
   try {
-    console.log('🔍 [api.ts] getTeachers 함수 시작 - User 기반 (is_teacher=true)');
-    console.log('🔍 [api.ts] API_URL:', API_URL);
-    console.log('🔍 [api.ts] 요청 URL:', `${API_URL}/users/?is_active=true&is_teacher=true&is_superuser=false`);
+    // console.log('🔍 [api.ts] getTeachers 함수 시작 - User 기반 (is_teacher=true)');
+    // console.log('🔍 [api.ts] API_URL:', API_URL);
+    // console.log('🔍 [api.ts] 요청 URL:', `${API_URL}/users/?is_active=true&is_teacher=true&is_superuser=false`);
     
     // 토큰 확인
-    const token = localStorage.getItem('token');
-    console.log('🔍 [api.ts] 토큰 존재 여부:', !!token);
-    console.log('🔍 [api.ts] 토큰 앞 10자리:', token ? token.substring(0, 10) + '...' : 'null');
+    // const token = localStorage.getItem('token');
+    // console.log('🔍 [api.ts] 토큰 존재 여부:', !!token);
+    // console.log('🔍 [api.ts] 토큰 앞 10자리:', token ? token.substring(0, 10) + '...' : 'null');
     
     const response = await api.get('/users/?is_active=true&is_teacher=true&is_superuser=false');
-    console.log('🔍 [api.ts] API 응답 성공:', response.status);
-    console.log('🔍 [api.ts] 응답 데이터 타입:', typeof response.data);
-    console.log('🔍 [api.ts] 응답 데이터:', response.data);
+    // console.log('🔍 [api.ts] API 응답 성공:', response.status);
+    // console.log('🔍 [api.ts] 응답 데이터 타입:', typeof response.data);
+    // console.log('🔍 [api.ts] 응답 데이터:', response.data);
 
     const users = Array.isArray(response.data) ? response.data : 
                   (response.data.results ? response.data.results : []);
@@ -257,17 +270,17 @@ export const getTeachers = async () => {
       max_student_num: 20, // 기본값 설정 (향후 User 모델에 추가 필요시 수정)
     }));
     
-    console.log('🔍 [api.ts] 처리된 선생님 데이터:', teachers);
-    console.log('🔍 [api.ts] 선생님 수:', teachers.length);
+    // console.log('🔍 [api.ts] 처리된 선생님 데이터:', teachers);
+    // console.log('🔍 [api.ts] 선생님 수:', teachers.length);
     
     return teachers;
   } catch (error) {
     console.error('❌ [api.ts] getTeachers 함수에서 오류 발생:');
-    console.error('❌ [api.ts] 오류 타입:', error?.constructor?.name);
-    console.error('❌ [api.ts] 오류 메시지:', (error as any)?.message);
-    console.error('❌ [api.ts] 오류 코드:', (error as any)?.code);
-    console.error('❌ [api.ts] 오류 설정:', (error as any)?.config);
-    console.error('❌ [api.ts] 전체 오류 객체:', error);
+    // console.error('❌ [api.ts] 오류 타입:', error?.constructor?.name);
+    // console.error('❌ [api.ts] 오류 메시지:', (error as any)?.message);
+    // console.error('❌ [api.ts] 오류 코드:', (error as any)?.code);
+    // console.error('❌ [api.ts] 오류 설정:', (error as any)?.config);
+    // console.error('❌ [api.ts] 전체 오류 객체:', error);
     throw error;
   }
 };
@@ -286,20 +299,20 @@ export const unassignStudent = async (studentId: number) => {
 // 엑셀 파일로 학생 명단 업로드 API (User 기반으로 수정)
 export const uploadStudentExcel = async (file: File) => {
   try {
-    console.log('🔍 [api.ts] 학생 명단 엑셀 파일 업로드 시도:', file.name);
-    console.log('🔍 [api.ts] 파일 크기:', file.size, 'bytes');
-    console.log('🔍 [api.ts] 파일 타입:', file.type);
+    // console.log('🔍 [api.ts] 학생 명단 엑셀 파일 업로드 시도:', file.name);
+    // console.log('🔍 [api.ts] 파일 크기:', file.size, 'bytes');
+    // console.log('🔍 [api.ts] 파일 타입:', file.type);
     
     // FormData 생성
     const formData = new FormData();
     formData.append('file', file);
-    console.log('🔍 [api.ts] FormData 생성 완료');
+    // console.log('🔍 [api.ts] FormData 생성 완료');
     
     // multipart/form-data로 전송하기 위해 별도 axios 인스턴스 사용
     const token = localStorage.getItem('token');
-    console.log('🔍 [api.ts] 토큰 확인:', token ? '있음' : '없음');
+    // console.log('🔍 [api.ts] 토큰 확인:', token ? '있음' : '없음');
     
-    console.log('🔍 [api.ts] API 요청 시작...');
+    // console.log('🔍 [api.ts] API 요청 시작...');
     // User 엔드포인트로 변경
     const response = await axios.post(`${API_URL}/users/upload-student-excel/`, formData, {
       headers: {
@@ -308,8 +321,8 @@ export const uploadStudentExcel = async (file: File) => {
       },
     });
     
-    console.log('🔍 [api.ts] API 응답 수신:', response.status);
-    console.log('🔍 [api.ts] 학생 명단 엑셀 업로드 응답:', response.data);
+    // console.log('🔍 [api.ts] API 응답 수신:', response.status);
+    // console.log('🔍 [api.ts] 학생 명단 엑셀 업로드 응답:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 학생 명단 엑셀 업로드 오류:', error);
@@ -325,15 +338,15 @@ export const uploadStudentExcel = async (file: File) => {
 // 모든 클리닉 가져오기
 export const getClinics = async () => {
   try {
-    console.log('🔍 [api.ts] getClinics 함수 시작');
+    // console.log('🔍 [api.ts] getClinics 함수 시작');
     
     const response = await api.get('/clinics/');
-    console.log('🔍 [api.ts] 클리닉 데이터 로딩 완료:', response.data);
+    // console.log('🔍 [api.ts] 클리닉 데이터 로딩 완료:', response.data);
     
     const clinics = Array.isArray(response.data) ? response.data : 
                    (response.data.results ? response.data.results : []);
     
-    console.log('🔍 [api.ts] 처리된 클리닉 데이터:', clinics);
+    // console.log('🔍 [api.ts] 처리된 클리닉 데이터:', clinics);
     return clinics;
   } catch (error) {
     console.error('❌ [api.ts] getClinics 함수에서 오류 발생:', error);
@@ -344,10 +357,10 @@ export const getClinics = async () => {
 // 특정 요일의 클리닉 가져오기
 export const getClinicsByDay = async (day: string) => {
   try {
-    console.log('🔍 [api.ts] getClinicsByDay 함수 시작:', day);
+    // console.log('🔍 [api.ts] getClinicsByDay 함수 시작:', day);
     
     const response = await api.get(`/clinics/?clinic_day=${day}`);
-    console.log('🔍 [api.ts] 요일별 클리닉 데이터 로딩 완료:', response.data);
+    // console.log('🔍 [api.ts] 요일별 클리닉 데이터 로딩 완료:', response.data);
     
     const clinics = Array.isArray(response.data) ? response.data : 
                    (response.data.results ? response.data.results : []);
@@ -362,14 +375,44 @@ export const getClinicsByDay = async (day: string) => {
 // 클리닉 업데이트 (학생 배치 관련)
 export const updateClinic = async (clinicId: number, clinicData: any) => {
   try {
-    console.log('🔍 [api.ts] updateClinic 함수 시작:', clinicId, clinicData);
+    console.log('🔍 [api.ts] === updateClinic 함수 시작 ===');
+    console.log('🔍 [api.ts] clinicId:', clinicId, 'type:', typeof clinicId);
+    console.log('🔍 [api.ts] clinicData 전체:', clinicData);
+    console.log('🔍 [api.ts] clinic_students:', clinicData.clinic_students);
+    console.log('🔍 [api.ts] clinic_students 타입:', typeof clinicData.clinic_students);
+    console.log('🔍 [api.ts] clinic_students 배열 여부:', Array.isArray(clinicData.clinic_students));
     
-    const response = await api.put(`/clinics/${clinicId}/`, clinicData);
-    console.log('🔍 [api.ts] 클리닉 업데이트 완료:', response.data);
+    if (Array.isArray(clinicData.clinic_students)) {
+      console.log('🔍 [api.ts] clinic_students 배열 내용:', 
+        clinicData.clinic_students.map((id: any, index: number) => 
+          `[${index}]: ${id} (type: ${typeof id}, isInteger: ${Number.isInteger(id)})`
+        )
+      );
+    }
+    
+    // PATCH 방식으로 clinic_students 필드만 업데이트 (기존 assignStudentToClinic과 동일한 방식)
+    console.log('🔍 [api.ts] PATCH 요청 시작...');
+    const response = await api.patch(`/clinics/${clinicId}/`, {
+      clinic_students: clinicData.clinic_students
+    });
+    
+    console.log('🔍 [api.ts] PATCH 응답 성공:', response.status);
+    console.log('🔍 [api.ts] 응답 데이터:', response.data);
+    console.log('✅ [api.ts] updateClinic 완료');
     
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] updateClinic 함수에서 오류 발생:', error);
+    
+    // axios 에러인 경우 상세 정보 출력
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      console.error('❌ [api.ts] 오류 상태:', axiosError.response?.status);
+      console.error('❌ [api.ts] 오류 데이터:', axiosError.response?.data);
+      console.error('❌ [api.ts] 요청 URL:', axiosError.config?.url);
+      console.error('❌ [api.ts] 요청 데이터:', axiosError.config?.data);
+    }
+    
     throw error;
   }
 };
@@ -377,10 +420,10 @@ export const updateClinic = async (clinicId: number, clinicData: any) => {
 // 클리닉 생성
 export const createClinic = async (clinicData: any) => {
   try {
-    console.log('🔍 [api.ts] createClinic 함수 시작:', clinicData);
+    // console.log('🔍 [api.ts] createClinic 함수 시작:', clinicData);
     
     const response = await api.post('/clinics/', clinicData);
-    console.log('🔍 [api.ts] 클리닉 생성 완료:', response.data);
+    // console.log('🔍 [api.ts] 클리닉 생성 완료:', response.data);
     
     return response.data;
   } catch (error) {
@@ -389,35 +432,50 @@ export const createClinic = async (clinicData: any) => {
   }
 };
 
-// 클리닉에 학생 배치 API (Student 배치를 clinic_students에 직접 추가)
+// 클리닉에 사용자 배치 API (모든 사용자 유형을 clinic_students에 직접 추가)
 export const assignStudentToClinic = async (clinicId: number, studentIds: number[]) => {
   try {
-    console.log('🔍 [api.ts] assignStudentToClinic 함수 시작:', clinicId, studentIds);
+    // console.log('🔍 [api.ts] assignStudentToClinic 함수 시작:', clinicId, studentIds);
     
     // 클리닉 정보 가져오기
     const clinicResponse = await api.get(`/clinics/${clinicId}/`);
     const clinic = clinicResponse.data;
     
-    console.log('🔍 [api.ts] 현재 클리닉 정보:', clinic);
+    // console.log('🔍 [api.ts] 현재 클리닉 정보:', clinic);
     
-    // 기존 학생 ID 목록 추출 (clinic_students는 User 객체 배열)
-    const existingStudentIds = clinic.clinic_students?.map((user: any) => user.id) || [];
-    console.log('🔍 [api.ts] 기존 학생 ID들:', existingStudentIds);
+    // 기존 사용자 ID 목록 추출 (모든 사용자 유형 포함)
+    const existingUserIds = clinic.clinic_students?.map((user: any) => user.id) || [];
+    // console.log('🔍 [api.ts] 기존 사용자 ID들:', existingUserIds);
     
-    // 새 학생 ID들과 기존 학생 ID들을 합치되, 중복 제거
-    const updatedStudentIds = Array.from(new Set([...existingStudentIds, ...studentIds]));
-    console.log('🔍 [api.ts] 업데이트될 학생 ID들:', updatedStudentIds);
+    // 새 사용자 ID들과 기존 사용자 ID들을 합치되, 중복 제거
+    const updatedUserIds = Array.from(new Set([...existingUserIds, ...studentIds]));
+    // console.log('🔍 [api.ts] 업데이트될 사용자 ID들:', updatedUserIds);
     
-    // 클리닉 업데이트 (clinic_students에 학생 ID 배열 전송)
-    const response = await api.put(`/clinics/${clinicId}/`, {
-      ...clinic,
-      clinic_students: updatedStudentIds // User ID 배열로 전송
+    // 데이터 타입 검증 로그
+    // console.log('🔍 [api.ts] updatedUserIds 타입 검증:');
+    // updatedUserIds.forEach((id, index) => {
+    //   console.log(`  [${index}]: ${id} (type: ${typeof id}, isInteger: ${Number.isInteger(id)})`);
+    // });
+    
+    // 클리닉 업데이트 (PATCH 방식으로 clinic_students 필드만 업데이트)
+    const response = await api.patch(`/clinics/${clinicId}/`, {
+      clinic_students: updatedUserIds // User ID 배열로 전송
     });
     
-    console.log('🔍 [api.ts] 학생 클리닉 배치 완료:', response.data);
+    // console.log('🔍 [api.ts] 사용자 클리닉 배치 완료:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] assignStudentToClinic 함수에서 오류 발생:', error);
+    
+    // axios 에러인 경우 상세 정보 출력
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      console.error('❌ [api.ts] 오류 상태:', axiosError.response?.status);
+      console.error('❌ [api.ts] 오류 데이터:', axiosError.response?.data);
+      console.error('❌ [api.ts] 요청 URL:', axiosError.config?.url);
+      console.error('❌ [api.ts] 요청 데이터:', axiosError.config?.data);
+    }
+    
     throw error;
   }
 };
@@ -425,13 +483,27 @@ export const assignStudentToClinic = async (clinicId: number, studentIds: number
 // 오늘의 클리닉 정보 가져오기
 export const getTodayClinic = async () => {
   try {
-    console.log('🔍 [api.ts] getTodayClinic 함수 시작');
+    // console.log('🔍 [api.ts] getTodayClinic 함수 시작');
     const response = await api.get('/today-clinic/');
-    console.log('🔍 [api.ts] 오늘의 클리닉 API 응답 성공:', response.status);
-    console.log('🔍 [api.ts] 오늘의 클리닉 데이터:', response.data);
+    // console.log('🔍 [api.ts] 오늘의 클리닉 API 응답 성공:', response.status);
+    // console.log('🔍 [api.ts] 오늘의 클리닉 데이터:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 오늘의 클리닉 정보 가져오기 오류:', error);
+    throw error;
+  }
+};
+
+// 주간 클리닉 스케줄 가져오기 (관리자용 학생 배치 모달에서 사용)
+export const getWeeklySchedule = async () => {
+  try {
+    // console.log('🔍 [api.ts] getWeeklySchedule 함수 시작');
+    const response = await api.get('/clinics/weekly_schedule/');
+    // console.log('🔍 [api.ts] 주간 스케줄 API 응답 성공:', response.status);
+    // console.log('🔍 [api.ts] 주간 스케줄 데이터:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 주간 스케줄 가져오기 오류:', error);
     throw error;
   }
 };
@@ -444,7 +516,7 @@ type AttendanceType = 'attended' | 'absent' | 'sick' | 'late' | 'none';
 // 특정 클리닉의 출석 데이터 조회
 export const getClinicAttendances = async (clinicId: number, date?: string) => {
   try {
-    console.log(`🔍 [api.ts] getClinicAttendances 시작 - 클리닉 ID: ${clinicId}, 날짜: ${date || '오늘'}`);
+    // console.log(`🔍 [api.ts] getClinicAttendances 시작 - 클리닉 ID: ${clinicId}, 날짜: ${date || '오늘'}`);
     
     const params: any = { clinic_id: clinicId };
     if (date) {
@@ -453,13 +525,13 @@ export const getClinicAttendances = async (clinicId: number, date?: string) => {
     
     const response = await api.get('/clinic-attendances/', { params });
     
-    console.log('✅ [api.ts] 출석 데이터 조회 완료:', response.data);
+    // console.log('✅ [api.ts] 출석 데이터 조회 완료:', response.data);
     
     // 페이지네이션된 응답에서 results 배열 반환
     const attendances = Array.isArray(response.data) ? response.data : 
                        (response.data.results ? response.data.results : []);
     
-    console.log('📋 [api.ts] 처리된 출석 데이터 배열:', attendances);
+    // console.log('📋 [api.ts] 처리된 출석 데이터 배열:', attendances);
     return attendances;
   } catch (error) {
     console.error('❌ [api.ts] 출석 데이터 조회 오류:', error);
@@ -470,13 +542,13 @@ export const getClinicAttendances = async (clinicId: number, date?: string) => {
 // 출석 상태 업데이트
 export const updateAttendance = async (attendanceId: number, attendanceType: AttendanceType) => {
   try {
-    console.log(`🔍 [api.ts] updateAttendance 시작 - ID: ${attendanceId}, 상태: ${attendanceType}`);
+    // console.log(`🔍 [api.ts] updateAttendance 시작 - ID: ${attendanceId}, 상태: ${attendanceType}`);
     
     const response = await api.patch(`/clinic-attendances/${attendanceId}/update_attendance/`, {
       attendance_type: attendanceType
     });
     
-    console.log('✅ [api.ts] 출석 상태 업데이트 완료:', response.data);
+    // console.log('✅ [api.ts] 출석 상태 업데이트 완료:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 출석 상태 업데이트 오류:', error);
@@ -487,7 +559,7 @@ export const updateAttendance = async (attendanceId: number, attendanceType: Att
 // 출석 데이터 직접 생성 (개별 학생용)
 export const createAttendance = async (clinicId: number, studentId: number, attendanceType: AttendanceType = 'none') => {
   try {
-    console.log(`🔍 [api.ts] createAttendance 시작 - 클리닉: ${clinicId}, 학생: ${studentId}, 상태: ${attendanceType}`);
+    // console.log(`🔍 [api.ts] createAttendance 시작 - 클리닉: ${clinicId}, 학생: ${studentId}, 상태: ${attendanceType}`);
     
     const response = await api.post('/clinic-attendances/', {
       clinic: clinicId,
@@ -495,7 +567,7 @@ export const createAttendance = async (clinicId: number, studentId: number, atte
       attendance_type: attendanceType
     });
     
-    console.log('✅ [api.ts] 출석 데이터 생성 완료:', response.data);
+    // console.log('✅ [api.ts] 출석 데이터 생성 완료:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 출석 데이터 생성 오류:', error);
@@ -506,21 +578,21 @@ export const createAttendance = async (clinicId: number, studentId: number, atte
 // 특정 클리닉+학생 조합의 출석 데이터 조회 또는 생성
 export const getOrCreateAttendance = async (clinicId: number, studentId: number) => {
   try {
-    console.log(`🔍 [api.ts] getOrCreateAttendance 시작 - 클리닉: ${clinicId}, 학생: ${studentId}`);
+    // console.log(`🔍 [api.ts] getOrCreateAttendance 시작 - 클리닉: ${clinicId}, 학생: ${studentId}`);
     
     // 먼저 기존 출석 데이터 조회 (이제 배열을 반환함)
     const existingAttendances = await getClinicAttendances(clinicId);
-    console.log(`📋 [api.ts] 기존 출석 데이터 조회 결과: ${existingAttendances.length}개`);
+    // console.log(`📋 [api.ts] 기존 출석 데이터 조회 결과: ${existingAttendances.length}개`);
     
     const existingAttendance = existingAttendances.find((att: any) => att.student === studentId);
     
     if (existingAttendance) {
-      console.log('📋 [api.ts] 기존 출석 데이터 발견:', existingAttendance);
+      // console.log('📋 [api.ts] 기존 출석 데이터 발견:', existingAttendance);
       return existingAttendance;
     }
     
     // 없으면 새로 생성
-    console.log('📝 [api.ts] 출석 데이터 새로 생성');
+    // console.log('📝 [api.ts] 출석 데이터 새로 생성');
     return await createAttendance(clinicId, studentId, 'none');
     
   } catch (error) {
@@ -541,14 +613,14 @@ export const cancelClinicReservation = async (userId: number, clinicId: number) 
 // 클리닉 예약 API
 export const reserveClinic = async (userId: number, clinicId: number) => {
   try {
-    console.log('🔍 [api.ts] reserveClinic 함수 시작:', { userId, clinicId });
+    // console.log('🔍 [api.ts] reserveClinic 함수 시작:', { userId, clinicId });
     
     const response = await api.post('/clinics/reserve_clinic/', {
       user_id: userId,
       clinic_id: clinicId,
     });
     
-    console.log('✅ [api.ts] 클리닉 예약 완료:', response.data);
+    // console.log('✅ [api.ts] 클리닉 예약 완료:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 클리닉 예약 오류:', error);
@@ -559,14 +631,14 @@ export const reserveClinic = async (userId: number, clinicId: number) => {
 // 학생 의무 클리닉 상태 업데이트 API
 export const updateStudentNonPass = async (userId: number, nonPass: boolean) => {
   try {
-    console.log(`🔍 [api.ts] updateStudentNonPass 시작 - ID: ${userId}, non_pass: ${nonPass}`);
+    // console.log(`🔍 [api.ts] updateStudentNonPass 시작 - ID: ${userId}, non_pass: ${nonPass}`);
     
     // API 엔드포인트 수정: update_non_pass -> update-non-pass (하이픈 사용)
     const response = await api.patch(`/users/${userId}/update_non_pass/`, {
       non_pass: nonPass
     });
     
-    console.log('✅ [api.ts] 의무 클리닉 상태 업데이트 완료:', response.data);
+    // console.log('✅ [api.ts] 의무 클리닉 상태 업데이트 완료:', response.data);
     return response.data;
   } catch (error) {
     console.error('❌ [api.ts] 의무 클리닉 상태 업데이트 오류:', error);
