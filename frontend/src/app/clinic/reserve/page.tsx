@@ -606,17 +606,7 @@ const ClinicReservePage: React.FC = () => {
                 </Box>
                 
                                  {/* 마감 표시 - 하단 중앙 */}
-                 {/* {clinic.is_full && !isPastDay && (
-                   <Center>
-                     <Text 
-                       fontSize={{ base: "0.6rem", sm: "xs", md: "xs" }}
-                       color={useColorModeValue("red.500", "red.400")}
-                       fontWeight="bold"
-                     >
-                       마감
-                     </Text>
-                   </Center>
-                 )} */}
+                 {/* ㅓ */}
               </>
             ) : (
                              <Center height="100%">
