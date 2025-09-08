@@ -34,6 +34,12 @@ urlpatterns = [
         views.UserViewSet.as_view({"patch": "update_non_pass"}),
         name="user_update_non_pass",
     ),
+    # 필수 클리닉 신청 상태 업데이트 API
+    path(
+        "users/<int:pk>/update_essential_clinic/",
+        views.UserViewSet.as_view({"patch": "update_essential_clinic"}),
+        name="user_update_essential_clinic",
+    ),
     # 보충 신청 엑셀 업로드 API - 현재 기능 없음 (추후 구현 필요)
     # path(
     #     "clinics/upload-enrollment/",

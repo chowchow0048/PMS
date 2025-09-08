@@ -162,6 +162,57 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=True, methods=["patch"])
+    def update_essential_clinic(self, request, pk=None):
+        """학생의 필수 클리닉 신청 상태(essential_clinic) 업데이트"""
+        try:
+            user = self.get_object()
+            essential_clinic_status = request.data.get("essential_clinic")
+
+            if essential_clinic_status is None:
+                return Response(
+                    {"error": "essential_clinic 값이 필요합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # boolean 변환
+            if isinstance(essential_clinic_status, str):
+                essential_clinic_status = essential_clinic_status.lower() == "true"
+
+            # non_pass=True인 학생은 essential_clinic을 False로 설정할 수 없음
+            if user.non_pass and not essential_clinic_status:
+                return Response(
+                    {"error": "전 주 시험에서 Fail한 학생은 필수 클리닉 신청 취소를 끌 수 없습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user.essential_clinic = essential_clinic_status
+            user.save(update_fields=["essential_clinic"])
+
+            logger.info(
+                f"[api/views.py] essential_clinic 상태 업데이트: user_id={user.id}, "
+                f"name={user.name}, essential_clinic={essential_clinic_status}"
+            )
+
+            return Response(
+                {
+                    "success": True,
+                    "message": f"{user.name} 학생의 필수 클리닉 신청 상태가 {'설정' if essential_clinic_status else '해제'}되었습니다.",
+                    "user_id": user.id,
+                    "name": user.name,
+                    "essential_clinic": essential_clinic_status,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[api/views.py] essential_clinic 상태 업데이트 오류: {error_msg}")
+            return Response(
+                {"error": f"상태 업데이트 중 오류가 발생했습니다: {error_msg}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=["post"])
     def upload_student_excel(self, request):
         """학생 명단 엑셀 파일로 학생 사용자(is_student=True) 추가"""

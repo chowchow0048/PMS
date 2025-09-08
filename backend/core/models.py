@@ -93,6 +93,11 @@ class User(AbstractUser):
         verbose_name="의무 클리닉 대상자",
         help_text="True인 경우 의무적으로 보충 클리닉을 수강해야 합니다.",
     )  # 의무 클리닉 대상 여부
+    essential_clinic = models.BooleanField(
+        default=True,
+        verbose_name="필수 클리닉 신청",
+        help_text="True인 경우 필수 클리닉을 신청하겠다는 뜻이고, False인 경우 필수 클리닉을 하지 않겠다는 뜻입니다.",
+    )  # 필수 클리닉 신청 여부
 
     def __str__(self):
         return self.name

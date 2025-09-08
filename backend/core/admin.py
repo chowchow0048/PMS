@@ -80,6 +80,7 @@ class CustomUserAdmin(UserAdmin):
         "school",
         "grade",
         "non_pass",
+        "essential_clinic",
     )
     list_filter = (
         "is_teacher",
@@ -105,7 +106,7 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
         (
-            "학생 정보 (학생인 경우만)",
+            "학생 정보",
             {
                 "fields": (
                     "student_phone_num",
@@ -114,11 +115,12 @@ class CustomUserAdmin(UserAdmin):
                     "grade",
                     "no_show",  # 무단결석 횟수 추가
                     "non_pass",  # 의무 클리닉 대상자 여부
+                    "essential_clinic",  # 필수 클리닉 신청 여부
                 )
             },
         ),
         (
-            "출석 정보 (학생인 경우만)",
+            "출석 정보",
             {
                 "fields": (
                     "get_total_attendance_info",
