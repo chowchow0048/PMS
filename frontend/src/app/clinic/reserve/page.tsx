@@ -27,6 +27,7 @@ import {
   AlertIcon,
   AlertTitle,
   AlertDescription,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import { useAuth } from '@/lib/authContext';
 
@@ -132,6 +133,13 @@ const ClinicReservePage: React.FC = () => {
 
   // 의무 대상자 애니메이션을 위한 상태
   const [showMandatoryAnimation, setShowMandatoryAnimation] = useState(false);
+
+  // 다크모드 색상 값
+  const bgColor = useColorModeValue('white', 'dark.background');
+  const textColor = useColorModeValue('gray.800', 'dark.text');
+  const cardBg = useColorModeValue('white', 'dark.background');
+  const borderColor = useColorModeValue('gray.200', 'dark.border');
+  const secondaryTextColor = useColorModeValue('gray.600', 'dark.textSecondary');
 
   // 요일 매핑
   const dayNames: { [key: string]: string } = {
@@ -479,18 +487,20 @@ const ClinicReservePage: React.FC = () => {
           // 정사각형으로 고정
           aspectRatio={1}
           border="1px solid"
-          borderColor={hasClinic ? "gray.200" : "gray.100"}
+          borderColor={
+            hasClinic ? isReserved ? "green.300" : borderColor : useColorModeValue("gray.100", "dark.border")
+          }
           borderRadius="md"
           bg={
             !hasClinic
-              ? "gray.50"
+              ? useColorModeValue("gray.50", "dark.background")
               : isPastDay
-              ? "gray.100"
+              ? useColorModeValue("gray.100", "dark.background")
               : isReserved
-              ? "blue.50"
+              ? useColorModeValue("green.50", "rgba(16, 147, 27, 0.13)")
               : clinic.is_full
-              ? "red.50"
-              : "white"
+              ? useColorModeValue("red.50", "rgba(244, 63, 94, 0.1)")
+              : cardBg
           }
           _hover={{
             shadow: hasClinic && !clinic.is_full && !isPastDay && !isReserved ? "md" : "none",
@@ -520,7 +530,8 @@ const ClinicReservePage: React.FC = () => {
                   <Text 
                     // sm 이하에서 더 작은 텍스트
                     fontSize={{ base: "0.6rem", sm: "xs", md: "sm" }}
-                    color="gray.600" 
+                    // color={secondaryTextColor}
+                    color={"white.600"}
                     fontWeight="bold"
                     lineHeight="1.2"
                   >
@@ -528,7 +539,7 @@ const ClinicReservePage: React.FC = () => {
                   </Text>
                   <Text 
                     fontSize={{ base: "0.6rem", sm: "xs", md: "xs" }}
-                    color="gray.600" 
+                    color={"white.600"}
                     fontWeight="bold"
                     lineHeight="1.2"
                   >
@@ -548,7 +559,7 @@ const ClinicReservePage: React.FC = () => {
                 >
                   {isReserved && (
                     <Badge 
-                      colorScheme="blue"
+                      colorScheme="green"
                       fontSize={{ base: "0.6rem", sm: "0.8rem", md: "0.8rem" }}
                       px={0.8}
                       py={0.2}
@@ -571,7 +582,7 @@ const ClinicReservePage: React.FC = () => {
                        fontSize={{ base: "0.6rem", sm: "sm", md: "sm" }}
                        fontWeight="bold"
                        textAlign="center"
-                       color="gray.500"
+                       color={useColorModeValue("gray.500", "dark.textSecondary")}
                      >
                        마감
                      </Text>
@@ -582,7 +593,11 @@ const ClinicReservePage: React.FC = () => {
                        fontWeight="bold"
                        textAlign="center"
                        color={
-                         clinic.is_full ? "red.500" : clinic.remaining_spots <= 3 ? "orange.500" : "blue.600"
+                         clinic.is_full 
+                           ? useColorModeValue("red.500", "red.400") 
+                           : clinic.remaining_spots <= 3 
+                           ? useColorModeValue("orange.500", "orange.400") 
+                           : useColorModeValue("green.600", "green.400")
                        }
                      >
                        {clinic.current_count}/{clinic.capacity}
@@ -591,23 +606,23 @@ const ClinicReservePage: React.FC = () => {
                 </Box>
                 
                                  {/* 마감 표시 - 하단 중앙 */}
-                 {clinic.is_full && !isPastDay && (
+                 {/* {clinic.is_full && !isPastDay && (
                    <Center>
                      <Text 
                        fontSize={{ base: "0.6rem", sm: "xs", md: "xs" }}
-                       color="red.500" 
+                       color={useColorModeValue("red.500", "red.400")}
                        fontWeight="bold"
                      >
                        마감
                      </Text>
                    </Center>
-                 )}
+                 )} */}
               </>
             ) : (
                              <Center height="100%">
                  <Text 
                    fontSize={{ base: "xs", sm: "xs", md: "xs" }}
-                   color="gray.400"
+                   color={useColorModeValue("gray.400", "dark.textSecondary")}
                    textAlign="center"
                  >
                    클리닉 없음
@@ -648,13 +663,13 @@ const ClinicReservePage: React.FC = () => {
             as="h1" 
             size={{ base: "lg", md: "md" }}
             fontWeight="bold"
-            color="gray.600"
+            color={"white.600"}
           >
             보충 예약
           </Heading>
           <Text 
             fontSize={{ base: "md", md: "lg" }}
-            color="blue.500"
+            color={useColorModeValue("green.500", "green.400")}
             fontWeight="bold"
             maxW="md"
             mx="auto"
@@ -724,6 +739,8 @@ const ClinicReservePage: React.FC = () => {
           // 모바일에서 화면 가장자리 여백
           mx={{ base: 4, md: 0 }}
           my={{ base: 4, md: 0 }}
+          bg={cardBg}
+          color={textColor}
         >
           {selectedSlot && (
             <>
