@@ -808,7 +808,7 @@ const ClinicReservePage: React.FC = () => {
               color={textColor}
               mr={3}
             >
-              필수 클리닉 신청
+              클리닉 의무화
             </FormLabel>
             <Switch
               id="essential-clinic-switch"
