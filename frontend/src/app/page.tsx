@@ -21,26 +21,12 @@ export default function HomePage() {
   useEffect(() => {
     // 인증 상태 로딩 중이면 대기
     if (isLoading) {
-      console.log('루트 페이지: 인증 상태 로딩 중...');
       return;
     }
-
-    console.log('루트 페이지 권한 체크:', {
-      isAuthenticated,
-      user: user ? {
-        id: user.id,
-        username: user.username,
-        is_active: user.is_active,
-        is_staff: user.is_staff,
-        is_superuser: user.is_superuser,
-        is_teacher: user.is_teacher
-      } : null
-    });
 
     if (isAuthenticated && user) {
       // 계정이 비활성화된 경우
       if (!user.is_active) {
-        console.log('계정 비활성화 - 404 페이지로 이동');
         toast({
           title: '계정 비활성화',
           description: '계정이 비활성화되었습니다. 관리자에게 문의하세요.',
@@ -55,28 +41,22 @@ export default function HomePage() {
       // 로그인된 상태: 사용자 권한에 따라 리다이렉트 (백엔드와 동일한 우선순위)
       if (user.is_superuser) {
         // 슈퍼유저는 기본 관리 페이지로
-        console.log('슈퍼유저 권한 - 학생 배치 페이지로 이동');
         router.push('/student-placement');
       } else if (user.is_student) {
         // 학생은 클리닉 예약 페이지로 (우선순위 높음)
-        console.log('학생 권한 - 클리닉 예약 페이지로 이동');
         router.push('/clinic/reserve');
       } else if (user.is_staff && !user.is_superuser && !user.is_student) {
         // 관리자는 학생 배치 페이지로 (학생이 아닌 경우만)
-        console.log('관리자 권한 - 학생 배치 페이지로 이동');
         router.push('/student-placement');
       } else if (user.is_teacher) {
         // 강사는 마이페이지로
-        console.log('강사 권한 - 마이페이지로 이동:', `/mypage/${user.id}`);
         router.push(`/mypage/${user.id}`);
       } else {
         // 기본값: 클리닉 예약 페이지로
-        console.log('기본 리다이렉션 - 클리닉 예약 페이지로 이동');
         router.push('/clinic/reserve');
       }
     } else {
       // 로그인되지 않은 상태: 로그인 페이지로 리다이렉트
-      console.log('비로그인 상태 - 로그인 페이지로 이동');
       router.push('/login');
     }
   }, [isAuthenticated, user, isLoading, router, toast]);

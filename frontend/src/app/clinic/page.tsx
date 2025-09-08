@@ -107,18 +107,4 @@ const ClinicPage: React.FC = () => {
 
 export default ClinicPage;
 
-/*
-보충 시스템 개편으로 주석처리된 원본 코드
-
-원본 파일에는 다음과 같은 기능들이 있었음:
-- 오늘의 클리닉 목록 표시
-- prime/sub 클리닉 구분 관리  
-- 학생 출석 체크 기능
-- 박스/테이블 뷰 전환
-- 실시간 업데이트 처리
-
-하지만 백엔드 모델에서 clinic_prime_students, clinic_sub_students 등의 
-속성이 제거되고 단순한 clinic_students 배열로 통합되어 더 이상 작동하지 않음.
-
-새로운 시스템에서는 /clinic/reserve 페이지에서 클리닉 예약을 처리함.
-*/ 
+ 

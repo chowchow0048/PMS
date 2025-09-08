@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, VStack, Text, Badge, Button, Flex, Tooltip, Center } from '@chakra-ui/react';
+import { Box, VStack, Text, Badge, Button, Flex, Tooltip, Center, useColorModeValue } from '@chakra-ui/react';
 // import { useDrop } from 'react-dnd'; // drag&drop 주석처리
 import { Clinic, Student } from '@/lib/types'; // types.ts에서 Student와 Clinic import
 // import { ItemTypes } from './StudentItem'; // ItemTypes만 StudentItem에서 import - drag&drop 주석처리
@@ -24,6 +24,14 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
   onStudentDrop,
   isStudentAlreadyAssigned,
 }) => {
+  // Material Design 다크테마 색상 설정
+  const cardBg = useColorModeValue('white', 'dark.surface');
+  const cardBg2 = useColorModeValue('white', 'dark.surface2');
+  const borderColor = useColorModeValue('gray.200', 'dark.border');
+  const textColor = useColorModeValue('gray.800', 'dark.text');
+  const headerBg = useColorModeValue('gray.50', 'dark.hover');
+  const hoverBg = useColorModeValue('gray.50', 'dark.hover');
+  
   // 해당 요일의 시간대별 클리닉 찾기
   const dayClinics = TIME_SLOTS.map(timeSlot => 
     clinics.find(clinic => clinic.clinic_day === day && clinic.clinic_time === timeSlot)
@@ -32,109 +40,33 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
   // 해당 요일에 클리닉이 하나라도 있는지 확인
   const hasAnyClinics = dayClinics.some(clinic => clinic !== undefined);
 
-  // 드롭 기능 구현 - drag&drop 주석처리
-  // const [{ isOver, canDrop }, dropRef] = useDrop({
-  //   accept: ItemTypes.STUDENT,
-  //   canDrop: (item: { 
-  //     id: number; 
-  //     student: Student; 
-  //     selectedStudents?: Student[]; 
-  //     isMultiple?: boolean; 
-  //   }) => {
-  //     // 클리닉이 없으면 드롭 불가
-  //     if (!hasAnyClinics) return false;
-  //     
-  //     // 이미 배치된 학생이 있는지 확인
-  //     if (isStudentAlreadyAssigned) {
-  //       const studentsToCheck = item.isMultiple && item.selectedStudents ? 
-  //         item.selectedStudents : [item.student];
-  //       
-  //       // 하나라도 이미 배치된 학생이 있으면 드롭 불가
-  //       return !studentsToCheck.some(student => 
-  //         isStudentAlreadyAssigned(student.id, day)
-  //       );
-  //     }
-  //     
-  //     return true;
-  //   },
-  //   drop: (item: { 
-  //     id: number; 
-  //     student: Student; 
-  //     selectedStudents?: Student[]; 
-  //     isMultiple?: boolean; 
-  //   }) => {
-  //     // 드롭 이벤트 핸들러 호출
-  //     if (onStudentDrop) {
-  //       // 다중 선택된 학생들이 있는 경우
-  //       if (item.isMultiple && item.selectedStudents) {
-  //         onStudentDrop(day, item.selectedStudents);
-  //       } else {
-  //         // 단일 학생
-  //         onStudentDrop(day, [item.student]);
-  //       }
-  //     }
-  //     
-  //     return { dropped: true };
-  //   },
-  //   collect: (monitor) => ({
-  //     isOver: !!monitor.isOver(),
-  //     canDrop: !!monitor.canDrop(),
-  //   }),
-  // });
-
   const handleBoxClick = () => {
     onClinicClick(day); // 요일을 전달
   };
 
   return (
     <Box
-      // ref={dropRef as any} // drag&drop 주석처리
       border="1px solid"
-      borderColor="gray.300" // drag&drop 조건 제거
+      borderColor={borderColor}
       borderRadius="lg"
-      p={4}
+      p={{ base: 3, md: 4 }}
       h="full"
-      minH="300px"
-      bg="white" // drag&drop 조건 제거
+      minH={{ base: "250px", md: "300px" }}
+      w="100%"
+      bg={cardBg}
+      color={textColor}
       cursor={hasAnyClinics ? "pointer" : "default"}
       _hover={hasAnyClinics ? { 
-        borderColor: 'blue.400', 
+        borderColor: 'gray.600', 
         shadow: 'md'
       } : {}}
       transition="all 0.2s"
       onClick={handleBoxClick}
       position="relative"
     >
-      {/* 드롭 오버레이 - drag&drop 주석처리 */}
-      {/* {isOver && (
-        <Box
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          bottom={0}
-          bg={canDrop ? 'green.100' : 'red.100'}
-          borderRadius="lg"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          zIndex={10}
-          opacity={0.8}
-        >
-          <VStack spacing={2}>
-            <Text fontSize="3xl">
-              {canDrop ? '📥' : '❌'}
-            </Text>
-            <Text fontSize="lg" fontWeight="bold" color={canDrop ? 'green.700' : 'red.700'}>
-              {canDrop ? '학생 배치' : '중복 배치 불가'}
-            </Text>
-          </VStack>
-        </Box>
-      )} */}
-      
       {/* 요일 헤더 */}
       <Flex justify="center" align="center" mb={6}>
-        <Text fontSize="xl" fontWeight="bold" color="gray.700">
+        <Text fontSize="xl" fontWeight="bold" color={textColor}>
           {dayLabel}
         </Text>
       </Flex>
@@ -142,13 +74,13 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
       {/* 클리닉 정보 */}
       {!hasAnyClinics ? (
         <Center py={8} flexDirection="column">
-          <Text color="gray.500" fontSize="2xl" mb={3}>
+          <Text color={useColorModeValue('gray.500', 'dark.textSecondary')} fontSize="2xl" mb={3}>
             🕐
           </Text>
-          <Text color="gray.500" fontSize="md" mb={2}>
+          <Text color={useColorModeValue('gray.500', 'dark.textSecondary')} fontSize="md" mb={2}>
             등록된 클리닉이 없습니다
           </Text>
-          <Text color="gray.400" fontSize="sm">
+          <Text color={useColorModeValue('gray.400', 'dark.textSecondary')} fontSize="sm">
             클릭하여 클리닉을 생성하세요
           </Text>
         </Center>
@@ -156,9 +88,9 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
         <VStack align="stretch" spacing={4}>
           {/* 시간대별 학생 수 표시 */}
           <VStack align="stretch" spacing={3}>
-            <Text fontSize="sm" fontWeight="semibold" color="gray.600" textAlign="center">
+            {/* <Text fontSize="sm" fontWeight="semibold" color="gray.600" textAlign="center">
               시간대별 현황
-            </Text>
+            </Text> */}
             
             <VStack spacing={2}>
               {TIME_SLOTS.map((timeSlot) => {
@@ -174,10 +106,10 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
                     align="center"
                     w="full"
                     p={2}
-                    bg={isActive ? 'white.50' : 'gray.50'}
+                    bg={isActive ? useColorModeValue('white.50', 'dark.hover') : headerBg}
                     borderRadius="md"
                     border="1px solid"
-                    borderColor={isActive ? 'gray.300' : 'gray.300'}
+                    borderColor={borderColor}
                   >
                     <Flex align="center" gap={2}>
                       {/* <Text fontSize="sm" color={isActive ? "blue.600" : "gray.500"}>
@@ -186,7 +118,10 @@ const ClinicDayBox: React.FC<ClinicDayBoxProps> = ({
                       <Text 
                         fontSize="sm" 
                         fontWeight="medium"
-                        color={isActive ? "blue.700" : "gray.500"}
+                        color={isActive ? 
+                          useColorModeValue("gray.700", "dark.text") : 
+                          useColorModeValue("gray.500", "dark.textSecondary")
+                        }
                       >
                         {timeSlot}
                       </Text>

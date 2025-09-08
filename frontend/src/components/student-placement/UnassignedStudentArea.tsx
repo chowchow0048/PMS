@@ -29,7 +29,8 @@ import {
   AlertTitle,
   AlertDescription,
   Spinner,
-  Center
+  Center,
+  useColorModeValue
 } from '@chakra-ui/react';
 import { SearchIcon, AttachmentIcon, DownloadIcon, ChevronDownIcon, ChevronUpIcon, AddIcon, SettingsIcon } from '@chakra-ui/icons';
 // import { useDrop } from 'react-dnd'; // drag&drop 주석처리
@@ -73,6 +74,14 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   // 검색어 상태 관리
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Material Design 다크테마 색상 설정
+  const cardBg = useColorModeValue('white', 'dark.surface');
+  const borderColor = useColorModeValue('gray.200', 'dark.border');
+  const textColor = useColorModeValue('gray.800', 'dark.text');
+  const headerBg = useColorModeValue('gray.50', 'dark.background');
+  const inputBg = useColorModeValue('white', 'dark.surface');
+  const modalBg = useColorModeValue('white', 'dark.surface');
+  
   // 접기/펼치기 상태 관리 (학교별)
   const [collapsedSchools, setCollapsedSchools] = useState<Set<string>>(new Set());
   
@@ -107,34 +116,6 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   // 마지막 선택된 학생의 그룹 정보 추가
   const [lastSelectedGroup, setLastSelectedGroup] = useState<string | null>(null);
-
-  // 드롭 기능 구현 (배치된 학생이 다시 미배치 상태로 돌아올 때) - drag&drop 주석처리
-  // const [{ isOver }, dropRef] = useDrop({
-  //   accept: ItemTypes.STUDENT,
-  //   drop: (item: { 
-  //     id: number; 
-  //     student: Student; 
-  //     selectedStudents?: Student[]; 
-  //     isMultiple?: boolean; 
-  //   }) => {
-  //     // 다중 선택된 학생들이 있는 경우
-  //     if (item.isMultiple && item.selectedStudents && onUnassignMultipleStudents) {
-  //       // 다중 학생 미배치 함수 사용
-  //       onUnassignMultipleStudents(item.selectedStudents);
-  //     } else {
-  //       // 단일 학생 미배치
-  //       onUnassignStudent(item.id);
-  //     }
-  //     
-  //     // 드래그 완료 후 선택 해제
-  //     clearSelection();
-  //     
-  //     return { unassigned: true };
-  //   },
-  //   collect: (monitor) => ({
-  //     isOver: !!monitor.isOver(),
-  //   }),
-  // });
 
   // 파일 선택 핸들러
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -219,7 +200,6 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       }
       
       setUploadResult(result);
-
       // 데이터 새로고침
       if (onRefresh) {
         onRefresh();
@@ -466,9 +446,10 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   return (
     <Box
       // ref={dropRef as any} // drag&drop 주석처리
-      bg="gray.50" // isOver 조건 제거
+      bg={headerBg}
       borderRadius="md"
       width="100%"
+      color={textColor}
       height="100%"
       display="flex"
       flexDirection="column"
@@ -476,7 +457,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       {/* 헤더: 제목과 엑셀 업로드 버튼 (고정) */}
       <Box p={4} pb={2} flexShrink={0}>
         <Flex justify="space-between" align="center" mb={4}>
-          <Heading as="h1" size="md" fontWeight='bold'>
+          <Heading as="h1" size="md" fontWeight='bold' color={textColor}>
             학생 명단
           </Heading>
           <HStack spacing={2}>
@@ -531,18 +512,6 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
              >
                학생 명단
                </Button>
-               {/* <Button
-               leftIcon={<AddIcon />}
-               colorScheme="green"
-               variant="solid"
-               size="md"
-               bg="green.600"
-               _hover={{ bg: "green.400" }}
-               onClick={() => handleOpenModal('generate')}
-               isDisabled={true} // 기능 비활성화
-             >
-               학생아이디 생성 (비활성화)
-               </Button> */}
           </HStack>
         </Flex>
         
@@ -555,8 +524,10 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
             placeholder="학생 이름 검색" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            bg="white"
-            borderColor="gray.300"
+            bg={inputBg}
+            borderColor={borderColor}
+            color={textColor}
+            _placeholder={{ color: useColorModeValue('gray.500', 'dark.textSecondary') }}
           />
         </InputGroup>
       </Box>
@@ -577,7 +548,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                   justify="space-between" 
                   cursor="pointer"
                   onClick={() => toggleSchool(school)}
-                  _hover={{ bg: 'gray.100' }}
+                  _hover={{ bg: 'dark.hover' }}
                   p={2}
                   borderRadius="md"
                   transition="background-color 0.2s"
@@ -609,7 +580,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                             justify="space-between" 
                             cursor="pointer"
                             onClick={(e) => toggleGrade(school, grade)}
-                            _hover={{ bg: 'gray.50' }}
+                            _hover={{ bg: 'dark.hover' }}
                             p={2}
                             borderRadius="md"
                             transition="background-color 0.2s"
@@ -664,7 +635,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
       {/* 엑셀 업로드 모달 */}
       <Modal isOpen={isOpen} onClose={handleCloseModal} size="xl">
         <ModalOverlay />
-        <ModalContent>
+        <ModalContent bg={modalBg} color={textColor}>
                      <ModalHeader>
             {uploadType === 'student' ? '학생 명단 업로드' : '학생 아이디 생성'}
           </ModalHeader>

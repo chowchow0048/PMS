@@ -4,8 +4,6 @@ import React, { useState, useEffect } from 'react';
 import styles from './ClinicCell.module.css';
 import pageStyles from './page.module.css';
 import { useClinic } from './ClinicContext';
-import StudentItem from './StudentItem.deprecated';
-import { bg } from 'date-fns/locale';
 
 // 시간 정보 타입 정의 (실제 API 응답 구조에 맞게 수정)
 interface Time {
@@ -113,26 +111,18 @@ const ClinicCell: React.FC<ClinicCellProps> = ({ day, time, teacher }) => {
     if (clinic.students.length === 1) {
       // 학생이 한 명인 경우 해당 학생만 표시
       return (
-        <StudentItem
-          key={firstStudent.id}
-          student={firstStudent}
-          onDragStart={(e) => handleDragStart(e, firstStudent)}
-          startTime={clinic.time || time}
-          currentTime={time}
-        />
+        <div key={firstStudent.id} className={styles.studentItem}>
+          {firstStudent.name}
+        </div>
       );
     } else {
       // 학생이 여러 명인 경우 첫 학생과 "외 n명" 텍스트 표시
       const remainingCount = clinic.students.length - 1;
       return (
         <div className={styles.studentSummary}>
-          <StudentItem
-            key={firstStudent.id}
-            student={firstStudent}
-            onDragStart={(e) => handleDragStart(e, firstStudent)}
-            startTime={clinic.time || time}
-            currentTime={time}
-          />
+          <div key={firstStudent.id} className={styles.studentItem}>
+            {firstStudent.name}
+          </div>
           <div className={styles.otherStudents}>외 {remainingCount}명</div>
         </div>
       );

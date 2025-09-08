@@ -168,8 +168,6 @@ const ClinicReservePage: React.FC = () => {
     const today = new Date();
     const weekday = today.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
     
-    // 테스팅용: 월요일로 가정
-    return 0; // 월요일로 고정
     
     // 일요일(0)을 토요일 다음(6)으로 처리
     if (weekday === 0) return 6; // 일요일은 모든 요일 예약 가능
@@ -202,10 +200,6 @@ const ClinicReservePage: React.FC = () => {
     return targetDayOrder >= currentDayOrder;
   };
 
-  // 예약 취소는 완전히 불가능 (관리자 문의 필요)
-  const isCancellationAllowed = () => {
-    return false; // 모든 예약 취소 불가능
-  };
 
   // 다음주 월요일 00:00까지의 시간 계산 함수 (24시간계)
   const getTimeUntilNextMonday = () => {
@@ -276,8 +270,7 @@ const ClinicReservePage: React.FC = () => {
       setDays(data.days);
       setTimes(data.times);
     } catch (error) {
-      // console.error('스케줄 로드 오류:', error);
-      toast({
+        toast({
         title: '오류',
         description: '스케줄을 불러오는데 실패했습니다.',
         status: 'error',
@@ -291,17 +284,6 @@ const ClinicReservePage: React.FC = () => {
 
   // 클리닉 예약 처리
   const handleReserveClinic = async (day: string, time: string, clinic: ClinicSlot) => {
-    // 모든 사용자가 예약 가능하도록 수정 (학생 < 강사 < 관리자 < 슈퍼유저)
-    // if (!user || !user.is_student) {  // 보충 시스템 개편으로 주석처리
-    //   toast({
-    //     title: '권한 없음',
-    //     description: '학생만 예약할 수 있습니다.',
-    //     status: 'error',
-    //     duration: 3000,
-    //     isClosable: true,
-    //   });
-    //   return;
-    // }
 
     if (!user) {
       toast({
@@ -456,8 +438,7 @@ const ClinicReservePage: React.FC = () => {
               });
             }
     } catch (error) {
-      // console.error('예약 오류:', error);
-      toast({
+        toast({
         title: '네트워크 오류',
         description: '예약 요청 중 오류가 발생했습니다.',
         status: 'error',
@@ -660,14 +641,6 @@ const ClinicReservePage: React.FC = () => {
       position="relative"
       overflow="hidden"
     >
-      {/* 의무 대상자 애니메이션 */}
-      {/* {showMandatoryAnimation && user?.non_pass && (
-        <>
-          {Array.from({ length: 20 }, (_, i) => (
-            <MandatoryText key={i} delay={i * 0.2} />
-          ))}
-        </>
-      )} */}
       
       <VStack spacing={4} align="stretch">
         <VStack spacing={2} textAlign="center">

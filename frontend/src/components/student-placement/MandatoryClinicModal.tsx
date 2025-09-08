@@ -21,6 +21,7 @@ import {
   Spinner,
   Center,
   VStack,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
 import { Student } from '@/lib/types';
@@ -41,6 +42,22 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState<number | null>(null); // 업데이트 중인 학생 ID
   const toast = useToast();
+
+  // Dark mode colors
+  const bgColor = useColorModeValue('white', 'dark.surface');
+  const borderColor = useColorModeValue('gray.300', 'gray.600');
+  const textColor = useColorModeValue('gray.700', 'gray.100');
+  const secondaryTextColor = useColorModeValue('gray.600', 'gray.300');
+  const tertiaryTextColor = useColorModeValue('gray.500', 'gray.400');
+  const searchBg = useColorModeValue('white', 'gray.700');
+  const searchIconColor = useColorModeValue('gray.300', 'gray.500');
+  const statisticsBg = useColorModeValue('gray.50', 'gray.700');
+  const hoverBg = useColorModeValue('gray.50', 'gray.600');
+  const mandatoryBg = useColorModeValue('red.50', 'red.900');
+  const mandatoryHoverBg = useColorModeValue('red.100', 'red.800');
+  const mandatoryBorder = useColorModeValue('red.300', 'red.600');
+  const mandatoryTextColor = useColorModeValue('red.700', 'red.200');
+  const mandatorySecondaryTextColor = useColorModeValue('red.600', 'red.300');
 
   // 모달이 열릴 때 학생 데이터 로드
   useEffect(() => {
@@ -219,16 +236,19 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="6xl" isCentered>
-      <ModalOverlay bg="blackAlpha.300" />
+      <ModalOverlay bg="useColorModeValue('gray.50', 'dark.background')" />
       <ModalContent 
+        border={"1px"}
+        borderColor={useColorModeValue('gray.200', 'dark.border')}
         maxH="90vh" 
         minH="80vh"
         minW="80vw"
         display="flex" 
         flexDirection="column"
+        bg={useColorModeValue('white', 'dark.background')}
       >
-        <ModalHeader>
-          <Text fontSize="xl" fontWeight="bold" color="gray.700">
+        <ModalHeader bg={useColorModeValue('gray.50', 'dark.background')}>
+          <Text fontSize="xl" fontWeight="bold" color={textColor}>
             의무 클리닉 관리
           </Text>
         </ModalHeader>
@@ -239,17 +259,21 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
           <Box mb={4}>
             <InputGroup>
               <InputLeftElement pointerEvents="none">
-                <SearchIcon color="gray.300" />
+                <SearchIcon color={searchIconColor} />
               </InputLeftElement>
               <Input
                 placeholder="학생 이름, 아이디, 학교, 학년으로 검색..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                bg="white"
-                borderColor="gray.300"
+                bg={searchBg}
+                borderColor={borderColor}
+                color={textColor}
                 _focus={{
                   borderColor: "blue.500",
                   boxShadow: "0 0 0 1px #3182ce",
+                }}
+                _placeholder={{
+                  color: tertiaryTextColor,
                 }}
               />
             </InputGroup>
@@ -261,12 +285,12 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
               <Center py={8}>
                 <VStack spacing={4}>
                   <Spinner size="lg" color="blue.500" />
-                  <Text color="gray.600">학생 명단을 불러오는 중...</Text>
+                  <Text color={secondaryTextColor}>학생 명단을 불러오는 중...</Text>
                 </VStack>
               </Center>
             ) : filteredStudents.length === 0 ? (
               <Center py={8}>
-                <Text color="gray.500" fontSize="lg">
+                <Text color={tertiaryTextColor} fontSize="lg">
                   {searchTerm ? '검색 결과가 없습니다.' : '학생이 없습니다.'}
                 </Text>
               </Center>
@@ -284,10 +308,11 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                       p={4}
                       variant="outline"
                       colorScheme={student.non_pass ? "red" : "gray"}
-                      bg={student.non_pass ? "red.50" : "white"}
-                      borderColor={student.non_pass ? "red.300" : "gray.300"}
+                      // bg={student.non_pass ? mandatoryBg : bgColor}
+                      bg={useColorModeValue('white', 'dark.surface')}
+                      borderColor={student.non_pass ? mandatoryBorder : borderColor}
                       _hover={{
-                        bg: student.non_pass ? "red.100" : "gray.50",
+                        bg: student.non_pass ? mandatoryHoverBg : hoverBg,
                       }}
                       transition="all 0.15s ease-in-out"
                       onClick={() => handleToggleNonPass(student)}
@@ -302,7 +327,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                             <Text
                               fontSize="md"
                               fontWeight="bold"
-                              color={student.non_pass ? "red.700" : "gray.700"}
+                              color={student.non_pass ? mandatoryTextColor : textColor}
                               noOfLines={1}
                               flex="1"
                             >
@@ -323,7 +348,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                           </Box>
                           <Text
                             fontSize="sm"
-                            color={student.non_pass ? "red.600" : "gray.600"}
+                            color={student.non_pass ? mandatorySecondaryTextColor : secondaryTextColor}
                             noOfLines={1}
                           >
                             {student.username}
@@ -333,7 +358,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                         <Box textAlign="left">
                           <Text
                             fontSize="xs"
-                            color={student.non_pass ? "red.500" : "gray.500"}
+                            color={student.non_pass ? mandatorySecondaryTextColor : tertiaryTextColor}
                           >
                             {student.school} {student.grade}
                           </Text>
@@ -347,10 +372,10 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
           </Box>
 
           {/* 통계 정보 */}
-          <Box mt={4} p={3} bg="gray.50" borderRadius="md">
-            <Text fontSize="sm" color="gray.600" textAlign="center">
+          <Box mt={4} p={3} bg={useColorModeValue('gray.50', 'dark.background')} borderRadius="md">
+            <Text fontSize="sm" color={secondaryTextColor} textAlign="center">
               총 {students.length}명 중 의무 대상자{' '}
-              <Text as="span" fontWeight="bold" color="red.600">
+              <Text as="span" fontWeight="bold" color="red.500">
                 {students.filter(s => s.non_pass).length}명
               </Text>
               {searchTerm && (

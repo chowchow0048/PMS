@@ -1,7 +1,7 @@
 'use client';
 
 import { FC, useRef } from 'react';
-import { Box, Text } from '@chakra-ui/react';
+import { Box, Text, useColorModeValue } from '@chakra-ui/react';
 // import { useDrag } from 'react-dnd'; // drag&drop 기능 주석처리
 import { Student } from '@/lib/types'; // types.ts에서 Student import
 
@@ -43,31 +43,13 @@ const StudentItem: FC<StudentItemProps> = ({
   // selectedStudents = [], // drag&drop 주석처리
   onClick
 }) => {
-  // 드래그 기능 구현 - 주석처리
-  // const [{ isDragging }, dragRef] = useDrag(() => ({
-  //   type: ItemTypes.STUDENT,
-  //   item: () => {
-  //     // 선택된 학생이 있고 현재 학생이 선택된 상태라면 모든 선택된 학생을 드래그
-  //     if (isSelected && selectedStudents.length > 1) {
-  //       return { 
-  //         id: student.id, 
-  //         student,
-  //         selectedStudents: selectedStudents,
-  //         isMultiple: true
-  //       };
-  //     }
-  //     // 단일 드래그
-  //     return { 
-  //       id: student.id, 
-  //       student,
-  //       selectedStudents: [student],
-  //       isMultiple: false
-  //     };
-  //   },
-  //   collect: (monitor) => ({
-  //     isDragging: !!monitor.isDragging(),
-  //   }),
-  // }), [student, isSelected, selectedStudents]);
+  // Material Design 다크테마 색상 설정
+  const cardBg = useColorModeValue('white', 'dark.surface');
+  const selectedBg = useColorModeValue('blue.50', 'rgba(66, 165, 245, 0.2)');
+  const highlightedBg = useColorModeValue('yellow.100', 'rgba(255, 193, 7, 0.2)');
+  const textColor = useColorModeValue('gray.800', 'dark.text');
+  const borderColor = useColorModeValue('gray.200', 'dark.border');
+  const selectedBorderColor = useColorModeValue('blue.300', 'blue.500');
 
   // 클릭 핸들러
   const handleClick = (event: React.MouseEvent) => {
@@ -82,15 +64,6 @@ const StudentItem: FC<StudentItemProps> = ({
     }
   };
 
-  // 더블클릭 핸들러 - 주석처리
-  // const handleDoubleClick = (event: React.MouseEvent) => {
-  //   event.preventDefault();
-  //   event.stopPropagation();
-  //   if (onDoubleClick) {
-  //     onDoubleClick(student);
-  //   }
-  // };
-
   // 학생 아이템 스타일 설정
   return (
     <Box
@@ -101,26 +74,22 @@ const StudentItem: FC<StudentItemProps> = ({
       mb={1}
       borderRadius="md"
       bg={
-        isSelected ? 'blue.50' : 
-        isHighlighted ? 'blue.50' : 
-        'transparent'
+        isSelected ? selectedBg : 
+        isHighlighted ? highlightedBg : 
+        cardBg
       }
+      color={textColor}
       border="1px solid"
       borderColor={
-        isSelected ? 'blue.100' :
-        isHighlighted ? 'blue.100' : 
-        'gray.300'
+        isSelected ? selectedBorderColor :
+        isHighlighted ? selectedBorderColor : 
+        borderColor
       }
       _hover={{ 
-        bg: isSelected ? 'blue.100' :
-            isHighlighted ? 'blue.100' : 
-            'gray.100' 
+        bg: isSelected ? useColorModeValue('blue.100', 'rgba(66, 165, 245, 0.3)') :
+            isHighlighted ? useColorModeValue('blue.100', 'rgba(66, 165, 245, 0.3)') : 
+            useColorModeValue('gray.100', 'dark.hover') 
       }}
-      // _focus={{
-      //   outline: 'none',
-      //   borderColor: isSelected ? 'blue.400' : 'blue.300',
-      //   bg: isSelected ? 'blue.300' : 'blue.100'
-      // }}
       display="flex"
       justifyContent="center"
       alignItems="center"
@@ -129,7 +98,6 @@ const StudentItem: FC<StudentItemProps> = ({
       textAlign="center"
       transition="all 0.2s"
       onClick={handleClick}
-      // onDoubleClick={handleDoubleClick} // 더블클릭 주석처리
       userSelect="none" // 텍스트 선택 방지
       position="relative"
       boxSizing="border-box" // 크기 변화 방지
@@ -143,9 +111,9 @@ const StudentItem: FC<StudentItemProps> = ({
         } 
         fontSize="sm" 
         color={
-          isSelected ? 'blue.800' :
-          isHighlighted ? 'blue.700' : 
-          'gray.800'
+          isSelected ? 'white.800' :
+          isHighlighted ? 'white.700' : 
+          'white.800'
         }
       >
         {student.student_name}

@@ -213,13 +213,8 @@ export default function LoginPage() {
       // API 로그인 요청
       const data = await login(username, password);
       
-      // 디버깅을 위한 콘솔 출력
-      console.log('로그인 응답 데이터:', data);
-      console.log('사용자 정보:', data.user);
-      
       // 초기 비밀번호 변경이 필요한 경우 모달 표시
       if (data.needs_password_change) {
-        console.log('초기 비밀번호 변경 필요 - 모달 표시');
         setPendingLoginData(data);
         onOpen();
         return;
@@ -238,31 +233,17 @@ export default function LoginPage() {
       
       // 백엔드 응답의 redirect 경로 사용 또는 사용자 권한에 따른 리다이렉션
       if (data.redirect) {
-        // 백엔드에서 제공한 리다이렉트 경로 사용
-        console.log('백엔드 리다이렉트 경로:', data.redirect);
         router.push(data.redirect);
       } else {
-        // 백엔드와 동일한 권한 로직 적용 (is_student 우선순위)
-        console.log('클라이언트 사이드 권한 체크');
         if (data.user.is_superuser) {
-          // 슈퍼유저는 메인 페이지로
-          console.log('슈퍼유저 권한 - 메인 페이지로 이동');
           router.push('/');
         } else if (data.user.is_student) {
-          // 학생은 클리닉 예약 페이지로 (우선순위 높음)
-          console.log('학생 권한 - 클리닉 예약 페이지로 이동');
           router.push('/clinic/reserve');
         } else if (data.user.is_staff && !data.user.is_superuser && !data.user.is_student) {
-          // 관리자는 학생 배치 페이지로 (학생이 아닌 경우만)
-          console.log('관리자 권한 - 학생 배치 페이지로 이동');
           router.push('/student-placement');
         } else if (data.user.is_teacher) {
-          // 강사는 마이페이지로
-          console.log('강사 권한 - 마이페이지로 이동:', `/mypage/${data.user.id}`);
           router.push(`/mypage/${data.user.id}`);
         } else {
-          // 기본 리다이렉션
-          console.log('기본 리다이렉션 - 메인 페이지로 이동');
           router.push('/');
         }
       }

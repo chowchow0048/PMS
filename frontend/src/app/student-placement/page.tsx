@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Box, Flex, Container, Heading, Grid, GridItem, Spinner, Center, useToast, useDisclosure } from '@chakra-ui/react';
+import { Box, Flex, Container, Heading, Grid, GridItem, Spinner, Center, useToast, useDisclosure, VStack } from '@chakra-ui/react';
 import UnassignedStudentArea from '@/components/student-placement/UnassignedStudentArea';
 import ClinicDayBox from '@/components/student-placement/ClinicDayBox';
 import ClinicManagementModal from '@/components/student-placement/ClinicManagementModal';
@@ -11,6 +11,7 @@ import { Student, User, Clinic, DAY_CHOICES } from '@/lib/types'; // types.ts에
 import { Time } from '@/components/student-placement/StudentItem'; // Time은 StudentItem에서 import
 import { getStudents, getTeachers, getClinics, assignStudent, unassignStudent, assignStudentToClinic } from '@/lib/api';
 import { AuthGuard } from '@/lib/authGuard';
+import { useColorModeValue } from '@chakra-ui/react';
 
 // Teacher 타입을 User 기반으로 정의 (is_teacher=true인 User)
 type Teacher = User & {
@@ -120,7 +121,6 @@ function StudentPlacementPageContent() {
   // 데이터 로딩 함수
   const fetchData = async () => {
     try {
-      // console.log('🔍 [student-placement/page.tsx] fetchData 함수 시작');
       setLoading(true);
       
       // 학생, 선생님, 클리닉 데이터 동시 로딩
@@ -130,7 +130,6 @@ function StudentPlacementPageContent() {
         getClinics()
       ]);
 
-      // console.log('🔍 [student-placement/page.tsx] 클리닉 데이터 로딩 완료:', clinicsData);
       
       // 데이터 처리
       const teachersArray = Array.isArray(teachersData) ? teachersData : [];
@@ -153,9 +152,7 @@ function StudentPlacementPageContent() {
       setUnassignedStudents(unassigned);
       setAssignedStudents(assigned);
       
-      // console.log('🔍 [student-placement/page.tsx] 모든 데이터 로딩 완료');
     } catch (error) {
-      // console.error('❌ [student-placement/page.tsx] fetchData에서 오류 발생:', error);
       
       toast({
         title: '데이터 로딩 실패',
@@ -193,7 +190,7 @@ function StudentPlacementPageContent() {
   }
   
   // 임시 더미 함수 (기존 코드 호환성을 위해)
-  const handleAssignStudent = async (studentId: number, teacherId: number) => {
+  const handleAssignStudent = async (_studentId: number, _teacherId: number) => {
     console.warn('handleAssignStudent: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
     toast({ 
       title: '기능 중단',
@@ -204,7 +201,7 @@ function StudentPlacementPageContent() {
     });
   };
   // 임시 더미 함수 (기존 코드 호환성을 위해)
-  const handleAssignMultipleStudents = async (students: Student[], teacherId: number) => {
+  const handleAssignMultipleStudents = async (_students: Student[], _teacherId: number) => {
     console.warn('handleAssignMultipleStudents: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
     toast({ 
       title: '기능 중단',
@@ -216,7 +213,7 @@ function StudentPlacementPageContent() {
   };
   
   // 임시 더미 함수 (기존 코드 호환성을 위해)
-  const handleUnassignStudent = async (studentId: number) => {
+  const handleUnassignStudent = async (_studentId: number) => {
     console.warn('handleUnassignStudent: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
     toast({
       title: '기능 중단',
@@ -228,7 +225,7 @@ function StudentPlacementPageContent() {
   };
   
   // 임시 더미 함수 (기존 코드 호환성을 위해)
-  const handleUnassignMultipleStudents = async (students: Student[]) => {
+  const handleUnassignMultipleStudents = async (_students: Student[]) => {
     console.warn('handleUnassignMultipleStudents: 보충 시스템 개편으로 이 기능은 더 이상 사용되지 않습니다.');
     toast({
       title: '기능 중단',
@@ -253,7 +250,6 @@ function StudentPlacementPageContent() {
   // 클리닉에 학생 배치 처리 함수
   const handleStudentDropToClinic = async (day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun', students: Student[]) => {
     try {
-      // console.log('🔍 [student-placement/page.tsx] 클리닉 배치 시도:', day, students);
       
       // 해당 요일의 클리닉 찾기
       const targetClinic = clinics.find(clinic => clinic.clinic_day === day);
@@ -330,18 +326,21 @@ function StudentPlacementPageContent() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <Container maxW="100%" p={4} h="100vh" display="flex" flexDirection="column">
-        <Flex h="calc(100vh)" gap={6}>
-          {/* 학생 목록 (왼쪽) */}
+      <Container maxW="100%" p={{ base: 2, md: 4 }} minH="100vh" bg={useColorModeValue('gray.50', 'dark.background')}>
+        <VStack
+          spacing={{ base: 1, md: 1 }}
+          maxW="90vw" 
+          mx="auto"
+        >
+          {/* 학생 목록 */}
           <Box 
-            flex="5" 
-            marginBottom={4}
-            border="1px solid" 
-            borderColor="#d6d6d6" 
+            w="100%"
+            minH="20vh"
             borderRadius="lg"
-            display="flex"
-            flexDirection="column"
-            overflow="hidden"
+            overflow="visible"
+            boxSizing="content-box"
+            border={"1px"}
+            borderColor={useColorModeValue('gray.200', 'dark.border')}
           >
             <UnassignedStudentArea 
               students={unassignedStudents} 
@@ -355,30 +354,66 @@ function StudentPlacementPageContent() {
             />
           </Box>
           
-          {/* 클리닉 데이 박스 영역 (오른쪽) */}
-          <Box flex="5" borderRadius="lg" overflow="hidden">
-            <Grid 
-              templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
-              gap={4} 
-              h="100%" 
+          {/* 클리닉 데이 박스 영역 */}
+          <Box 
+            w="100%"
+            minH="90vh"
+            borderRadius="lg" 
+            overflow="hidden"
+          >
+            {/* 모바일 레이아웃 */}
+            <Box 
+              display={{ base: "block", lg: "none" }}
+              maxH="80vh"
               overflowY="auto"
               p={1}
             >
-              {DAY_CHOICES.map(({ value, label }) => (
-                <GridItem key={value}>
-                  <ClinicDayBox
-                    day={value}
-                    dayLabel={label}
-                    clinics={clinics}
-                    onClinicClick={handleClinicClick}
-                    onStudentDrop={handleStudentDropToClinic}
-                    isStudentAlreadyAssigned={isStudentAlreadyAssignedToDay}
-                  />
-                </GridItem>
-              ))}
-            </Grid>
+              <VStack spacing={4}>
+                {DAY_CHOICES.map(({ value, label }) => (
+                  <Box key={value} w="100%">
+                    <ClinicDayBox
+                      day={value}
+                      dayLabel={label}
+                      clinics={clinics}
+                      onClinicClick={handleClinicClick}
+                      onStudentDrop={handleStudentDropToClinic}
+                      isStudentAlreadyAssigned={isStudentAlreadyAssignedToDay}
+                    />
+                  </Box>
+                ))}
+              </VStack>
+            </Box>
+            
+            {/* 데스크톱 레이아웃 */}
+            <Box 
+              display={{ base: "none", lg: "block" }}
+              h="100%"
+              maxH="100%"
+              padding={-1}
+            >
+              <Grid 
+                templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+                gap={4} 
+                h="100%" 
+                overflowY="auto"
+                p={1}
+              >
+                {DAY_CHOICES.map(({ value, label }) => (
+                  <GridItem key={value}>
+                    <ClinicDayBox
+                      day={value}
+                      dayLabel={label}
+                      clinics={clinics}
+                      onClinicClick={handleClinicClick}
+                      onStudentDrop={handleStudentDropToClinic}
+                      isStudentAlreadyAssigned={isStudentAlreadyAssignedToDay}
+                    />
+                  </GridItem>
+                ))}
+              </Grid>
+            </Box>
           </Box>
-        </Flex>
+        </VStack>
 
         {/* 클리닉 관리 모달 */}
         <ClinicManagementModal

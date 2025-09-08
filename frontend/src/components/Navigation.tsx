@@ -25,9 +25,11 @@ import {
   MenuItem,
   MenuDivider,
   useToast,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import { HamburgerIcon, ChevronDownIcon } from '@chakra-ui/icons';
 import { useAuth } from '@/lib/authContext';
+import ThemeToggleButton from '@/components/ThemeToggleButton';
 
 // 네비게이션 아이템 인터페이스
 interface NavItem {
@@ -45,6 +47,17 @@ export default function Navigation() {
   
   // 인증 상태 사용
   const { user, isAuthenticated, logout } = useAuth();
+  
+  // Material Design 다크테마 색상 설정
+  const navBg = useColorModeValue(
+    'rgba(0, 0, 0, 0.85)', // 라이트 모드
+    'dark.surface'          // 다크 모드: #1F1F1F
+  );
+  const textColor = useColorModeValue('white', 'dark.text');
+  const buttonHoverBg = useColorModeValue(
+    'rgba(255, 255, 255, 0.1)', // 라이트 모드
+    'dark.hover'                  // 다크 모드: #2D2E30
+  );
 
   // 마이페이지 클릭 핸들러 (학생용 - 아직 미구현)
   const handleStudentMyPage = () => {
@@ -60,7 +73,7 @@ export default function Navigation() {
   return (
     <Box 
       as="nav" 
-      bg="hsla(0, 0.00%, 0.00%, 0.85)" 
+      bg={navBg}
       px={4} 
       boxShadow="md"
       position="static"
@@ -75,7 +88,7 @@ export default function Navigation() {
         justifyContent="space-between"
       >
         <Link href="/" passHref>
-          <Text fontSize="xl" fontWeight="bold" color="white" cursor="pointer">
+          <Text fontSize="xl" fontWeight="bold" color={textColor} cursor="pointer">
             물리단
           </Text>
         </Link>
@@ -83,6 +96,9 @@ export default function Navigation() {
         {/* 데스크톱 뷰 */}
         {!isMobile ? (
           <HStack spacing={8} alignItems="center">
+            {/* 다크모드 토글 버튼 */}
+            <ThemeToggleButton size="sm" />
+            
             {/* 왼쪽 네비게이션 버튼들 - 사용자 역할별 */}
             <HStack
               as="nav"
@@ -92,17 +108,17 @@ export default function Navigation() {
               {isAuthenticated && user?.is_student && (
                 <>
                   <Button
-                    color="white"
+                    color={textColor}
                     bg="transparent"
-                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    _hover={{ bg: buttonHoverBg }}
                     onClick={() => router.push('/clinic/reserve')}
                   >
                     클리닉 예약
                   </Button>
                   <Button
-                    color="white"
+                    color={textColor}
                     bg="transparent"
-                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    _hover={{ bg: buttonHoverBg }}
                     onClick={handleStudentMyPage}
                   >
                     마이페이지
@@ -113,33 +129,33 @@ export default function Navigation() {
               {isAuthenticated && user?.is_staff && (
                 <>
                   <Button
-                    color="white"
+                    color={textColor}
                     bg="transparent"
-                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    _hover={{ bg: buttonHoverBg }}
                     onClick={() => router.push('/student-placement')}
                   >
                     학생 관리
                   </Button>
                   <Button
-                    color="white"
+                    color={textColor}
                     bg="transparent"
-                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    _hover={{ bg: buttonHoverBg }}
                     onClick={() => router.push('/clinic/today')}
                   >
                     오늘의 보충
                   </Button>
                   <Button
-                    color="white"
+                    color={textColor}
                     bg="transparent"
-                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    _hover={{ bg: buttonHoverBg }}
                     onClick={() => router.push('/clinic/reserve')}
                   >
                     클리닉 예약
                   </Button>
                   <Button
-                    color="white"
+                    color={textColor}
                     bg="transparent"
-                    _hover={{ bg: "hsla(0, 0.00%, 52.90%, 0.84)" }}
+                    _hover={{ bg: buttonHoverBg }}
                     onClick={() => router.push(`/mypage/${user?.id}`)}
                   >
                     마이페이지
@@ -152,13 +168,13 @@ export default function Navigation() {
               <Menu>
                 <MenuButton
                   as={Button}
-                  color="white"
-                  bg="hsla(0, 2.20%, 18.00%, 0.84)"
+                  color={textColor}
+                  bg={useColorModeValue('rgba(0, 0, 0, 0.6)', 'dark.surface')}
                   _hover={{
-                    bg: "hsla(0, 0.00%, 52.90%, 0.84)",
+                    bg: buttonHoverBg,
                   }}
                   _active={{
-                    bg: "hsla(0, 0.00%, 28.60%, 0.84)",
+                    bg: useColorModeValue('rgba(0, 0, 0, 0.8)', 'dark.hover'),
                   }}
                   rightIcon={<ChevronDownIcon />}
                 >
@@ -199,14 +215,17 @@ export default function Navigation() {
             ) : null}
           </HStack>
         ) : (
-          // 모바일 뷰 (햄버거 메뉴)
-          <IconButton
-            aria-label="메뉴 열기"
-            icon={<HamburgerIcon />}
-            variant="outline"
-            colorScheme="whiteAlpha"
-            onClick={onOpen}
-          />
+          // 모바일 뷰 (햄버거 메뉴와 다크모드 토글)
+          <HStack spacing={2}>
+            <ThemeToggleButton size="sm" />
+            <IconButton
+              aria-label="메뉴 열기"
+              icon={<HamburgerIcon />}
+              variant="outline"
+              colorScheme="whiteAlpha"
+              onClick={onOpen}
+            />
+          </HStack>
         )}
       </Flex>
 

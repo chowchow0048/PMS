@@ -1,14 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-// 보충 시스템 개편으로 주석처리 - clinicService가 더 이상 사용되지 않음
-// import { 
-//   fetchUsersClinics, 
-//   fetchUnassignedStudents, 
-//   saveClinicData,
-//   Student,
-//   Clinic
-// } from './clinicService.deprecated';
 
 // lib/types.ts에서 정의된 타입들을 가져와서 사용
 import { User, Clinic as LibClinic } from '@/lib/types';
@@ -87,60 +79,6 @@ export const ClinicProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // 에러 상태
   const [error, setError] = useState<string | null>(null);
 
-  // 보충 시스템 개편으로 주석처리 - 기존 클리닉 시스템이 더 이상 사용되지 않음
-  // useEffect(() => {
-  //   const fetchData = async () => {
-  //     try {
-  //       setIsLoading(true);
-  //       setError(null);
-  //       
-  //       // 토큰 확인
-  //       const token = localStorage.getItem('token');
-  //       if (!token) {
-  //         console.error('No authentication token found');
-  //         setError('인증 정보가 없습니다.');
-  //         setIsLoading(false);
-  //         return;
-  //       }
-  //       
-  //       if (!userId) {
-  //         setError('사용자 ID를 찾을 수 없습니다.');
-  //         setIsLoading(false);
-  //         return;
-  //       }
-  //       
-  //       // 백엔드에서 클리닉 데이터 가져오기
-  //       const clinicsData = await fetchUsersClinics(userId);
-  //       
-  //       // 일단 모든 클리닉을 표시하도록 임시 수정 (디버깅용)
-  //       // const validClinics = clinicsData.filter(clinic => clinic.students && clinic.students.length > 0);
-  //       const validClinics = clinicsData; // 임시로 모든 클리닉 표시
-  //       
-  //       setClinics(validClinics);
-  //       
-  //       // 백엔드에서 미배정 학생 데이터 가져오기
-  //       const studentsData = await fetchUnassignedStudents();
-  //       setUnassignedStudents(studentsData);
-  //       
-  //       // 로딩 완료
-  //       setIsLoading(false);
-  // 
-  //       
-  //       // 데이터 로딩 확인용 로그
-  //       // console.log('클리닉 데이터 로드 완료:', clinicsData.length, '개');
-  //       // console.log('필터링된 클리닉:', validClinics.length, '개');
-  //       // console.log('학생 데이터 로드 완료:', studentsData.length, '명');
-  //     } catch (err) {
-  //       console.error('Failed to fetch clinic data:', err);
-  //       setError(err instanceof Error ? err.message : '데이터를 가져오는데 실패했습니다.');
-  //       setIsLoading(false);
-  //     }
-  //   };
-  //   
-  //   if (userId) {
-  //     fetchData();
-  //   }
-  // }, [userId]);
 
   // 임시로 빈 데이터로 초기화 (기존 코드 호환성 유지)
   useEffect(() => {

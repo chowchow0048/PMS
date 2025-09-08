@@ -19,6 +19,7 @@ import {
   useToast,
   Spinner,
   Center,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import { Student } from '@/lib/types';
 
@@ -106,6 +107,22 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
   // 확인 다이얼로그 제거됨
 
   const toast = useToast();
+  
+  // 다크모드 색상 설정
+  const modalBg = useColorModeValue('white', 'dark.background');
+  const modalHeaderBg = useColorModeValue('gray.50', 'dark.background');
+  const textColor = useColorModeValue('gray.800', 'dark.text');
+  const secondaryTextColor = useColorModeValue('gray.600', 'dark.textSecondary');
+  const borderColor = useColorModeValue('gray.200', 'dark.border');
+  const cardBg = useColorModeValue('white', 'dark.surface');
+  const hoverBg = useColorModeValue('gray.50', 'dark.hover');
+  const dayHeaderBg = useColorModeValue('white', 'dark.surface2');
+  const dayHeaderTextColor = useColorModeValue('black', 'dark.text');
+  const clinicSlotBg = useColorModeValue('gray.50', 'dark.surface');
+  const availableClinicBg = useColorModeValue('green.50', 'dark.surface');
+  const fullClinicBg = useColorModeValue('red.50', 'dark.surface');
+  const assignedClinicBg = useColorModeValue('green.50', 'dark.surface');
+  const hoverAvailableBg = useColorModeValue('blue.50', 'dark.surface');
 
   // 주간 스케줄 로드
   const loadWeeklySchedule = async () => {
@@ -380,8 +397,14 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
       {/* 메인 모달 */}
       <Modal isOpen={isOpen} onClose={handleClose} size="6xl">
         <ModalOverlay />
-        <ModalContent maxH="90vh">
-          <ModalHeader>
+        <ModalContent 
+          maxH="90vh" 
+          bg={modalBg} 
+          color={textColor}
+          border="1px"
+          borderColor={borderColor}
+        >
+          <ModalHeader bg={modalHeaderBg} borderBottomWidth="1px" borderColor={borderColor}>
             <VStack spacing={2} align="start" flex={1}>
               <Text fontSize="xl" fontWeight="bold">
                 클리닉 배치
@@ -411,7 +434,7 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
               <Center py={10}>
                 <VStack spacing={4}>
                   <Spinner size="xl" color="blue.500" />
-                  <Text>스케줄을 불러오는 중...</Text>
+                  <Text color={textColor}>스케줄을 불러오는 중...</Text>
                 </VStack>
               </Center>
             ) : (
@@ -431,13 +454,15 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
                       <VStack key={day} spacing={3} align="stretch">
                         {/* 요일 헤더 */}
                         <Box
-                          bg="white"
-                          color="black"
+                          bg={dayHeaderBg}
+                          color={dayHeaderTextColor}
                           py={2}
                           px={4}
                           borderRadius="md"
                           textAlign="center"
                           fontWeight="bold"
+                          border="1px"
+                          borderColor={borderColor}
                         >
                           {DAY_MAPPING[day as keyof typeof DAY_MAPPING]}
                         </Box>
@@ -458,50 +483,49 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
                                 p={3}
                                 border="2px solid"
                                 borderColor={
-                                  !hasClinic ? 'gray.200' :
+                                  !hasClinic ? borderColor :
                                   isAlreadyAssigned ? 'green.400' :
                                   isFull ? 'red.300' : 
-                                  'gray.300'
+                                  borderColor
+                                }
+                                bg={
+                                  !hasClinic ? clinicSlotBg :
+                                  isAlreadyAssigned ? assignedClinicBg :
+                                  isFull ? fullClinicBg : 
+                                  availableClinicBg
                                 }
                                 borderRadius="md"
-                                bg={
-                                  !hasClinic ? 'gray.50' :
-                                  isAlreadyAssigned ? 'green.50' :
-                                  isFull ? 'red.50' : 
-                                  'green.50'
-                                }
-                                // cursor={hasClinic && !isFull && !isAlreadyAssigned ? 'pointer' : 'pointer'}
                                 cursor='pointer'
                                 _hover={
                                   hasClinic && !isFull && !isAlreadyAssigned
                                     ? { 
                                         borderColor: 'blue.400', 
-                                        bg: 'blue.50',
+                                        bg: hoverAvailableBg,
                                       }
-                                    : {}
+                                    : { bg: hoverBg }
                                 }
                                 transition="all 0.2s"
                                 onClick={() => hasClinic && clinic && handleClinicSlotClick(day, time, clinic)}
                               >
                                 <VStack spacing={4}>
-                                  <Text fontWeight="bold" fontSize="sm">
+                                  <Text fontWeight="bold" fontSize="sm" color={textColor}>
                                     {TIME_MAPPING[time as keyof typeof TIME_MAPPING]}
                                   </Text>
                                   
                                   {hasClinic && clinic ? (
                                     <>
-                                      {/* <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                                      {/* <Text fontSize="xs" color={secondaryTextColor} noOfLines={1}>
                                         {clinic.teacher_name || '강사 미정'}
                                       </Text> */}
-                                      <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                                      <Text fontSize="xs" color={secondaryTextColor} noOfLines={1}>
                                         {clinic.room || '강의실 미정'}
                                       </Text>
                                       <Badge
                                         colorScheme={
                                           isAlreadyAssigned ? 'green' :
-                                          isFull ? 'red' : 'green'
+                                          isFull ? 'red' : 'blue'
                                         }
-                                        fontSize="xs"
+                                        fontSize="s"
                                       >
                                         {isAlreadyAssigned ? '배치됨' :
                                          isFull ? '정원 마감' :
@@ -509,7 +533,7 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
                                       </Badge>
                                     </>
                                   ) : (
-                                    <Text fontSize="xs" color="gray.500">
+                                    <Text fontSize="xs" color={secondaryTextColor}>
                                       클리닉 없음
                                     </Text>
                                   )}

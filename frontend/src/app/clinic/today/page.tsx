@@ -30,7 +30,8 @@ import {
   Heading,
   IconButton,
   Button,
-  ButtonGroup
+  ButtonGroup,
+  useColorModeValue
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 import { Clinic, User, DAY_CHOICES } from '@/lib/types';
@@ -109,6 +110,16 @@ const TodayClinicPageContent: React.FC = () => {
   const [attendanceStates, setAttendanceStates] = useState<{ [key: string]: AttendanceType }>({});
   // 출석 데이터 ID 매핑 - API 업데이트를 위해 필요
   const [attendanceIds, setAttendanceIds] = useState<{ [key: string]: number }>({});
+  
+  // 다크모드 색상 값들
+  const bgColor = useColorModeValue('white', 'dark.background');
+  const cardBgColor = useColorModeValue('white', 'dark.surface');
+  const cardBorderColor = useColorModeValue('gray.200', 'dark.border');
+  const textColor = useColorModeValue('gray.800', 'dark.text');
+  const textSecondary = useColorModeValue('gray.600', 'dark.textSecondary');
+  const tableBorderColor = useColorModeValue('gray.200', 'dark.border');
+  const tableHoverBg = useColorModeValue('gray.50', 'dark.hover');
+  const spinnerColor = useColorModeValue('blue.500', 'brand.400');;
   
   const today = getTodayDay(); // 오늘 요일
   const dayDisplay = DAY_CHOICES.find(d => d.value === today)?.label || today; // 요일 한글 표시
@@ -266,9 +277,6 @@ const TodayClinicPageContent: React.FC = () => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        // console.log('🚀 [TodayClinicPage] === 페이지 진입 시작 ===');
-        // console.log('🔍 [TodayClinicPage] 데이터 로드 시작');
-        // console.log('📅 [TodayClinicPage] 오늘 요일:', today, `(${dayDisplay})`);
 
         // 클리닉과 학생 데이터를 병렬로 로드
         const [clinicsData, studentsData] = await Promise.all([
@@ -279,50 +287,11 @@ const TodayClinicPageContent: React.FC = () => {
         setClinics(clinicsData);
         setStudents(studentsData);
 
-        // === 디버깅 로그: 해당 요일 클리닉 정보 ===
         const todayClinicsData = clinicsData.filter((clinic: Clinic) => clinic.clinic_day === today) as Clinic[];
-        // console.log('🏥 [TodayClinicPage] === 오늘 클리닉 정보 ===');
-        // console.log(`📊 [TodayClinicPage] 전체 클리닉 수: ${clinicsData.length}개`);
-        // console.log(`🎯 [TodayClinicPage] 오늘(${dayDisplay}) 클리닉 수: ${todayClinicsData.length}개`);
         
-        if (todayClinicsData.length === 0) {
-          // console.log('⚠️ [TodayClinicPage] 오늘 등록된 클리닉이 없습니다.');
-        } else {
-          // 시간별로 정렬하여 출력
-          const sortedClinics = todayClinicsData.sort((a: Clinic, b: Clinic) => a.clinic_time.localeCompare(b.clinic_time));
-          
-          // console.log('📋 [TodayClinicPage] === 시간별 클리닉 상세 정보 ===');
-          for (const clinic of sortedClinics) {
-            const subject_kr = getKoreanSubjectName(clinic.clinic_subject);
-            const teacher_name = (clinic.clinic_teacher as any)?.name || '강사 없음';
-            const student_count = clinic.clinic_students?.length || 0;
-            
-            // console.log(`⏰ [${clinic.clinic_time}] ${subject_kr} - ${clinic.clinic_room}`);
-            // console.log(`   👨‍🏫 강사: ${teacher_name}`);
-            // console.log(`   👥 예약 학생: ${student_count}/${clinic.clinic_capacity}명`);
-            // console.log(`   🔄 활성화: ${(clinic as any).is_active ? '활성' : '비활성'}`);
-            // console.log(`   📍 클리닉 ID: ${clinic.id}`);
-            
-            // === 디버깅 로그: 클리닉별 학생 정보 ===
-            if (student_count > 0) {
-              // console.log(`   📚 [${clinic.clinic_time}] 예약 학생 목록:`);
-              clinic.clinic_students.forEach((student: any, index: number) => {
-                // console.log(`      ${index + 1}. ${student.name} (${student.username}) - ${student.school} ${student.grade}`);
-                // console.log(`         📞 학생: ${student.student_phone_num || '없음'}, 학부모: ${student.student_parent_phone_num || '없음'}`);
-                // console.log(`         ❌ 무단결석: ${student.no_show || 0}회`);
-              });
-            } else {
-              // console.log(`   📚 [${clinic.clinic_time}] 예약 학생 없음`);
-            }
-            // console.log(''); // 빈 줄로 구분
-          }
-        }
 
-        // === 디버깅 로그: 출석 데이터 로드 및 분석 ===
-        // console.log('📋 [TodayClinicPage] === 출석 데이터 로드 시작 ===');
         let totalAttendanceRecords = 0;
         let clinicsWithAttendance = 0;
-        let clinicsNeedingAttendance = 0;
         
         for (const clinic of todayClinicsData) {
             // 각 클리닉별로 출석 데이터 처리
@@ -332,56 +301,19 @@ const TodayClinicPageContent: React.FC = () => {
               const attendanceCount = existingAttendances.length;
               
               if (attendanceCount === 0) {
-                // 예약된 학생이 있지만 출석 데이터가 없는 경우 (이론적으로는 발생하지 않아야 함)
-                // console.log(`⚠️ [경고] ${clinic.clinic_time} 클리닉: 예약된 학생이 있지만 출석 데이터가 없습니다.`);
-                
-                // 그냥 기존 로직대로 진행 (출석 데이터 로드)
                 await loadAttendanceData(clinic);
-                
               } else {
-                // 기존 출석 데이터가 있는 경우 (정상적인 경우)
                 await loadAttendanceData(clinic);
                 totalAttendanceRecords += attendanceCount;
                 clinicsWithAttendance++;
                 
-                // console.log(`✅ [출석데이터] ${clinic.clinic_time} 클리닉: ${attendanceCount}개 출석 기록 발견 (예약과 함께 자동 생성됨)`);
-                
-                // 출석 상태별 통계
-                const attendanceStats = existingAttendances.reduce((stats: any, att: any) => {
-                  stats[att.attendance_type] = (stats[att.attendance_type] || 0) + 1;
-                  return stats;
-                }, {});
-                
-                // console.log(`   📊 [출석통계] none: ${attendanceStats.none || 0}, attended: ${attendanceStats.attended || 0}, absent: ${attendanceStats.absent || 0}, late: ${attendanceStats.late || 0}, sick: ${attendanceStats.sick || 0}`);
               }
               
-            } else {
-              // 예약된 학생이 없는 클리닉 - 출석 데이터 처리 건너뜀
-              // console.log(`⏭️ [출석데이터] ${clinic.clinic_time} 클리닉: 예약 학생 없음, 출석 데이터 처리 건너뜀`);
             }
         }
 
-        // === 디버깅 로그: 전체 요약 ===
-        // console.log('📈 [TodayClinicPage] === 전체 데이터 로드 요약 ===');
-        // console.log(`🏥 총 클리닉: ${clinicsData.length}개 (오늘: ${todayClinicsData.length}개)`);
-        // console.log(`👥 총 학생: ${studentsData.length}명`);
-        // console.log(`📋 총 출석 기록: ${totalAttendanceRecords}개`);
-        // console.log(`✅ 출석 데이터가 있는 클리닉: ${clinicsWithAttendance}/${todayClinicsData.length}개`);
-        // console.log(`🔧 자동 생성이 필요했던 클리닉: ${clinicsNeedingAttendance}개`);
-        
-        // console.log('✅ [TodayClinicPage] 데이터 로드 완료:', {
-          // clinics: clinicsData.length,
-          // students: studentsData.length,
-          // todayClinics: todayClinicsData.length,
-          // attendanceRecords: totalAttendanceRecords,
-          // autoCreatedClinics: clinicsNeedingAttendance,
-          // today
-        // });
-
-        // console.log('🏁 [TodayClinicPage] === 페이지 진입 완료 ===');
 
       } catch (error) {
-        // console.error('❌ [TodayClinicPage] 데이터 로드 오류:', error);
         
         toast({
           title: '데이터 로드 실패',
@@ -402,10 +334,10 @@ const TodayClinicPageContent: React.FC = () => {
   const renderClinicTimeTab = (clinic: Clinic | undefined, timeSlot: string) => {
     if (!clinic) {
       return (
-        <Box textAlign="center" py={8} color="gray.500">
+        <Box textAlign="center" py={8} color={textSecondary}>
           <Text>🕐</Text>
           <Text mt={2}>{timeSlot} 시간대에 등록된 클리닉이 없습니다.</Text>
-          <Text fontSize="sm" color="gray.400" mt={1}>
+          <Text fontSize="sm" color={textSecondary} mt={1}>
             관리자가 해당 시간대 클리닉을 생성해야 합니다.
           </Text>
         </Box>
@@ -418,12 +350,12 @@ const TodayClinicPageContent: React.FC = () => {
     return (
       <VStack align="stretch" spacing={4}>
         {/* 클리닉 기본 정보 카드 */}
-        <Card>
+        <Card bg={cardBgColor} borderColor={cardBorderColor}>
           <CardHeader pb={2}>
             <Flex justify="space-between" align="center">
-              <Heading size="sm">클리닉 정보</Heading>
+              <Heading size="sm" color={textColor}>클리닉 정보</Heading>
               {/* 자동 생성 상태 표시 */}
-              <Text fontSize="xs" color="gray.500">
+              <Text fontSize="xs" color={textSecondary}>
                 출석 데이터 자동 생성됨
               </Text>
             </Flex>
@@ -450,23 +382,39 @@ const TodayClinicPageContent: React.FC = () => {
         </Card>
 
         {/* 신청한 학생 목록 및 출석 체크 */}
-        <Card>
+        <Card bg={cardBgColor} borderColor={cardBorderColor}>
           <CardHeader pb={2}>
             <Flex justify="space-between" align="center">
-              <Heading size="sm">학생 목록 및 출석 체크</Heading>
-              <Text fontSize="sm" color="gray.600">
+              <Heading size="sm" color={textColor}>학생 목록 및 출석 체크</Heading>
+              <Text fontSize="sm" color={textSecondary}>
                 총 {currentStudentCount}명
               </Text>
             </Flex>
           </CardHeader>
           <CardBody pt={0}>
             {currentStudentCount === 0 ? (
-              <Box textAlign="center" py={8} color="gray.500">
+              <Box textAlign="center" py={8} color={textSecondary}>
                 <Text>아직 신청한 학생이 없습니다.</Text>
               </Box>
             ) : (
               <TableContainer>
-                <Table variant="simple" size="sm">
+                <Table 
+                  variant="simple" 
+                  size="sm"
+                  sx={{
+                    '& th': {
+                      color: textColor,
+                      borderColor: tableBorderColor,
+                    },
+                    '& td': {
+                      color: textColor,
+                      borderColor: tableBorderColor,
+                    },
+                    '& tr:hover': {
+                      bg: tableHoverBg,
+                    },
+                  }}
+                >
                   <Thead>
                     <Tr>
                       <Th>번호</Th>
@@ -545,28 +493,28 @@ const TodayClinicPageContent: React.FC = () => {
   // 로딩 상태 렌더링
   if (isLoading) {
     return (
-      <Center minH="50vh">
+      <Center minH="50vh" bg={bgColor}>
         <VStack spacing={4}>
-          <Spinner size="lg" color="blue.500" />
-          <Text color="gray.600">오늘의 클리닉 정보를 불러오는 중...</Text>
+          <Spinner size="lg" color={spinnerColor} />
+          <Text color={textSecondary}>오늘의 클리닉 정보를 불러오는 중...</Text>
         </VStack>
       </Center>
     );
   }
 
   return (
-    <Box maxW="7xl" mx="auto" px={6} py={4}>
+    <Box maxW="7xl" mx="auto" px={6} py={4} bg={bgColor} minH="100vh">
       <VStack align="stretch" spacing={6}>
         {/* 페이지 헤더 */}
-        <Card>
+        <Card bg={cardBgColor} borderColor={cardBorderColor}>
           <CardHeader>
             <VStack align="stretch" spacing={3}>
               {/* 제목 */}
               <Flex justify="space-between" align="center">
-                <Heading size="lg" color="blue.600">
+                <Heading size="lg" color={useColorModeValue("blue.600", "brand.400")}>
                   {dayDisplay} 보충
                 </Heading>
-                <Text fontSize="sm" color="gray.600">
+                <Text fontSize="sm" color={textSecondary}>
                   {new Date().toLocaleDateString('ko-KR')}
                 </Text>
               </Flex>
@@ -594,7 +542,7 @@ const TodayClinicPageContent: React.FC = () => {
         </Card>
 
         {/* 시간대별 클리닉 탭 */}
-        <Card>
+        <Card bg={cardBgColor} borderColor={cardBorderColor}>
           <CardBody>
             <Tabs 
               index={selectedTabIndex} 
@@ -603,21 +551,29 @@ const TodayClinicPageContent: React.FC = () => {
               colorScheme="blue"
             >
               {/* 시간대별 탭 헤더 */}
-              <TabList>
+              <TabList 
+                sx={{
+                  '& .chakra-tabs__tab': {
+                    color: textColor,
+                    borderColor: tableBorderColor,
+                    _selected: {
+                      color: useColorModeValue('blue.600', 'brand.400'),
+                      borderColor: useColorModeValue('blue.500', 'brand.400'),
+                      bg: cardBgColor,
+                    },
+                    _hover: {
+                      bg: tableHoverBg,
+                    },
+                  },
+                }}
+              >
                 {TIME_SLOTS.map((timeSlot, index) => {
                   const clinic = todayClinics[index];
                   const count = clinic?.clinic_students?.length || 0;
                   const isActive = clinic !== undefined;
                   
                   return (
-                    <Tab 
-                      key={timeSlot}
-                      _selected={{ 
-                        color: isActive ? 'blue.600' : 'gray.600',
-                        borderColor: isActive ? 'blue.500' : 'gray.400'
-                      }}
-                      color={isActive ? 'blue.500' : 'gray.400'}
-                    >
+                    <Tab key={timeSlot}>
                       <VStack spacing={1}>
                         <Text fontSize="md" fontWeight="bold">
                           {timeSlot}
