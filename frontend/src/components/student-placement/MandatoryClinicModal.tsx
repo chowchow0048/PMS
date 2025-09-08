@@ -201,7 +201,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         
         if (Array.isArray(attendanceData)) {
           console.log('🔍 [MandatoryClinicModal] 배열 형태 데이터 처리');
-          attendanceData.forEach((attendance: any, index) => {
+          attendanceData.forEach((attendance: any, index: number) => {
             console.log(`🔍 [MandatoryClinicModal] 예약 ${index}:`, attendance);
             if (attendance.student) {
               reservedIds.add(attendance.student);
@@ -210,7 +210,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         } else if (attendanceData.results && Array.isArray(attendanceData.results)) {
           // 페이지네이션된 응답인 경우
           console.log('🔍 [MandatoryClinicModal] 페이지네이션 데이터 처리');
-          attendanceData.results.forEach((attendance: any, index) => {
+          attendanceData.results.forEach((attendance: any, index: number) => {
             console.log(`🔍 [MandatoryClinicModal] 예약 ${index}:`, attendance);
             if (attendance.student) {
               reservedIds.add(attendance.student);
