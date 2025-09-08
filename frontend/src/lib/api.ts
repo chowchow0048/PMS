@@ -654,4 +654,29 @@ export const updateStudentNonPass = async (userId: number, nonPass: boolean) => 
   }
 };
 
+// 학생 필수 클리닉 신청 상태 업데이트 API
+export const updateStudentEssentialClinic = async (userId: number, essentialClinic: boolean) => {
+  try {
+    console.log(`🔍 [api.ts] updateStudentEssentialClinic 시작 - ID: ${userId}, essential_clinic: ${essentialClinic}`);
+    
+    const response = await api.patch(`/users/${userId}/update_essential_clinic/`, {
+      essential_clinic: essentialClinic
+    });
+    
+    console.log('✅ [api.ts] 필수 클리닉 신청 상태 업데이트 완료:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ [api.ts] 필수 클리닉 신청 상태 업데이트 오류:', error);
+    
+    // axios 에러인지 확인하고 타입 캐스팅
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as any;
+      console.error('❌ [api.ts] 오류 응답:', axiosError.response?.data);
+      console.error('❌ [api.ts] 오류 상태:', axiosError.response?.status);
+    }
+    
+    throw error;
+  }
+};
+
 export default api; 

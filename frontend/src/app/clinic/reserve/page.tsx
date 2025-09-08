@@ -28,6 +28,9 @@ import {
   AlertTitle,
   AlertDescription,
   useColorModeValue,
+  Switch,
+  FormControl,
+  FormLabel,
 } from '@chakra-ui/react';
 import { useAuth } from '@/lib/authContext';
 
@@ -125,10 +128,12 @@ const ClinicReservePage: React.FC = () => {
     action: 'reserve';  // 예약만 가능 (취소는 불가능)
   } | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>(''); // 타이머 상태
+  const [essentialClinic, setEssentialClinic] = useState<boolean>(true); // 필수 클리닉 신청 상태 (초기값은 user 데이터 로드 후 업데이트)
+  const [updatingEssential, setUpdatingEssential] = useState<boolean>(false); // 필수 클리닉 업데이트 로딩
   
   // 모달 및 유틸리티
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { user, token, isLoading } = useAuth();
+  const { user, token, isLoading, updateUser } = useAuth();
   const toast = useToast();
 
   // 의무 대상자 애니메이션을 위한 상태
@@ -239,6 +244,20 @@ const ClinicReservePage: React.FC = () => {
       // 의무 대상자인 경우 애니메이션 표시
       if (user?.non_pass) {
         setShowMandatoryAnimation(true);
+      }
+      
+      // 사용자의 필수 클리닉 신청 상태 초기화
+      console.log('🔍 [clinic/reserve] user 데이터:', user);
+      console.log('🔍 [clinic/reserve] user.essential_clinic:', user?.essential_clinic);
+      
+      if (user?.essential_clinic !== undefined) {
+        console.log('✅ [clinic/reserve] essential_clinic 상태 설정:', user.essential_clinic);
+        setEssentialClinic(user.essential_clinic);
+      } else {
+        console.log('⚠️ [clinic/reserve] user.essential_clinic이 undefined입니다. 서버에서 최신 데이터 가져오기');
+        // localStorage의 기존 사용자 데이터에 essential_clinic 필드가 없는 경우
+        // 서버에서 최신 사용자 데이터를 가져와서 업데이트
+        fetchUserData();
       }
     }
   }, [token, isLoading, user]);
@@ -469,6 +488,121 @@ const ClinicReservePage: React.FC = () => {
     });
   };
 
+  // 사용자 데이터 최신화 함수 (essential_clinic 필드가 없는 경우 사용)
+  const fetchUserData = async () => {
+    if (!user || !token) return;
+
+    try {
+      console.log('🔍 [clinic/reserve] 서버에서 최신 사용자 데이터 가져오는 중...');
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/users/${user.id}/`, {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        console.log('✅ [clinic/reserve] 최신 사용자 데이터:', updatedUser);
+        
+        if (updatedUser.essential_clinic !== undefined) {
+          setEssentialClinic(updatedUser.essential_clinic);
+          console.log('✅ [clinic/reserve] essential_clinic 상태 업데이트:', updatedUser.essential_clinic);
+          
+          // AuthContext와 localStorage의 사용자 데이터 업데이트
+          updateUser(updatedUser);
+          console.log('✅ [clinic/reserve] 사용자 데이터 업데이트 완료');
+        } else {
+          console.log('⚠️ [clinic/reserve] 서버 데이터에도 essential_clinic 필드가 없습니다. 기본값 true 사용');
+          setEssentialClinic(true);
+        }
+      } else {
+        console.error('❌ [clinic/reserve] 사용자 데이터 가져오기 실패:', response.status);
+        // 서버에서 데이터를 가져올 수 없는 경우 기본값 사용
+        setEssentialClinic(true);
+      }
+    } catch (error) {
+      console.error('❌ [clinic/reserve] 사용자 데이터 가져오기 오류:', error);
+      // 오류 발생 시 기본값 사용
+      setEssentialClinic(true);
+    }
+  };
+
+  // 필수 클리닉 신청 상태 토글
+  const handleToggleEssentialClinic = async (newValue: boolean) => {
+    if (!user || !token) return;
+    
+    // non_pass=true인 사용자는 essential_clinic을 false로 설정할 수 없음
+    if (user.non_pass && !newValue) {
+      toast({
+        title: '변경 불가',
+        description: '전 주 시험에서 Fail한 학생은 필수 클리닉 신청 취소를 끌 수 없습니다.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      setUpdatingEssential(true);
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/users/${user.id}/update_essential_clinic/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          essential_clinic: newValue
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log('✅ [clinic/reserve] 서버 응답 성공:', data);
+        setEssentialClinic(newValue);
+        console.log('✅ [clinic/reserve] 로컬 상태 업데이트:', newValue);
+        
+        // AuthContext와 localStorage의 사용자 데이터 모두 업데이트 (새로고침 시 올바른 상태 유지)
+        if (user) {
+          const updatedUser = { ...user, essential_clinic: newValue };
+          updateUser(updatedUser);
+          console.log('✅ [clinic/reserve] AuthContext 사용자 데이터 업데이트:', newValue);
+        }
+        
+        toast({
+          title: '변경 완료',
+          description: `필수 클리닉 신청이 ${newValue ? '설정' : '해제'}되었습니다.`,
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: '변경 실패',
+          description: data.error || '상태 변경 중 오류가 발생했습니다.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('필수 클리닉 상태 업데이트 오류:', error);
+      toast({
+        title: '네트워크 오류',
+        description: '상태 변경 요청 중 오류가 발생했습니다.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setUpdatingEssential(false);
+    }
+  };
+
   // 슬롯 렌더링 - 모바일 최적화
   const renderSlot = (day: string, time: string) => {
     const clinic = schedule[day]?.[time];
@@ -657,6 +791,48 @@ const ClinicReservePage: React.FC = () => {
           >
             보충 예약
           </Heading>
+          
+          {/* 필수 클리닉 신청 Toggle 버튼 */}
+          <FormControl 
+            display="flex" 
+            alignItems="center" 
+            justifyContent="center"
+            maxW="md"
+            mx="auto"
+            mb={2}
+          >
+            <FormLabel 
+              htmlFor="essential-clinic-switch" 
+              mb="0"
+              fontSize={{ base: "sm", md: "md" }}
+              color={textColor}
+              mr={3}
+            >
+              필수 클리닉 신청
+            </FormLabel>
+            <Switch
+              id="essential-clinic-switch"
+              isChecked={essentialClinic}
+              onChange={(e) => handleToggleEssentialClinic(e.target.checked)}
+              isDisabled={updatingEssential || (user?.non_pass && !essentialClinic)}
+              colorScheme="blue"
+              size="md"
+            />
+          </FormControl>
+          
+          {/* non_pass=true인 경우 안내 메시지 */}
+          {user?.non_pass && (
+            <Text 
+              fontSize="xs"
+              color="orange.500"
+              textAlign="center"
+              maxW="md"
+              mx="auto"
+            >
+              전 주 시험 실패로 필수 클리닉 신청 취소가 불가능합니다.
+            </Text>
+          )}
+          
           <Text 
             fontSize={{ base: "md", md: "lg" }}
             color={useColorModeValue("green.500", "green.400")}

@@ -14,6 +14,7 @@ interface AuthContextType {
   login: (token: string, user: User, needsPasswordChange?: boolean) => void;
   logout: () => void;
   clearPasswordChangeFlag: () => void;
+  updateUser: (updatedUser: User) => void;
 }
 
 // 기본값으로 컨텍스트 생성
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthContextType>({
   login: () => {},
   logout: () => {},
   clearPasswordChangeFlag: () => {},
+  updateUser: () => {},
 });
 
 // 인증 제공자 프롭스 타입 정의
@@ -109,6 +111,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setNeedsPasswordChange(false);
   };
 
+  // 사용자 정보 업데이트 함수
+  const updateUser = (updatedUser: User) => {
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -120,6 +128,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         login,
         logout,
         clearPasswordChangeFlag,
+        updateUser,
       }}
     >
       {children}

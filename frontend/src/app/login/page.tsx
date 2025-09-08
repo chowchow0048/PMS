@@ -27,6 +27,7 @@ import {
 import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 import { login } from '@/lib/api';
 import { useAuth } from '@/lib/authContext';
+import { useColorModeValue } from '@chakra-ui/react';
 
 /**
  * 로그인 페이지 컴포넌트
@@ -269,6 +270,7 @@ export default function LoginPage() {
         justifyContent="center" 
         alignItems="center"
         flexDirection="column"
+        bg={useColorModeValue('white', 'dark.background')}
       >
         <Heading size="xl" mb={10} mt={-150} textAlign="center" fontWeight="normal">
           물리단
@@ -277,12 +279,13 @@ export default function LoginPage() {
           p={8} 
           width="100%" 
           maxW="400px" 
-          border="1px solid rgb(198, 203, 210)" 
+          border="1px"
+          borderColor={useColorModeValue('gray.200', 'dark.border')}
           borderRadius="lg" 
-          bg="white"
+          bg={useColorModeValue('white', 'dark.background')}
         >
           <VStack spacing={6}>
-            <Heading size="xl" mb={2} textAlign="center" fontWeight="normal">
+            <Heading size="xl" mb={2} textAlign="center" fontWeight="normal" color={useColorModeValue('gray.800', 'dark.text')}>
               로그인
             </Heading>
             
@@ -293,7 +296,8 @@ export default function LoginPage() {
                   <Input 
                     type="text" 
                     value={username} 
-                    border="1px solid rgb(198, 203, 210)" 
+                    border="1px"
+                    borderColor={useColorModeValue('gray.200', 'dark.border')}
                     onChange={(e) => setUsername(e.target.value)} 
                     placeholder="아이디를 입력하세요"
                   />
@@ -305,7 +309,8 @@ export default function LoginPage() {
                     <Input 
                       type={showPassword ? 'text' : 'password'} 
                       value={password} 
-                      border="1px solid rgb(198, 203, 210)" 
+                      border="1px"
+                      borderColor={useColorModeValue('gray.200', 'dark.border')}
                       onChange={(e) => setPassword(e.target.value)} 
                       placeholder="비밀번호를 입력하세요"
                     />
@@ -324,7 +329,8 @@ export default function LoginPage() {
                 <Button 
                   width="100%"  
                   type="submit" 
-                  border="1px solid rgb(127, 163, 213)"
+                  border="1px"
+                  borderColor={useColorModeValue('gray.200', 'dark.border')}
                   isLoading={loading}
                   mt={4}
                 >

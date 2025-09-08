@@ -25,6 +25,7 @@ export interface User {
   subject_name?: string; // 과목명 (조인된 정보)
   no_show?: number; // 무단결석 횟수
   non_pass?: boolean; // 의무 클리닉 대상자 여부
+  essential_clinic?: boolean; // 필수 클리닉 신청 여부
 }
 
 // Student 타입을 User 기반으로 정의 (is_student=true인 User)
