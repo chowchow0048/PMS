@@ -187,6 +187,8 @@ class CustomUserAdmin(UserAdmin):
         "reset_no_show_count",
         "set_essential_clinic_to_true",
         "set_essential_clinic_to_false",
+        "set_user_active_to_true",
+        "set_user_active_to_false",
     ]
     inlines = [ClinicAttendanceInline]  # 출석 기록 인라인 추가
 
@@ -312,6 +314,27 @@ class CustomUserAdmin(UserAdmin):
             )
 
     regenerate_student_credentials.short_description = "학생유저 아이디/비밀번호 재구성"
+
+    def set_user_active_to_true(self, request, queryset):
+        """
+        선택된 사용자들의 활성화 상태를 True로 설정
+        """
+        queryset.update(is_active=True)
+        self.message_user(
+            request, "선택된 사용자들의 활성화 상태가 True로 설정되었습니다."
+        )
+
+    def set_user_active_to_false(self, request, queryset):
+        """
+        선택된 사용자들의 활성화 상태를 False로 설정
+        """
+        queryset.update(is_active=False)
+        self.message_user(
+            request, "선택된 사용자들의 활성화 상태가 False로 설정되었습니다."
+        )
+
+    set_user_active_to_true.short_description = "사용자 활성화"
+    set_user_active_to_false.short_description = "사용자 비활성화"
 
     def set_essential_clinic_to_true(self, request, queryset):
         """

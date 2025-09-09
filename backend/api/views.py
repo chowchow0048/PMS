@@ -94,10 +94,13 @@ class UserViewSet(viewsets.ModelViewSet):
         # if is_manager is not None:
         #     queryset = queryset.filter(is_manager=(is_manager.lower() == "true"))
 
-        # 활성 상태 필터링
+        # 활성 상태 필터링 - 기본적으로 활성화된 사용자만 반환
         is_active = self.request.query_params.get("is_active")
         if is_active is not None:
             queryset = queryset.filter(is_active=(is_active.lower() == "true"))
+        else:
+            # 쿼리 파라미터가 없으면 기본적으로 활성화된 사용자만 반환
+            queryset = queryset.filter(is_active=True)
 
         # 강사 필터링 (새로 추가)
         is_teacher = self.request.query_params.get("is_teacher")
@@ -1327,8 +1330,8 @@ class StudentPlacementView(viewsets.ViewSet):
             logger.info("[api/views.py] StudentPlacementView.list 시작")
             logger.info(f"[api/views.py] 인증된 사용자: {request.user.username}")
 
-            # 학생 데이터 로드 - User 모델에서 is_student=True인 사용자들
-            students = User.objects.filter(is_student=True)
+            # 학생 데이터 로드 - User 모델에서 is_student=True이고 활성화된 사용자들
+            students = User.objects.filter(is_student=True, is_active=True)
             logger.info(f"[api/views.py] 학생 데이터 로드 완료: {students.count()}명")
 
             # 학생 데이터 직렬화 - UserSerializer 사용 (is_student=True인 사용자들)
@@ -1471,8 +1474,8 @@ class TodayClinicView(APIView):
             # 클리닉 데이터 직렬화
             clinic_serializer = ClinicSerializer(clinics, many=True)
 
-            # 모든 학생 데이터 조회 (클리닉 관리를 위해) - User 모델 기반으로 변경
-            students = User.objects.filter(is_student=True)
+            # 모든 활성화된 학생 데이터 조회 (클리닉 관리를 위해) - User 모델 기반으로 변경
+            students = User.objects.filter(is_student=True, is_active=True)
             student_serializer = UserSerializer(students, many=True)
 
             response_data = {
