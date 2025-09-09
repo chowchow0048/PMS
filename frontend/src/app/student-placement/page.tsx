@@ -92,7 +92,7 @@ function StudentPlacementPageContent() {
     });
   };
 
-  // 학생의 non_pass 상태 업데이트 함수 (의무 클리닉 대상자 뱃지 제거용)
+  // 학생의 non_pass 상태 업데이트 함수 (필수 클리닉 대상자 뱃지 제거용)
   const updateStudentNonPassStatus = (studentId: number, nonPass: boolean) => {
     console.log('🔍 [student-placement/page.tsx] 학생 non_pass 상태 업데이트:', { studentId, nonPass });
     

@@ -114,8 +114,8 @@ class CustomUserAdmin(UserAdmin):
                     "school",
                     "grade",
                     "no_show",  # 무단결석 횟수 추가
-                    "non_pass",  # 의무 클리닉 대상자 여부
-                    "essential_clinic",  # 필수 클리닉 신청 여부
+                    "non_pass",  # 논패스 클리닉 대상자 여부
+                    "essential_clinic",  # 의무 클리닉 신청 여부
                 )
             },
         ),
@@ -185,6 +185,8 @@ class CustomUserAdmin(UserAdmin):
         "regenerate_student_credentials",
         "reset_user_password_to_username",  # 모든 사용자 대상 비밀번호 초기화 액션 추가
         "reset_no_show_count",
+        "set_essential_clinic_to_true",
+        "set_essential_clinic_to_false",
     ]
     inlines = [ClinicAttendanceInline]  # 출석 기록 인라인 추가
 
@@ -310,6 +312,30 @@ class CustomUserAdmin(UserAdmin):
             )
 
     regenerate_student_credentials.short_description = "학생유저 아이디/비밀번호 재구성"
+
+    def set_essential_clinic_to_true(self, request, queryset):
+        """
+        선택된 학생 사용자들의 의무 클리닉 신청 상태를 True로 설정
+        """
+        queryset.update(essential_clinic=True)
+        self.message_user(
+            request,
+            "선택된 학생 사용자들의 의무 클리닉 신청 상태가 True로 설정되었습니다.",
+        )
+
+    set_essential_clinic_to_true.short_description = "학생 의무 클리닉 신청 상태 설정"
+
+    def set_essential_clinic_to_false(self, request, queryset):
+        """
+        선택된 학생 사용자들의 의무 클리닉 신청 상태를 False로 설정
+        """
+        queryset.update(essential_clinic=False)
+        self.message_user(
+            request,
+            "선택된 학생 사용자들의 의무 클리닉 신청 상태가 False로 설정되었습니다.",
+        )
+
+    set_essential_clinic_to_false.short_description = "학생 의무 클리닉 신청 상태 해제"
 
     def reset_user_password_to_username(self, request, queryset):
         """

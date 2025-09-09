@@ -21,6 +21,8 @@ import {
   Spinner,
   Center,
   VStack,
+  HStack,
+  ButtonGroup,
   useColorModeValue,
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
@@ -42,6 +44,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState<number | null>(null); // 업데이트 중인 학생 ID
   const [reservedStudentIds, setReservedStudentIds] = useState<Set<number>>(new Set()); // 예약한 학생 ID 집합
+  const [activeFilter, setActiveFilter] = useState<'mandatory' | 'required' | 'unrequired' | 'reserved' | null>(null); // 활성화된 필터
   const toast = useToast();
 
   // Dark mode colors
@@ -69,10 +72,15 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
   const greenBorder = useColorModeValue('green.300', 'green.600');
   const greenTextColor = useColorModeValue('green.700', 'green.200');
   const greenSecondaryTextColor = useColorModeValue('green.600', 'green.300');
+  const grayBg = useColorModeValue('gray.50', 'gray.900');
+  const grayHoverBg = useColorModeValue('gray.100', 'gray.800');
+  const grayBorder = useColorModeValue('gray.300', 'gray.600');
+  const grayTextColor = useColorModeValue('gray.700', 'gray.200');
+  const graySecondaryTextColor = useColorModeValue('gray.600', 'gray.300');
 
   // 학생 그룹 분류 함수 (실제 클리닉 예약 데이터 반영)
-  const getStudentGroup = (student: Student): 'mandatory' | 'required' | 'reserved' => {
-    // 1. non_pass=True (테두리 빨간색) - 의무 대상자
+  const getStudentGroup = (student: Student): 'mandatory' | 'required' | 'unrequired' | 'reserved' => {
+    // 1. non_pass=True (테두리 빨간색) - 논패스 대상자
     if (student.non_pass) {
       return 'mandatory';
     }
@@ -87,14 +95,13 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       // essential_clinic=True && 클리닉 예약 안함 (테두리 노란색)
       return 'required';
     } else {
-      // essential_clinic=False && 클리닉 예약 안함
-      // 요구사항에 따라 'required' 그룹으로 분류 (필수 클리닉 신청 안함)
-      return 'required';
+      // essential_clinic=False && 클리닉 예약 안함 (테두리 회색)
+      return 'unrequired';
     }
   };
 
   // 학생 그룹별 스타일 반환
-  const getStudentGroupStyle = (group: 'mandatory' | 'required' | 'reserved') => {
+  const getStudentGroupStyle = (group: 'mandatory' | 'required' | 'unrequired' | 'reserved') => {
     switch (group) {
       case 'mandatory':
         return {
@@ -113,6 +120,15 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
           textColor: yellowTextColor,
           secondaryTextColor: yellowSecondaryTextColor,
           colorScheme: 'yellow' as const,
+        };
+      case 'unrequired':
+        return {
+          bg: useColorModeValue('white', 'dark.surface'),
+          borderColor: grayBorder,
+          hoverBg: grayHoverBg,
+          textColor: grayTextColor,
+          secondaryTextColor: graySecondaryTextColor,
+          colorScheme: 'gray' as const,
         };
       case 'reserved':
         return {
@@ -133,35 +149,42 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
     }
   }, [isOpen]);
 
-  // 검색어에 따른 학생 필터링
+  // 검색어 및 필터에 따른 학생 필터링
   useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredStudents(students);
-    } else {
-      const filtered = students.filter(student =>
+    let filtered = students;
+
+    // 검색어 필터링
+    if (searchTerm.trim() !== '') {
+      filtered = filtered.filter(student =>
         student.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.school?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.grade?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      // 필터링된 결과를 3그룹 순서대로 정렬
-      const sortedFiltered = filtered.sort((a, b) => {
-        const groupA = getStudentGroup(a);
-        const groupB = getStudentGroup(b);
-        
-        // 그룹 우선순위: mandatory -> required -> reserved
-        const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
-        
-        if (groupA !== groupB) {
-          return groupOrder[groupA] - groupOrder[groupB];
-        }
-        
-        // 같은 그룹 내에서는 이름순으로 정렬
-        return a.student_name.localeCompare(b.student_name, 'ko-KR');
-      });
-      setFilteredStudents(sortedFiltered);
     }
-  }, [searchTerm, students]);
+
+    // 그룹 필터링
+    if (activeFilter) {
+      filtered = filtered.filter(student => getStudentGroup(student) === activeFilter);
+    }
+
+    // 필터링된 결과를 4그룹 순서대로 정렬
+    const sortedFiltered = filtered.sort((a, b) => {
+      const groupA = getStudentGroup(a);
+      const groupB = getStudentGroup(b);
+      
+      // 그룹 우선순위: mandatory -> required -> unrequired -> reserved
+      const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
+      
+      if (groupA !== groupB) {
+        return groupOrder[groupA] - groupOrder[groupB];
+      }
+      
+      // 같은 그룹 내에서는 이름순으로 정렬
+      return a.student_name.localeCompare(b.student_name, 'ko-KR');
+    });
+    setFilteredStudents(sortedFiltered);
+  }, [searchTerm, students, activeFilter]);
 
   // 클리닉 예약 데이터 로드
   const loadClinicReservations = async () => {
@@ -246,8 +269,8 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
             const groupA = getStudentGroup(a);
             const groupB = getStudentGroup(b);
             
-            // 그룹 우선순위: mandatory -> required -> reserved
-            const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
+            // 그룹 우선순위: mandatory -> required -> unrequired -> reserved
+            const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
             
             if (groupA !== groupB) {
               return groupOrder[groupA] - groupOrder[groupB];
@@ -260,7 +283,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
           setStudents(sortedStudents);
           setFilteredStudents(sortedStudents);
           console.log('🔍 [MandatoryClinicModal] 학생 데이터 로드 완료:', sortedStudents.length);
-          console.log('🔍 [MandatoryClinicModal] 의무 클리닉 대상자:', sortedStudents.filter(s => s.non_pass).length, '명');
+          console.log('🔍 [MandatoryClinicModal] 논패스 클리닉 대상자:', sortedStudents.filter(s => s.non_pass).length, '명');
         })()
       ]);
     } catch (error) {
@@ -277,7 +300,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
     }
   };
 
-  // 학생의 필수 클리닉 신청 상태 토글
+  // 학생의 의무 클리닉 신청 상태 토글
   const handleToggleEssentialClinic = async (student: Student) => {
     const newEssentialClinicStatus = !student.essential_clinic;
     const originalStudent = { ...student };
@@ -293,7 +316,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       const groupB = getStudentGroup(b);
       
       // 그룹 우선순위: mandatory -> required -> reserved
-      const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
+      const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
       
       if (groupA !== groupB) {
         return groupOrder[groupA] - groupOrder[groupB];
@@ -324,7 +347,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
           const groupA = getStudentGroup(a);
           const groupB = getStudentGroup(b);
           
-          const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
+          const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
           
           if (groupA !== groupB) {
             return groupOrder[groupA] - groupOrder[groupB];
@@ -340,7 +363,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       // 성공 토스트
       toast({
         title: '완료',
-        description: `${student.student_name} ${actualEssentialClinicStatus ? '필수 신청' : '신청 취소'}`,
+        description: `${student.student_name} ${actualEssentialClinicStatus ? '의무 신청' : '신청 취소'}`,
         status: 'success',
         duration: 1000,
         isClosable: true,
@@ -357,7 +380,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         const groupA = getStudentGroup(a);
         const groupB = getStudentGroup(b);
         
-        const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
+        const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
         
         if (groupA !== groupB) {
           return groupOrder[groupA] - groupOrder[groupB];
@@ -368,7 +391,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       setStudents(sortedRolledBackStudents);
       
       // 상세한 오류 정보 표시
-      let errorMessage = '필수 클리닉 신청 상태 변경에 실패했습니다.';
+      let errorMessage = '의무 클리닉 신청 상태 변경에 실패했습니다.';
       if (error && typeof error === 'object' && 'response' in error) {
         const axiosError = error as any;
         if (axiosError.response?.data?.error) {
@@ -395,7 +418,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
     }
   };
 
-  // 학생의 의무 클리닉 상태 토글 (최적화된 버전)
+  // 학생의 논패스 클리닉 상태 토글 (최적화된 버전)
   const handleToggleNonPass = async (student: Student) => {
     const newNonPassStatus = !student.non_pass;
     const originalStudent = { ...student };
@@ -411,7 +434,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       const groupB = getStudentGroup(b);
       
       // 그룹 우선순위: mandatory -> required -> reserved
-      const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
+      const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
       
       if (groupA !== groupB) {
         return groupOrder[groupA] - groupOrder[groupB];
@@ -442,7 +465,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
           const groupA = getStudentGroup(a);
           const groupB = getStudentGroup(b);
           
-          const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
+          const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
           
           if (groupA !== groupB) {
             return groupOrder[groupA] - groupOrder[groupB];
@@ -458,7 +481,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       // 성공 토스트는 더 짧게
       toast({
         title: '완료',
-        description: `${student.student_name} ${actualNonPassStatus ? '의무 설정' : '의무 해제'}`,
+        description: `${student.student_name} ${actualNonPassStatus ? '논패스 설정' : '논패스 해제'}`,
         status: 'success',
         duration: 1000,
         isClosable: true,
@@ -475,7 +498,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         const groupA = getStudentGroup(a);
         const groupB = getStudentGroup(b);
         
-        const groupOrder = { mandatory: 0, required: 1, reserved: 2 };
+        const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
         
         if (groupA !== groupB) {
           return groupOrder[groupA] - groupOrder[groupB];
@@ -486,7 +509,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       setStudents(sortedRolledBackStudents);
       
       // 상세한 오류 정보 표시
-      let errorMessage = '의무 클리닉 상태 변경에 실패했습니다.';
+      let errorMessage = '논패스 클리닉 상태 변경에 실패했습니다.';
       if (error && typeof error === 'object' && 'response' in error) {
         const axiosError = error as any;
         if (axiosError.response?.data?.error) {
@@ -513,9 +536,15 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
     }
   };
 
-  // 모달 닫기 시 검색어 초기화
+  // 토글 필터 핸들러
+  const handleFilterToggle = (filter: 'mandatory' | 'required' | 'unrequired' | 'reserved') => {
+    setActiveFilter(activeFilter === filter ? null : filter);
+  };
+
+  // 모달 닫기 시 검색어와 필터 초기화
   const handleClose = () => {
     setSearchTerm('');
+    setActiveFilter(null);
     onClose();
   };
 
@@ -526,16 +555,60 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         border={"1px"}
         borderColor={useColorModeValue('gray.200', 'dark.border')}
         maxH="90vh" 
-        minH="80vh"
+        minH="90vh"
         minW="80vw"
         display="flex" 
         flexDirection="column"
         bg={useColorModeValue('white', 'dark.background')}
       >
         <ModalHeader bg={useColorModeValue('gray.50', 'dark.background')}>
-          <Text fontSize="xl" fontWeight="bold" color={textColor}>
-            의무 클리닉 관리
-          </Text>
+          <VStack spacing={3} align="stretch" flex={1}>
+            <Text fontSize="xl" fontWeight="bold" color={textColor}>
+              클리닉 관리
+            </Text>
+            {/* 토글 필터 그룹 */}
+            <HStack spacing={2} justify="center">
+              <ButtonGroup size="sm" spacing={2}>
+                <Button
+                  colorScheme={activeFilter === 'mandatory' ? 'red' : 'gray'}
+                  variant={activeFilter === 'mandatory' ? 'solid' : 'outline'}
+                  onClick={() => handleFilterToggle('mandatory')}
+                  borderColor={useColorModeValue('red.300', 'red.600')}
+                >
+                  논패스
+                </Button>
+                <Button
+                  colorScheme={activeFilter === 'required' ? 'yellow' : 'gray'}
+                  variant={activeFilter === 'required' ? 'solid' : 'outline'}
+                  onClick={() => handleFilterToggle('required')}
+                  borderColor={useColorModeValue('yellow.300', 'yellow.600')}
+                >
+                  의무
+                </Button>
+                <Button
+                  colorScheme={activeFilter === 'unrequired' ? 'gray' : 'gray'}
+                  variant={activeFilter === 'unrequired' ? 'solid' : 'outline'}
+                  onClick={() => handleFilterToggle('unrequired')}
+                  bg={activeFilter === 'unrequired' ? useColorModeValue('gray.500', 'gray.600') : 'transparent'}
+                  color={activeFilter === 'unrequired' ? 'white' : useColorModeValue('gray.600', 'gray.300')}
+                  _hover={{
+                    bg: activeFilter === 'unrequired' ? useColorModeValue('gray.600', 'gray.500') : useColorModeValue('gray.100', 'gray.700')
+                  }}
+                  borderColor={useColorModeValue('gray.300', 'gray.600')}
+                >
+                  의무해제
+                </Button>
+                <Button
+                  colorScheme={activeFilter === 'reserved' ? 'green' : 'gray'}
+                  variant={activeFilter === 'reserved' ? 'solid' : 'outline'}
+                  onClick={() => handleFilterToggle('reserved')}
+                  borderColor={useColorModeValue('green.300', 'green.600')}
+                >
+                  예약함
+                </Button>
+              </ButtonGroup>
+            </HStack>
+          </VStack>
         </ModalHeader>
         <ModalCloseButton />
         
@@ -646,7 +719,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                                     py={1}
                                     flexShrink={0}
                                   >
-                                    의무
+                                    논패스
                                   </Badge>
                                 )}
                                 {group === 'required' && (
@@ -658,7 +731,19 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                                     py={1}
                                     flexShrink={0}
                                   >
-                                    {student.essential_clinic ? '필수' : '미신청'}
+                                    의무
+                                  </Badge>
+                                )}
+                                {group === 'unrequired' && (
+                                  <Badge
+                                    colorScheme="gray"
+                                    variant="solid"
+                                    fontSize="xs"
+                                    px={2}
+                                    py={1}
+                                    flexShrink={0}
+                                  >
+                                    의무해제
                                   </Badge>
                                 )}
                                 {group === 'reserved' && (
@@ -670,7 +755,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                                     py={1}
                                     flexShrink={0}
                                   >
-                                    예약
+                                    예약함
                                   </Badge>
                                 )}
                               </Box>
@@ -707,15 +792,19 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
               <Text fontSize="sm" color={secondaryTextColor} textAlign="center">
                 총 {students.length}명 중{' '}
                 <Text as="span" fontWeight="bold" color="red.500">
-                  의무 {students.filter(s => getStudentGroup(s) === 'mandatory').length}명
+                  논패스 {students.filter(s => getStudentGroup(s) === 'mandatory').length}명
                 </Text>
                 {' / '}
                 <Text as="span" fontWeight="bold" color="yellow.500">
-                  필수 {students.filter(s => getStudentGroup(s) === 'required').length}명
+                  의무 {students.filter(s => getStudentGroup(s) === 'required').length}명
+                </Text>
+                {' / '}
+                <Text as="span" fontWeight="bold" color="gray.500">
+                  의무해제 {students.filter(s => getStudentGroup(s) === 'unrequired').length}명
                 </Text>
                 {' / '}
                 <Text as="span" fontWeight="bold" color="green.500">
-                  예약 {students.filter(s => getStudentGroup(s) === 'reserved').length}명
+                  예약함 {students.filter(s => getStudentGroup(s) === 'reserved').length}명
                 </Text>
                 {searchTerm && (
                   <>

@@ -96,7 +96,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   
-  // 의무 클리닉 모달 관련
+  // 클리닉 모달 관련
   const { 
     isOpen: isMandatoryOpen, 
     onOpen: onMandatoryOpen, 
@@ -472,7 +472,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
               onClick={() => {
                 // 현재 non_pass=true인 학생들을 콘솔에 출력
                 const mandatoryStudents = students.filter(student => student.non_pass === true);
-                console.log('🔍 [UnassignedStudentArea] 의무 클리닉 버튼 클릭 시점');
+                console.log('🔍 [UnassignedStudentArea] 클리닉 관리 버튼 클릭 시점');
                 console.log('🔍 [UnassignedStudentArea] 전체 학생 수:', students.length);
                 console.log('🔍 [UnassignedStudentArea] non_pass=true인 학생 수:', mandatoryStudents.length);
                 console.log('🔍 [UnassignedStudentArea] non_pass=true인 학생들:', 
@@ -497,7 +497,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
               }}
               mr={2}
             >
-              의무 클리닉
+              클리닉 관리
             </Button>
             <Button
                leftIcon={<AttachmentIcon />}

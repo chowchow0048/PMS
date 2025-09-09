@@ -128,8 +128,8 @@ const ClinicReservePage: React.FC = () => {
     action: 'reserve';  // 예약만 가능 (취소는 불가능)
   } | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>(''); // 타이머 상태
-  const [essentialClinic, setEssentialClinic] = useState<boolean>(true); // 필수 클리닉 신청 상태 (초기값은 user 데이터 로드 후 업데이트)
-  const [updatingEssential, setUpdatingEssential] = useState<boolean>(false); // 필수 클리닉 업데이트 로딩
+  const [essentialClinic, setEssentialClinic] = useState<boolean>(true); // 의무 클리닉 신청 상태 (초기값은 user 데이터 로드 후 업데이트)
+  const [updatingEssential, setUpdatingEssential] = useState<boolean>(false); // 의무 클리닉 업데이트 로딩
   
   // 모달 및 유틸리티
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -246,7 +246,7 @@ const ClinicReservePage: React.FC = () => {
         setShowMandatoryAnimation(true);
       }
       
-      // 사용자의 필수 클리닉 신청 상태 초기화
+      // 사용자의 의무 클리닉 신청 상태 초기화
       console.log('🔍 [clinic/reserve] user 데이터:', user);
       console.log('🔍 [clinic/reserve] user.essential_clinic:', user?.essential_clinic);
       
@@ -529,7 +529,7 @@ const ClinicReservePage: React.FC = () => {
     }
   };
 
-  // 필수 클리닉 신청 상태 토글
+  // 의무 클리닉 신청 상태 토글
   const handleToggleEssentialClinic = async (newValue: boolean) => {
     if (!user || !token) return;
     
@@ -537,7 +537,7 @@ const ClinicReservePage: React.FC = () => {
     if (user.non_pass && !newValue) {
       toast({
         title: '변경 불가',
-        description: '전 주 시험에서 Fail한 학생은 필수 클리닉 신청 취소를 끌 수 없습니다.',
+        description: '전 주 시험에서 Fail한 학생은 의무 클리닉 신청 취소를 끌 수 없습니다.',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -575,7 +575,7 @@ const ClinicReservePage: React.FC = () => {
         
         toast({
           title: '변경 완료',
-          description: `필수 클리닉 신청이 ${newValue ? '설정' : '해제'}되었습니다.`,
+          description: `의무 클리닉 신청이 ${newValue ? '설정' : '해제'}되었습니다.`,
           status: 'success',
           duration: 2000,
           isClosable: true,
@@ -590,7 +590,7 @@ const ClinicReservePage: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('필수 클리닉 상태 업데이트 오류:', error);
+      console.error('의무 클리닉 상태 업데이트 오류:', error);
       toast({
         title: '네트워크 오류',
         description: '상태 변경 요청 중 오류가 발생했습니다.',
@@ -792,7 +792,7 @@ const ClinicReservePage: React.FC = () => {
             보충 예약
           </Heading>
           
-          {/* 필수 클리닉 신청 Toggle 버튼 */}
+          {/* 의무 클리닉 신청 Toggle 버튼 */}
           <FormControl 
             display="flex" 
             alignItems="center" 
@@ -829,7 +829,7 @@ const ClinicReservePage: React.FC = () => {
               maxW="md"
               mx="auto"
             >
-              전 주 시험 실패로 필수 클리닉 신청 취소가 불가능합니다.
+              전 주 시험 실패로 의무 클리닉 신청 취소가 불가능합니다.
             </Text>
           )}
           
