@@ -30,7 +30,7 @@ import {
   useColorModeValue,
   Switch,
   FormControl,
-  FormLabel,
+  Tooltip,
 } from '@chakra-ui/react';
 import { useAuth } from '@/lib/authContext';
 
@@ -133,6 +133,7 @@ const ClinicReservePage: React.FC = () => {
   
   // 모달 및 유틸리티
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isTooltipOpen, onOpen: onTooltipOpen, onClose: onTooltipClose } = useDisclosure();
   const { user, token, isLoading, updateUser } = useAuth();
   const toast = useToast();
 
@@ -801,15 +802,35 @@ const ClinicReservePage: React.FC = () => {
             mx="auto"
             mb={2}
           >
-            <FormLabel 
-              htmlFor="essential-clinic-switch" 
-              mb="0"
-              fontSize={{ base: "sm", md: "md" }}
-              color={textColor}
-              mr={3}
+            <Tooltip
+              label="희망하는 학생에 한하여 의무 클리닉을 해제할 수 있습니다. 의무 클리닉 해제 시, 클리닉을 예약하지 않아도 페널티가 부과되지 않습니다."
+              placement="top"
+              hasArrow
+              bg="gray.900"
+              color="white"
+              borderRadius="md"
+              fontSize="xs"
+              maxW="300px"
+              textAlign="center"
+              left={3}
+              p={3}
+              isOpen={isTooltipOpen}
+              onClose={onTooltipClose}
             >
-              클리닉 의무화
-            </FormLabel>
+              <Text
+                fontSize={{ base: "sm", md: "md" }}
+                color={textColor}
+                mr={3}
+                cursor="help"
+                onClick={onTooltipOpen}
+                textDecoration="underline"
+                textDecorationStyle="dotted"
+                textUnderlineOffset="2px"
+                _hover={{ opacity: 0.8 }}
+              >
+                클리닉 의무화
+              </Text>
+            </Tooltip>
             <Switch
               id="essential-clinic-switch"
               isChecked={essentialClinic}
