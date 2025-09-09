@@ -538,7 +538,7 @@ const ClinicReservePage: React.FC = () => {
     if (user.non_pass && !newValue) {
       toast({
         title: '변경 불가',
-        description: '전 주 시험에서 Fail한 학생은 의무 클리닉 신청 취소를 끌 수 없습니다.',
+        description: '전 주 시험에 통과하지 못한 학생은 의무 클리닉 신청 취소를 해제 할 수 없습니다.',
         status: 'warning',
         duration: 3000,
         isClosable: true,
@@ -567,12 +567,8 @@ const ClinicReservePage: React.FC = () => {
         setEssentialClinic(newValue);
         console.log('✅ [clinic/reserve] 로컬 상태 업데이트:', newValue);
         
-        // AuthContext와 localStorage의 사용자 데이터 모두 업데이트 (새로고침 시 올바른 상태 유지)
-        if (user) {
-          const updatedUser = { ...user, essential_clinic: newValue };
-          updateUser(updatedUser);
-          console.log('✅ [clinic/reserve] AuthContext 사용자 데이터 업데이트:', newValue);
-        }
+        // 서버에서 최신 사용자 데이터 가져와서 AuthContext 업데이트 (non_pass 상태도 함께 업데이트)
+        await fetchUserData();
         
         toast({
           title: '변경 완료',
@@ -835,7 +831,7 @@ const ClinicReservePage: React.FC = () => {
               id="essential-clinic-switch"
               isChecked={essentialClinic}
               onChange={(e) => handleToggleEssentialClinic(e.target.checked)}
-              isDisabled={updatingEssential || (user?.non_pass && !essentialClinic)}
+              isDisabled={updatingEssential}
               colorScheme="blue"
               size="md"
             />
