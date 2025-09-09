@@ -548,7 +548,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                   justify="space-between" 
                   cursor="pointer"
                   onClick={() => toggleSchool(school)}
-                  _hover={{ bg: 'dark.hover' }}
+                  _hover={{ bg: useColorModeValue('gray.300', 'dark.hover') }}
                   p={2}
                   borderRadius="md"
                   transition="background-color 0.2s"
@@ -580,7 +580,7 @@ const UnassignedStudentArea: FC<UnassignedStudentAreaProps> = ({
                             justify="space-between" 
                             cursor="pointer"
                             onClick={(e) => toggleGrade(school, grade)}
-                            _hover={{ bg: 'dark.hover' }}
+                            _hover={{ bg: useColorModeValue('gray.300', 'dark.hover') }}
                             p={2}
                             borderRadius="md"
                             transition="background-color 0.2s"
