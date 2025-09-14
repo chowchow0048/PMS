@@ -533,18 +533,6 @@ const ClinicReservePage: React.FC = () => {
   // 의무 클리닉 신청 상태 토글
   const handleToggleEssentialClinic = async (newValue: boolean) => {
     if (!user || !token) return;
-    
-    // non_pass=true인 사용자는 essential_clinic을 false로 설정할 수 없음
-    if (user.non_pass && !newValue) {
-      toast({
-        title: '변경 불가',
-        description: '전 주 시험에 통과하지 못한 학생은 의무 클리닉 신청 취소를 해제 할 수 없습니다.',
-        status: 'warning',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
 
     try {
       setUpdatingEssential(true);
@@ -836,19 +824,6 @@ const ClinicReservePage: React.FC = () => {
               size="md"
             />
           </FormControl>
-          
-          {/* non_pass=true인 경우 안내 메시지 */}
-          {user?.non_pass && (
-            <Text 
-              fontSize="xs"
-              color="orange.500"
-              textAlign="center"
-              maxW="md"
-              mx="auto"
-            >
-              전 주 시험 실패로 의무 클리닉 신청 취소가 불가능합니다.
-            </Text>
-          )}
           
           <Text 
             fontSize={{ base: "md", md: "lg" }}

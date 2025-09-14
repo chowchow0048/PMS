@@ -71,7 +71,9 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
   const [isLoading, setIsLoading] = useState(false); // 로딩 상태 관리
   const [studentToRemove, setStudentToRemove] = useState<User | null>(null); // 배치 해제할 학생
   const [selectedTabIndex, setSelectedTabIndex] = useState(0); // 선택된 탭 인덱스
+  const [selectedStudent, setSelectedStudent] = useState<User | null>(null); // 예약 정보를 보여줄 학생
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure(); // 삭제 확인 다이얼로그
+  const { isOpen: isReservationInfoOpen, onOpen: onReservationInfoOpen, onClose: onReservationInfoClose } = useDisclosure(); // 예약 정보 모달
   const cancelRef = React.useRef<HTMLButtonElement>(null); // 삭제 확인 다이얼로그 취소 버튼 레퍼런스
 
   // 요일이 없는 경우 처리
@@ -207,6 +209,31 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
     onDeleteOpen();
   };
 
+  // 학생 예약 정보 모달 열기
+  const openReservationInfo = (student: User) => {
+    setSelectedStudent(student);
+    onReservationInfoOpen();
+  };
+
+  // 선택된 학생이 예약한 모든 클리닉 찾기
+  const getStudentReservations = (student: User) => {
+    const reservations: Array<{day: string, time: string, dayDisplay: string}> = [];
+    
+    // 모든 클리닉을 검사하여 해당 학생이 예약한 클리닉 찾기
+    clinics.forEach(clinic => {
+      if (clinic.clinic_students?.some(s => s.id === student.id)) {
+        const dayDisplay = DAY_CHOICES.find(d => d.value === clinic.clinic_day)?.label || clinic.clinic_day;
+        reservations.push({
+          day: clinic.clinic_day,
+          time: clinic.clinic_time,
+          dayDisplay
+        });
+      }
+    });
+    
+    return reservations;
+  };
+
   // 시간대별 클리닉 정보를 렌더링하는 함수
   const renderClinicTimeTab = (clinic: Clinic | undefined, timeSlot: string) => {
     if (!clinic) {
@@ -254,7 +281,14 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
                     <Tr key={`student-${student.id}-${index}-${timeSlot}`}>
                       <Td>{index + 1}</Td>
                       <Td fontWeight="semibold">
-                        {student.name || student.username || '이름 없음'}
+                        <Text 
+                          cursor="pointer" 
+                          color="blue.500" 
+                          _hover={{ color: "blue.600", textDecoration: "underline" }}
+                          onClick={() => openReservationInfo(student)}
+                        >
+                          {student.name || student.username || '이름 없음'}
+                        </Text>
                         {!student.is_student && (
                           <Badge ml={2} colorScheme="orange" size="sm">
                             {student.is_superuser ? '관리자' : '강사'}
@@ -429,6 +463,95 @@ const ClinicManagementModal: React.FC<ClinicManagementModalProps> = ({
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+
+      {/* 학생 예약 정보 모달 */}
+      <Modal isOpen={isReservationInfoOpen} onClose={onReservationInfoClose} size="md">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>
+            <Text fontSize="lg" fontWeight="bold">
+              예약 정보
+            </Text>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {selectedStudent && (
+              <VStack align="stretch" spacing={4}>
+                {/* 학생 기본 정보 */}
+                <Box p={4} bg="gray.50" borderRadius="md">
+                  <Text fontSize="md" fontWeight="semibold" mb={2}>
+                    {selectedStudent.name || selectedStudent.username || '이름 없음'}
+                    {!selectedStudent.is_student && (
+                      <Badge ml={2} colorScheme="orange" size="sm">
+                        {selectedStudent.is_superuser ? '관리자' : '강사'}
+                      </Badge>
+                    )}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    사용자 ID: {selectedStudent.id}
+                  </Text>
+                  {selectedStudent.student_phone_num && (
+                    <Text fontSize="sm" color="gray.600">
+                      학생 전화번호: {selectedStudent.student_phone_num}
+                    </Text>
+                  )}
+                  {selectedStudent.student_parent_phone_num && (
+                    <Text fontSize="sm" color="gray.600">
+                      학부모 전화번호: {selectedStudent.student_parent_phone_num}
+                    </Text>
+                  )}
+                </Box>
+
+                {/* 예약된 클리닉 목록 */}
+                <Box>
+                  <Text fontSize="md" fontWeight="semibold" mb={3}>
+                    예약된 클리닉
+                  </Text>
+                  {(() => {
+                    const reservations = getStudentReservations(selectedStudent);
+                    if (reservations.length === 0) {
+                      return (
+                        <Box textAlign="center" py={4} color="gray.500">
+                          <Text>예약된 클리닉이 없습니다.</Text>
+                        </Box>
+                      );
+                    }
+                    
+                    return (
+                      <VStack align="stretch" spacing={2}>
+                        {reservations.map((reservation, index) => (
+                          <Box
+                            key={`${reservation.day}-${reservation.time}-${index}`}
+                            p={3}
+                            border="1px solid"
+                            borderColor="blue.200"
+                            borderRadius="md"
+                            bg="blue.50"
+                          >
+                            <HStack justify="space-between">
+                              <Text fontWeight="medium">
+                                {reservation.dayDisplay} {reservation.time}
+                              </Text>
+                              <Badge colorScheme="blue" size="sm">
+                                예약됨
+                              </Badge>
+                            </HStack>
+                          </Box>
+                        ))}
+                      </VStack>
+                    );
+                  })()}
+                </Box>
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" onClick={onReservationInfoClose}>
+              닫기
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </>
   );
 };

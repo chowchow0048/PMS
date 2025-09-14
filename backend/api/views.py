@@ -182,12 +182,6 @@ class UserViewSet(viewsets.ModelViewSet):
             if isinstance(essential_clinic_status, str):
                 essential_clinic_status = essential_clinic_status.lower() == "true"
 
-            # non_pass=True인 학생은 essential_clinic을 False로 설정할 수 없음
-            if user.non_pass and not essential_clinic_status:
-                return Response(
-                    {"error": "전 주 시험에서 Fail한 학생은 필수 클리닉 신청 취소를 끌 수 없습니다."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
             user.essential_clinic = essential_clinic_status
             user.save(update_fields=["essential_clinic"])

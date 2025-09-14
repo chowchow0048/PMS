@@ -8,6 +8,7 @@ import {
   ModalHeader,
   ModalCloseButton,
   ModalBody,
+  ModalFooter,
   Button,
   Grid,
   GridItem,
@@ -24,10 +25,12 @@ import {
   HStack,
   ButtonGroup,
   useColorModeValue,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { SearchIcon } from '@chakra-ui/icons';
 import { Student } from '@/lib/types';
 import { getStudents, updateStudentNonPass, updateStudentEssentialClinic } from '@/lib/api';
+import { log } from 'console';
 
 interface MandatoryClinicModalProps {
   isOpen: boolean;
@@ -45,15 +48,20 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
   const [updating, setUpdating] = useState<number | null>(null); // 업데이트 중인 학생 ID
   const [reservedStudentIds, setReservedStudentIds] = useState<Set<number>>(new Set()); // 예약한 학생 ID 집합
   const [activeFilter, setActiveFilter] = useState<'mandatory' | 'required' | 'unrequired' | 'reserved' | null>(null); // 활성화된 필터
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null); // 예약 정보를 보여줄 학생
+  const [studentReservations, setStudentReservations] = useState<Array<{day: string, time: string, dayDisplay: string, clinicId: number, attendanceId: number, expectedDate: string}>>([]);
+  const [cancelingClinic, setCancelingClinic] = useState<{day: string, time: string, clinicId: number, attendanceId: number} | null>(null);
+  const { isOpen: isCancelModalOpen, onOpen: onCancelModalOpen, onClose: onCancelModalClose } = useDisclosure();
+  const { isOpen: isReservationInfoOpen, onOpen: onReservationInfoOpen, onClose: onReservationInfoClose } = useDisclosure();
   const toast = useToast();
 
   // Dark mode colors
   const bgColor = useColorModeValue('white', 'dark.surface');
-  const borderColor = useColorModeValue('gray.300', 'gray.600');
-  const textColor = useColorModeValue('gray.700', 'gray.100');
+  const borderColor = useColorModeValue('gray.300', 'dark.border');
+  const textColor = useColorModeValue('gray.700', 'dark.text');
   const secondaryTextColor = useColorModeValue('gray.600', 'gray.300');
   const tertiaryTextColor = useColorModeValue('gray.500', 'gray.400');
-  const searchBg = useColorModeValue('white', 'gray.700');
+  const searchBg = useColorModeValue('white', 'dark.surface');
   const searchIconColor = useColorModeValue('gray.300', 'gray.500');
   const statisticsBg = useColorModeValue('gray.50', 'gray.700');
   const hoverBg = useColorModeValue('gray.50', 'gray.600');
@@ -194,12 +202,21 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       // 현재 주의 시작일과 종료일 계산
       const now = new Date();
       const currentDay = now.getDay(); // 0 = 일요일, 1 = 월요일, ...
+      
+      // 이번 주 월요일 계산
       const monday = new Date(now);
-      monday.setDate(now.getDate() - currentDay + 1); // 이번 주 월요일
+      if (currentDay === 0) {
+        // 일요일인 경우, 6일 전이 월요일
+        monday.setDate(now.getDate() - 6);
+      } else {
+        // 월요일~토요일인 경우
+        monday.setDate(now.getDate() - (currentDay - 1));
+      }
       monday.setHours(0, 0, 0, 0);
       
+      // 이번 주 일요일 계산
       const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6); // 이번 주 일요일
+      sunday.setDate(monday.getDate() + 6);
       sunday.setHours(23, 59, 59, 999);
       
       const mondayStr = monday.toISOString().split('T')[0]; // YYYY-MM-DD 형식
@@ -207,8 +224,8 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
       
       console.log(`🔍 [MandatoryClinicModal] 이번 주 범위: ${mondayStr} ~ ${sundayStr}`);
       
-      // ClinicAttendance API를 통해 현재 주의 예약 데이터만 가져오기
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/clinic-attendances/?is_active=true&date_after=${mondayStr}&date_before=${sundayStr}`, {
+      // ClinicAttendance API를 통해 모든 활성 예약 데이터 가져오기 (클라이언트에서 필터링)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/clinic-attendances/?is_active=true`, {
         headers: {
           'Authorization': `Token ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
@@ -222,24 +239,22 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         // 예약한 학생 ID들을 Set으로 저장 (중복 제거 및 빠른 조회)
         const reservedIds = new Set<number>();
         
-        if (Array.isArray(attendanceData)) {
-          console.log('🔍 [MandatoryClinicModal] 배열 형태 데이터 처리');
-          attendanceData.forEach((attendance: any, index: number) => {
-            console.log(`🔍 [MandatoryClinicModal] 예약 ${index}:`, attendance);
-            if (attendance.student) {
-              reservedIds.add(attendance.student);
-            }
-          });
-        } else if (attendanceData.results && Array.isArray(attendanceData.results)) {
-          // 페이지네이션된 응답인 경우
-          console.log('🔍 [MandatoryClinicModal] 페이지네이션 데이터 처리');
-          attendanceData.results.forEach((attendance: any, index: number) => {
-            console.log(`🔍 [MandatoryClinicModal] 예약 ${index}:`, attendance);
-            if (attendance.student) {
-              reservedIds.add(attendance.student);
-            }
-          });
-        }
+        // 이번 주 범위 내 예약 데이터만 필터링
+        const allAttendances = Array.isArray(attendanceData) ? attendanceData : (attendanceData.results || []);
+        const thisWeekAttendances = allAttendances.filter((attendance: any) => {
+          const expectedDate = attendance.expected_clinic_date;
+          if (!expectedDate) return false;
+          return expectedDate >= mondayStr && expectedDate <= sundayStr;
+        });
+        
+        console.log(`🔍 [MandatoryClinicModal] 전체 예약: ${allAttendances.length}개, 이번 주 예약: ${thisWeekAttendances.length}개`);
+        
+        thisWeekAttendances.forEach((attendance: any, index: number) => {
+          console.log(`🔍 [MandatoryClinicModal] 이번 주 예약 ${index}:`, attendance);
+          if (attendance.student) {
+            reservedIds.add(attendance.student);
+          }
+        });
         
         setReservedStudentIds(reservedIds);
         console.log('✅ [MandatoryClinicModal] 예약한 학생 ID들:', Array.from(reservedIds));
@@ -541,11 +556,207 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
     setActiveFilter(activeFilter === filter ? null : filter);
   };
 
+  // 학생 예약 정보 모달 열기
+  const openReservationInfo = async (student: Student) => {
+    setSelectedStudent(student);
+    
+    try {
+      // 현재 주의 시작일과 종료일 계산 (월요일~일요일)
+      const now = new Date();
+      const currentDay = now.getDay(); // 0 = 일요일, 1 = 월요일, ...
+      
+      // 이번 주 월요일 계산
+      const monday = new Date(now);
+      if (currentDay === 0) {
+        // 일요일인 경우, 6일 전이 월요일
+        monday.setDate(now.getDate() - 6);
+      } else {
+        // 월요일~토요일인 경우
+        monday.setDate(now.getDate() - (currentDay - 1));
+      }
+      monday.setHours(0, 0, 0, 0);
+      
+      // 이번 주 일요일 계산
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+      
+      const mondayStr = monday.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+      const sundayStr = sunday.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+      
+      console.log(`🔍 [MandatoryClinicModal] ${student.student_name} 예약 정보 - 이번 주 범위: ${mondayStr} ~ ${sundayStr}`);
+      
+      // 해당 학생의 모든 활성 예약 정보 가져오기 (클라이언트에서 필터링)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/clinic-attendances/?student=${student.id}&is_active=true`, {
+        headers: {
+          'Authorization': `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const attendanceData = await response.json();
+        const reservations: Array<{day: string, time: string, dayDisplay: string, clinicId: number, attendanceId: number, expectedDate: string}> = [];
+        console.log('attendanceData', attendanceData);
+        
+        // 요일 매핑
+        const dayMap: {[key: string]: string} = {
+          'mon': '월요일',
+          'tue': '화요일', 
+          'wed': '수요일',
+          'thu': '목요일',
+          'fri': '금요일',
+          'sat': '토요일',
+          'sun': '일요일'
+        };
+
+        // 각 클리닉에서 해당 학생의 예약 정보만 필터링 + 이번 주 범위 필터링
+        const results = Array.isArray(attendanceData) ? attendanceData : (attendanceData.results || []);
+        const studentAttendances = results.filter((attendance: any) => {
+          // 학생 ID 필터링
+          if (attendance.student !== student.id) return false;
+          
+          // 이번 주 범위 필터링
+          const expectedDate = attendance.expected_clinic_date;
+          if (!expectedDate) return false;
+          
+          return expectedDate >= mondayStr && expectedDate <= sundayStr;
+        });
+        
+        console.log(`🔍 [MandatoryClinicModal] ${student.student_name}의 이번 주 범위 필터링된 예약 정보:`, studentAttendances);
+        console.log(`🔍 [MandatoryClinicModal] 범위: ${mondayStr} ~ ${sundayStr}`);
+        
+        // 클리닉 정보를 가져와서 요일/시간 정보 추출
+        for (const attendance of studentAttendances) {
+          try {
+            const clinicResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/clinics/${attendance.clinic}/`, {
+              headers: {
+                'Authorization': `Token ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (clinicResponse.ok) {
+              const clinic = await clinicResponse.json();
+              reservations.push({
+                day: clinic.clinic_day,
+                time: clinic.clinic_time,
+                dayDisplay: `${dayMap[clinic.clinic_day] || clinic.clinic_day} ${clinic.clinic_time}`,
+                clinicId: attendance.clinic,
+                attendanceId: attendance.id,
+                expectedDate: attendance.expected_clinic_date
+              });
+            }
+          } catch (error) {
+            console.error('클리닉 정보 가져오기 실패:', error);
+          }
+        }
+        
+        console.log(`✅ [MandatoryClinicModal] ${student.student_name} 이번 주 예약 정보:`, reservations);
+        setStudentReservations(reservations);
+      } else {
+        setStudentReservations([]);
+      }
+    } catch (error) {
+      console.error('예약 정보 가져오기 실패:', error);
+      setStudentReservations([]);
+    }
+    
+    onReservationInfoOpen();
+  };
+
   // 모달 닫기 시 검색어와 필터 초기화
   const handleClose = () => {
     setSearchTerm('');
     setActiveFilter(null);
     onClose();
+  };
+
+  // 클리닉 예약 해제 처리
+  const handleCancelClinicReservation = async () => {
+    if (!cancelingClinic || !selectedStudent) return;
+    
+    try {
+      setUpdating(selectedStudent.id);
+      
+      // 클리닉 예약 해제 API 호출
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/clinic-attendances/${cancelingClinic.attendanceId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Token ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        console.log('✅ [MandatoryClinicModal] 클리닉 예약 해제 성공');
+        
+        // 예약 목록에서 해당 예약 제거
+        const updatedReservations = studentReservations.filter(
+          reservation => reservation.attendanceId !== cancelingClinic.attendanceId
+        );
+        setStudentReservations(updatedReservations);
+        
+        // 예약 데이터 새로고침 (메인 모달의 학생 리스트 업데이트)
+        await Promise.all([
+          loadClinicReservations(), // 전체 예약 데이터 업데이트
+          (async () => {
+            const studentsData = await getStudents();
+            const sortedStudents = studentsData.sort((a, b) => {
+              const groupA = getStudentGroup(a);
+              const groupB = getStudentGroup(b);
+              const groupOrder = { mandatory: 0, required: 1, unrequired: 2, reserved: 3 };
+              if (groupA !== groupB) {
+                return groupOrder[groupA] - groupOrder[groupB];
+              }
+              return a.student_name.localeCompare(b.student_name, 'ko-KR');
+            });
+            setStudents(sortedStudents);
+            setFilteredStudents(sortedStudents);
+          })()
+        ]);
+        
+        toast({
+          title: '해제 완료',
+          description: `${selectedStudent.student_name}의 클리닉 예약이 해제되었습니다.`,
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
+        });
+        
+        // 모달 닫기
+        onCancelModalClose();
+        
+        // 더 이상 예약이 없으면 예약 정보 모달도 닫기
+        if (updatedReservations.length === 0) {
+          onReservationInfoClose();
+        }
+        
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ [MandatoryClinicModal] 클리닉 예약 해제 실패:', response.status, errorData);
+        
+        toast({
+          title: '해제 실패',
+          description: errorData.error || '클리닉 예약 해제에 실패했습니다.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('❌ [MandatoryClinicModal] 클리닉 예약 해제 오류:', error);
+      toast({
+        title: '네트워크 오류',
+        description: '예약 해제 요청 중 오류가 발생했습니다.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setUpdating(null);
+      setCancelingClinic(null);
+    }
   };
 
   return (
@@ -557,6 +768,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
         maxH="90vh" 
         minH="90vh"
         minW="80vw"
+        borderRadius="md"
         display="flex" 
         flexDirection="column"
         bg={useColorModeValue('white', 'dark.background')}
@@ -668,7 +880,7 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                         <Button
                           w="100%"
                           h="auto"
-                          p={4}
+                          p={3}
                           variant="outline"
                           colorScheme={style.colorScheme}
                           bg={style.bg}
@@ -677,18 +889,34 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                             bg: style.hoverBg,
                           }}
                           transition="all 0.15s ease-in-out"
-                          onClick={() => {
-                            // 좌클릭: non_pass 토글
+                          onClick={(e) => {
+                            const group = getStudentGroup(student);
+                            
+                            // 예약한 학생(reserved)인 경우: 예약 정보 모달 열기
+                            if (group === 'reserved') {
+                              openReservationInfo(student);
+                              return;
+                            }
+                            
+                            // 예약하지 않은 학생인 경우: 기존 토글 동작
                             // Shift + 클릭: essential_clinic 토글 (non_pass가 false일 때만)
-                            if (window.event && (window.event as MouseEvent).shiftKey && !student.non_pass) {
+                            if (e.shiftKey && !student.non_pass) {
                               handleToggleEssentialClinic(student);
                             } else {
                               handleToggleNonPass(student);
                             }
                           }}
                           onContextMenu={(e) => {
-                            // 우클릭: essential_clinic 토글 (non_pass가 false일 때만)
                             e.preventDefault();
+                            const group = getStudentGroup(student);
+                            
+                            // 예약한 학생(reserved)인 경우: 예약 정보 모달 열기
+                            if (group === 'reserved') {
+                              openReservationInfo(student);
+                              return;
+                            }
+                            
+                            // 우클릭: essential_clinic 토글 (non_pass가 false일 때만)
                             if (!student.non_pass) {
                               handleToggleEssentialClinic(student);
                             }
@@ -776,6 +1004,45 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
                                 {student.school} {student.grade}
                               </Text>
                             </Box>
+                            
+                            {/* 의무화 토글 버튼 - non_pass가 false인 학생에게만 표시 */}
+                            {!student.non_pass && (
+                              <Box textAlign="left">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  bg={student.essential_clinic 
+                                    ? useColorModeValue('blue.50', 'blue.900') 
+                                    : useColorModeValue('gray.100', 'dark.surface')
+                                  }
+                                  borderColor={student.essential_clinic 
+                                    ? useColorModeValue('blue.200', 'blue.600') 
+                                    : useColorModeValue('gray.300', 'dark.border')
+                                  }
+                                  color={student.essential_clinic 
+                                    ? useColorModeValue('blue.700', 'blue.200') 
+                                    : useColorModeValue('gray.600', 'gray.400')
+                                  }
+                                  _hover={{
+                                    bg: student.essential_clinic 
+                                      ? useColorModeValue('blue.100', 'blue.800')
+                                      : useColorModeValue('gray.200', 'gray.700'),
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // 부모 버튼 클릭 이벤트 방지
+                                    handleToggleEssentialClinic(student);
+                                  }}
+                                  isDisabled={updating === student.id}
+                                  px={3}
+                                  py={1}
+                                  height="24px"
+                                  fontSize="xs"
+                                  fontWeight={student.essential_clinic ? "bold" : "normal"}
+                                >
+                                  의무화
+                                </Button>
+                              </Box>
+                            )}
                           </VStack>
                         </Button>
                       );
@@ -815,9 +1082,210 @@ const MandatoryClinicModal: React.FC<MandatoryClinicModalProps> = ({
             </VStack>
           </Box>
         </ModalBody>
-
-
       </ModalContent>
+
+      {/* 예약 정보 모달 */}
+      <Modal isOpen={isReservationInfoOpen} onClose={onReservationInfoClose} size="xl" isCentered>
+        <ModalOverlay />
+        <ModalContent
+          bg={bgColor} 
+          color={textColor}
+          border="1px"
+          borderColor={borderColor}
+          minW="70vw"
+          p={1}
+        >
+          <ModalHeader>
+            <VStack spacing={2} textAlign="center" align="stretch">
+              <Text fontSize="lg" fontWeight="bold" color={textColor}>
+                {selectedStudent?.student_name} 예약 현황
+              </Text>
+              <Text fontSize="sm" color={secondaryTextColor}>
+                해제하려면 클리닉 박스를 클릭하세요
+              </Text>
+            </VStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {studentReservations.length > 0 ? (
+              <VStack spacing={4} align="stretch">
+                
+                {/* 동적 그리드 레이아웃 */}
+                <Box 
+                  overflowX="auto"
+                  display="flex"
+                  justifyContent="center"
+                  alignItems="center"
+                  px={{ base: 0.5, md: 0 }}
+                  bg={useColorModeValue('white', 'dark.surface')}
+                  width="100%"
+                  height="100%"
+                >
+                  <Grid
+                    // 고정된 그리드: 각 박스가 일정한 크기 유지
+                    templateColumns="repeat(auto-fit, 140px)"
+                    columnGap="1rem"
+                    bg={useColorModeValue('white', 'dark.surface')}
+                    rowGap="1rem"
+                    w="100%"
+                    h="100%"
+                    maxW={{ base: "100%", md: "600px" }}
+                    minW={{ base: "20px", md: "auto" }}
+                    justifyContent="center"
+                  >
+                    {studentReservations.map((reservation, index) => {
+                      // 요일 매핑
+                      const dayNames: { [key: string]: string } = {
+                        mon: '월',
+                        tue: '화',
+                        wed: '수',
+                        thu: '목',
+                        fri: '금',
+                        sat: '토',
+                        sun: '일'
+                      };
+                      
+                      return (
+                        <GridItem key={index}>
+                          <Box
+                            p={1}
+                            aspectRatio={1}
+                            border="1px solid"
+                            borderColor={useColorModeValue('gray.300', 'dark.border')}
+                            borderRadius="md"
+                            bg={useColorModeValue('gray.50', 'dark.surface')}
+                            _hover={{
+                              shadow: "md",
+                              cursor: "pointer",
+                              bg: 'gray.700'
+                            }}
+                            transition="all 0.2s"
+                            onClick={() => {
+                              setCancelingClinic({
+                                day: reservation.day,
+                                time: reservation.time,
+                                clinicId: reservation.clinicId,
+                                attendanceId: reservation.attendanceId
+                              });
+                              onCancelModalOpen();
+                            }}
+                            position="relative"
+                            role="button"
+                            tabIndex={0}
+                          >
+                            <Box position="relative" height="100%" display="flex" flexDirection="column">
+                              {/* 시간과 요일 표시 - 최상단 */}
+                              <HStack justify="space-between" align="flex-start" mb={1}>
+                                <Text 
+                                  fontSize="sm"
+                                  color={useColorModeValue('green.700', 'gray.200')}
+                                  fontWeight="bold"
+                                  lineHeight="1.2"
+                                >
+                                  {reservation.time}
+                                </Text>
+                                <Text 
+                                  fontSize="xs"
+                                  color={useColorModeValue('green.700', 'gray.200')}
+                                  fontWeight="bold"
+                                  lineHeight="1.2"
+                                >
+                                  {dayNames[reservation.day] || reservation.day}
+                                </Text>
+                              </HStack>
+                              
+                              {/* 중앙 영역 - expected_clinic_date 표시 */}
+                              <Box
+                                flex="1"
+                                display="flex"
+                                alignItems="center"
+                                justifyContent="center"
+                                flexDirection="column"
+                              >
+                                <Text
+                                  fontSize="sm"
+                                  fontWeight="bold"
+                                  textAlign="center"
+                                  color={useColorModeValue('green.700', 'gray.300')}
+                                  mb={1}
+                                >
+                                  {reservation.expectedDate}
+                                </Text>
+                                <Text
+                                  fontSize="xs"
+                                  textAlign="center"
+                                  color={useColorModeValue('green.600', 'gray.400')}
+                                >
+                                  클릭으로 해제
+                                </Text>
+                              </Box>
+                            </Box>
+                          </Box>
+                        </GridItem>
+                      );
+                    })}
+                  </Grid>
+                </Box>
+              </VStack>
+            ) : (
+              <Text color={secondaryTextColor}>
+                예약 정보를 불러오는 중이거나 예약이 없습니다.
+              </Text>
+            )}
+          </ModalBody>
+          <ModalFooter>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 클리닉 배치 해제 확인 모달 */}
+      <Modal isOpen={isCancelModalOpen} onClose={onCancelModalClose} size="sm" isCentered>
+        <ModalOverlay />
+        <ModalContent
+          bg={bgColor} 
+          color={textColor}
+          border="1px"
+          borderColor={borderColor}
+        >
+          <ModalHeader>
+            <Text fontSize="lg" fontWeight="bold">
+              클리닉 배치 해제
+            </Text>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {cancelingClinic && (
+              <Text fontSize="md" textAlign="center" lineHeight="1.6">
+                {(() => {
+                  const dayNames: { [key: string]: string } = {
+                    mon: '월요일',
+                    tue: '화요일',
+                    wed: '수요일',
+                    thu: '목요일',
+                    fri: '금요일',
+                    sat: '토요일',
+                    sun: '일요일'
+                  };
+                  return `${dayNames[cancelingClinic.day]} ${cancelingClinic.time} 클리닉을 배치 해제하시겠습니까?`;
+                })()} 
+              </Text>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onCancelModalClose}>
+              취소
+            </Button>
+            <Button
+              colorScheme="red"
+              onClick={handleCancelClinicReservation}
+              isLoading={updating !== null}
+              loadingText="해제 중..."
+            >
+              확인
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Modal>
   );
 };

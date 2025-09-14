@@ -32,7 +32,7 @@ const colors = {
     background: '#010101',     // 다크모드 메인 배경
     surface: '#010101',       // 컴포넌트 배경 1 
     surface2: '#242323',       // 컴포넌트 배경 2
-    text: '#FFFFFF',          // 텍스트 색상
+    text: 'rgba(228, 228, 228, 0.95)',          // 텍스트 색상
     textSecondary: '#9AA0A6',  // 보조 텍스트
     border: '#3C4043',        // 테두리 색상
     hover: '#2D2E30',         // 호버 색상

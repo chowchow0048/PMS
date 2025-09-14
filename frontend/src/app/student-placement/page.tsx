@@ -5,6 +5,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { Box, Flex, Container, Heading, Grid, GridItem, Spinner, Center, useToast, useDisclosure, VStack } from '@chakra-ui/react';
 import UnassignedStudentArea from '@/components/student-placement/UnassignedStudentArea';
+import StudentManagementBoard from '@/components/student-placement/StudentManagementBoard';
 import ClinicDayBox from '@/components/student-placement/ClinicDayBox';
 import ClinicManagementModal from '@/components/student-placement/ClinicManagementModal';
 import { Student, User, Clinic, DAY_CHOICES } from '@/lib/types'; // types.ts에서 import
@@ -329,11 +330,28 @@ function StudentPlacementPageContent() {
       <Container maxW="100%" p={{ base: 2, md: 4 }} minH="100vh" bg={useColorModeValue('gray.50', 'dark.background')}>
         <VStack
           spacing={{ base: 1, md: 1 }}
-          maxW="90vw" 
+          maxW="90vw"
           mx="auto"
         >
+          {/* 학생 관리 게시판 */}
+          <Box
+            w="100%"
+            borderRadius="lg"
+            overflow="visible"
+            boxSizing="content-box"
+            border={"1px"}
+            borderColor={useColorModeValue('gray.200', 'dark.border')}
+            mb={4}
+          >
+            <StudentManagementBoard
+              onRefresh={fetchData}
+              onClinicDataUpdate={updateClinicData}
+              onUpdateStudentNonPass={updateStudentNonPassStatus}
+            />
+          </Box>
+
           {/* 학생 목록 */}
-          <Box 
+          {/* <Box
             w="100%"
             minH="20vh"
             borderRadius="lg"
@@ -342,8 +360,8 @@ function StudentPlacementPageContent() {
             border={"1px"}
             borderColor={useColorModeValue('gray.200', 'dark.border')}
           >
-            <UnassignedStudentArea 
-              students={unassignedStudents} 
+            <UnassignedStudentArea
+              students={unassignedStudents}
               onUnassignStudent={handleUnassignStudent}
               onUnassignMultipleStudents={handleUnassignMultipleStudents}
               onRefresh={fetchData}
@@ -352,7 +370,7 @@ function StudentPlacementPageContent() {
               onClinicDataUpdate={updateClinicData}
               onUpdateStudentNonPass={updateStudentNonPassStatus}
             />
-          </Box>
+          </Box> */}
           
           {/* 클리닉 데이 박스 영역 */}
           <Box 
