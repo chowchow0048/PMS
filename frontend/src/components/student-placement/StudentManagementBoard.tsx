@@ -321,6 +321,24 @@ const StudentManagementBoard: React.FC<StudentManagementBoardProps> = ({
     }
   };
 
+  // 요일이 과거인지 확인하는 함수
+  const isDayInPast = (day: string): boolean => {
+    const dayOrder: { [key: string]: number } = {
+      'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6, 'sun': 0
+    };
+
+    const today = new Date();
+    const currentDay = today.getDay(); // 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
+    const targetDay = dayOrder[day];
+
+    // 오늘보다 이전 요일인지 확인 (일요일의 경우 특별 처리)
+    if (currentDay === 0) { // 일요일인 경우
+      return false; // 일요일에는 모든 요일을 허용 (새로운 주 시작)
+    } else {
+      return targetDay < currentDay;
+    }
+  };
+
   // 학생 예약 정보 모달 열기
   const openReservationInfo = async (student: Student) => {
     setSelectedStudent(student);
@@ -875,13 +893,27 @@ const StudentManagementBoard: React.FC<StudentManagementBoardProps> = ({
                             bg={useColorModeValue('gray.50', 'dark.surface')}
                             _hover={{
                               shadow: "md",
-                              cursor: "pointer",
-                              bg: useColorModeValue('gray.700', 'dark.text')
+                              cursor: isDayInPast(reservation.day) ? "not-allowed" : "pointer",
+                              bg: isDayInPast(reservation.day) ? useColorModeValue('gray.300', 'dark.surface') : useColorModeValue('gray.700', 'dark.text')
                             }}
+                            opacity={isDayInPast(reservation.day) ? 0.5 : 1}
                             transition="all 0.2s"
                             position="relative"
                             role="button"
                             tabIndex={0}
+                            onClick={() => {
+                              if (isDayInPast(reservation.day)) {
+                                toast({
+                                  title: '해제 불가',
+                                  description: '이미 지난 요일의 클리닉 예약은 해제할 수 없습니다.',
+                                  status: 'warning',
+                                  duration: 3000,
+                                  isClosable: true,
+                                });
+                                return;
+                              }
+                              // 기존 해제 로직이 있다면 여기에 추가
+                            }}
                           >
                             <Box position="relative" height="100%" display="flex" flexDirection="column">
                               <HStack justify="space-between" align="flex-start" mb={1}>

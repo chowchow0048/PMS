@@ -22,6 +22,7 @@ import {
   useColorModeValue,
 } from '@chakra-ui/react';
 import { Student } from '@/lib/types';
+import { log } from 'console';
 
 // 요일 매핑
 const DAY_MAPPING = {
@@ -231,6 +232,27 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
     });
   };
 
+  // 요일이 과거인지 확인하는 함수
+  const isDayInPast = (day: string): boolean => {
+    const dayOrder: { [key: string]: number } = {
+      'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6, 'sun': 0
+    };
+
+    const today = new Date();
+    console.log('🔍 [ClinicPlacementModal] 오늘 날짜:', today);
+    const currentDay = today.getDay(); // 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
+    console.log('🔍 [ClinicPlacementModal] 현재 요일:', currentDay);
+    const targetDay = dayOrder[day];
+    console.log('🔍 [ClinicPlacementModal] 목표 요일:', targetDay);
+
+    // 오늘보다 이전 요일인지 확인 (일요일의 경우 특별 처리)
+    if (currentDay === 0) { // 일요일인 경우
+      return true; // 일요일에는 모든 요일 불가능
+    } else {
+      return targetDay < currentDay;
+    }
+  };
+
   // 클리닉 슬롯 클릭 핸들러
   const handleClinicSlotClick = (day: string, time: string, clinic: ClinicSlot) => {
     // 클리닉이 존재하지 않으면 배치 불가
@@ -239,7 +261,19 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
         title: '배치 불가',
         description: '해당 시간대에 클리닉이 존재하지 않습니다.',
         status: 'warning',
-        duration: 200,
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    // 과거 요일인지 확인
+    if (isDayInPast(day)) {
+      toast({
+        title: '배치 불가',
+        description: '이미 지난 요일의 클리닉에는 배치하거나 해제할 수 없습니다.',
+        status: 'warning',
+        duration: 3000,
         isClosable: true,
       });
       return;
@@ -251,7 +285,7 @@ const ClinicPlacementModal: React.FC<ClinicPlacementModalProps> = ({
         title: '배치 불가',
         description: '해당 클리닉의 정원이 가득 찼습니다.',
         status: 'warning',
-        duration: 200,
+        duration: 2000,
         isClosable: true,
       });
       return;
